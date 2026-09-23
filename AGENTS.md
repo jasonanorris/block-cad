@@ -21,19 +21,19 @@ Avoid adding large frameworks unless they provide a clear benefit.
 
 ## Local Workflow
 
-If this is a static site, it should work by opening `index.html` directly or by using a simple local web server.
+This is a Vite/React/TypeScript app; use the Vite development server.
 
 Document project-specific commands here:
 
 ```bash
 # install
-TBD
+npm install
 
 # run locally
-TBD
+npm run dev
 
 # build
-TBD
+npm run build
 ```
 
 ## Deployment
@@ -60,4 +60,3 @@ When setup, deployment, or architecture changes, update:
 - `README.md`
 - This `AGENTS.md`
 - Relevant docs in `/home/mint/projects/personal-dev-env`
-
