@@ -1,6 +1,6 @@
 # Block CAD
 
-A simple browser-based 3D modeling project. The foundation milestone shows a responsive workspace with a temporary cube, grid, and orbit camera controls. Modeling tools are planned for later milestones.
+A simple browser-based 3D modeling project. The current milestone shows a responsive workspace with a starter box, grid, and orbit camera controls. Modeling tools are planned for later milestones.
 
 ## Local development
 
@@ -22,4 +22,4 @@ The Vite app needs a local server; opening `index.html` directly is not supporte
 
 ## Architecture
 
-React renders the application layout. React Three Fiber renders the temporary scene in `src/Workspace.tsx`, and Three.js supplies orbit controls. The cube is hard-coded only for this foundation milestone. Milestone 2 will introduce CAD object data as the source of truth, separate from Three.js objects. Scene dimensions are treated as millimeters.
+React holds CAD objects as application data in `src/cadModel.ts`. React Three Fiber renders those objects in `src/Workspace.tsx`, and Three.js supplies orbit controls. A box has a stable ID, type, position, rotation, scale, and dimensions. Scene lengths and dimensions use millimeters; rotation values use radians. The starter box is 20 × 20 × 20 mm and rests on the Y=0 workplane. Editing controls are planned for later milestones.

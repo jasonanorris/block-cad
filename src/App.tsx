@@ -1,12 +1,16 @@
+import { useState } from 'react'
 import Workspace from './Workspace'
+import { createStarterBox, MODEL_UNIT, type CadObject } from './cadModel'
 
 export default function App() {
+  const [objects] = useState<CadObject[]>(() => [createStarterBox()])
+
   return (
     <div className="app-shell">
       <header className="app-header">
         <div className="brand-mark" aria-hidden="true"><span /></div>
         <div className="brand-copy"><strong>Block CAD</strong><span>Simple 3D modeling</span></div>
-        <span className="foundation-badge">Foundation preview</span>
+        <span className="foundation-badge">Workspace preview</span>
       </header>
       <main className="app-main">
         <section className="workspace-panel" aria-labelledby="workspace-title">
@@ -15,16 +19,16 @@ export default function App() {
             <div className="view-label"><span className="view-dot" /> Perspective view</div>
           </div>
           <div className="workspace-frame">
-            <Workspace />
+            <Workspace objects={objects} />
             <div className="workspace-hint">Drag to orbit · Scroll to zoom · Right drag to pan</div>
-            <div className="axis-label">X / Y / Z <span>·</span> mm</div>
+            <div className="axis-label">X / Y / Z <span>·</span> {MODEL_UNIT}</div>
           </div>
         </section>
         <aside className="info-panel" aria-label="Workspace information">
           <div className="panel-section">
             <p className="eyebrow">Getting started</p>
             <h2>Take a look around</h2>
-            <p>The blue cube is a temporary object to help you explore the 3D workspace.</p>
+            <p>The starter box sits on the workplane. Explore the scene using the camera controls.</p>
           </div>
           <div className="panel-section controls-section">
             <h3>Camera controls</h3>
