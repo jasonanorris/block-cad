@@ -6,6 +6,7 @@ import { createCadObject, duplicateCadObject, MODEL_UNIT, type CadObject, type C
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
+import type { CameraView } from './SceneControls'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -13,11 +14,19 @@ const shapeLabels: Record<CadObjectType, string> = {
   sphere: 'Sphere',
 }
 
+const cameraViews: { view: CameraView; label: string }[] = [
+  { view: 'perspective', label: 'Perspective' },
+  { view: 'top', label: 'Top' },
+  { view: 'front', label: 'Front' },
+  { view: 'right', label: 'Right' },
+]
+
 export default function App() {
   const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => [createCadObject('box')])
   const { objects, selectedObjectId } = scene
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [snapEnabled, setSnapEnabled] = useState(false)
+  const [cameraView, setCameraView] = useState<CameraView>('perspective')
   const [projectError, setProjectError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
@@ -139,7 +148,11 @@ export default function App() {
         <section className="workspace-panel" aria-labelledby="workspace-title">
           <div className="workspace-heading">
             <div><p className="eyebrow">Workspace</p><h1 id="workspace-title">Your canvas</h1></div>
-            <div className="view-label"><span className="view-dot" /> Perspective view</div>
+            <div className="view-presets" role="group" aria-label="Camera views">
+              {cameraViews.map(({ view, label }) => (
+                <button key={view} type="button" aria-pressed={cameraView === view} onClick={() => setCameraView(view)}>{label}</button>
+              ))}
+            </div>
           </div>
           <div className="workspace-toolbar" aria-label="Transform tools">
             {([
@@ -179,12 +192,13 @@ export default function App() {
               selectedObjectId={selectedObjectId}
               toolMode={toolMode}
               snapEnabled={snapEnabled}
+              cameraView={cameraView}
               onSelectObject={select}
               onTransformObject={updateObjectTransform}
               onTransformStart={begin}
               onTransformEnd={end}
             />
-            <div className="workspace-hint">Drag to orbit · Scroll to zoom · Right drag to pan</div>
+            <div className="workspace-hint">{cameraView === 'perspective' && 'Drag to orbit · '}Scroll to zoom · Right drag to pan</div>
             <div className="axis-label">X / Y / Z <span>·</span> {MODEL_UNIT}</div>
           </div>
         </section>

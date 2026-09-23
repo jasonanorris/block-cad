@@ -1,9 +1,11 @@
-import { useEffect, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
-import type { Mesh } from 'three'
+import { OrthographicCamera, type Mesh, type PerspectiveCamera } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { TransformControls, type TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import type { ObjectTransform } from './cadModel'
+
+export type CameraView = 'perspective' | 'top' | 'front' | 'right'
 
 type SceneControlsProps = {
   selectedMeshRef: RefObject<Mesh | null>
@@ -11,6 +13,7 @@ type SceneControlsProps = {
   selectedObjectId: string | null
   toolMode: TransformControlsMode
   snapEnabled: boolean
+  cameraView: CameraView
   onTransformObject: (id: string, transform: ObjectTransform) => void
   onTransformStart: () => void
   onTransformEnd: () => void
@@ -22,20 +25,61 @@ export default function SceneControls({
   selectedObjectId,
   toolMode,
   snapEnabled,
+  cameraView,
   onTransformObject,
   onTransformStart,
   onTransformEnd,
 }: SceneControlsProps) {
-  const { camera, gl, scene } = useThree()
+  const { camera, gl, scene, size, get, set } = useThree()
+  const perspectiveCamera = useRef(camera as PerspectiveCamera)
+  const orthographicCamera = useMemo(() => new OrthographicCamera(-120, 120, 60, -60, 0.1, 1000), [])
+  const orbitRef = useRef<OrbitControls | null>(null)
   const transformRef = useRef<TransformControls | null>(null)
   const selectedIdRef = useRef(selectedObjectId)
   selectedIdRef.current = selectedObjectId
 
   useEffect(() => {
+    if (size.height === 0) return
+    const halfHeight = 60
+    const halfWidth = halfHeight * size.width / size.height
+    orthographicCamera.left = -halfWidth
+    orthographicCamera.right = halfWidth
+    orthographicCamera.top = halfHeight
+    orthographicCamera.bottom = -halfHeight
+    orthographicCamera.updateProjectionMatrix()
+  }, [orthographicCamera, size.width, size.height])
+
+  useEffect(() => {
+    const nextCamera = cameraView === 'perspective' ? perspectiveCamera.current : orthographicCamera
+    const target = [0, 8, 0] as const
+    const positions: Record<CameraView, readonly [number, number, number]> = {
+      perspective: [65, 50, 65],
+      top: [0, 158, 0],
+      front: [0, 8, 150],
+      right: [150, 8, 0],
+    }
+    nextCamera.position.set(...positions[cameraView])
+    nextCamera.up.set(0, cameraView === 'top' ? 0 : 1, cameraView === 'top' ? -1 : 0)
+    nextCamera.lookAt(...target)
+    nextCamera.updateProjectionMatrix()
+
+    if (get().camera !== nextCamera) set({ camera: nextCamera })
+    if (orbitRef.current?.object === nextCamera) {
+      orbitRef.current.target.set(...target)
+      orbitRef.current.enableRotate = cameraView === 'perspective'
+      orbitRef.current.update()
+    }
+  }, [cameraView, get, orthographicCamera, set])
+
+  useEffect(() => {
     const orbit = new OrbitControls(camera, gl.domElement)
+    orbitRef.current = orbit
     orbit.target.set(0, 8, 0)
     orbit.minDistance = 25
     orbit.maxDistance = 400
+    orbit.minZoom = 0.25
+    orbit.maxZoom = 8
+    orbit.enableRotate = camera === perspectiveCamera.current
     orbit.update()
 
     const controls = new TransformControls(camera, gl.domElement)
@@ -80,6 +124,7 @@ export default function SceneControls({
       scene.remove(helper)
       controls.dispose()
       orbit.dispose()
+      orbitRef.current = null
       transformRef.current = null
     }
   }, [camera, gl, scene, gizmoInteractionRef, onTransformObject, onTransformStart, onTransformEnd])
@@ -93,14 +138,14 @@ export default function SceneControls({
     } else {
       controls.detach()
     }
-  }, [selectedObjectId, selectedMeshRef, toolMode])
+  }, [camera, selectedObjectId, selectedMeshRef, toolMode])
 
   useEffect(() => {
     const controls = transformRef.current
     if (!controls) return
     controls.setTranslationSnap(snapEnabled ? 5 : null)
     controls.setRotationSnap(snapEnabled ? Math.PI / 12 : null)
-  }, [snapEnabled])
+  }, [camera, snapEnabled])
 
   return null
 }

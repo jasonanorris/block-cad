@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import type { Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import type { CadObject, ObjectTransform } from './cadModel'
-import SceneControls from './SceneControls'
+import SceneControls, { type CameraView } from './SceneControls'
 
 function CadObjectMesh({
   object,
@@ -54,6 +54,7 @@ function CadScene({
   onSelectObject,
   toolMode,
   snapEnabled,
+  cameraView,
   onTransformObject,
   onTransformStart,
   onTransformEnd,
@@ -82,6 +83,7 @@ function CadScene({
         selectedObjectId={selectedObjectId}
         toolMode={toolMode}
         snapEnabled={snapEnabled}
+        cameraView={cameraView}
         onTransformObject={onTransformObject}
         onTransformStart={onTransformStart}
         onTransformEnd={onTransformEnd}
@@ -95,6 +97,7 @@ type WorkspaceProps = {
   selectedObjectId: string | null
   toolMode: TransformControlsMode
   snapEnabled: boolean
+  cameraView: CameraView
   onSelectObject: (id: string | null) => void
   onTransformObject: (id: string, transform: ObjectTransform) => void
   onTransformStart: () => void
