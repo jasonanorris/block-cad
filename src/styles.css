@@ -61,6 +61,12 @@ h1 { margin-bottom: 0; font-size: 23px; letter-spacing: -.035em; line-height: 1.
 .selection-card.is-selected { border-color: #f1cc99; background: #fff8ee; color: #79501e; font-weight: 700; }
 .selection-indicator { width: 9px; height: 9px; flex: none; border-radius: 3px; background: #cbd5e2; }
 .is-selected .selection-indicator { background: #ed9d39; }
+.selection-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.selection-actions button { padding: 8px 10px; border: 1px solid #dfe6f0; border-radius: 7px; background: #fff; color: #52657e; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
+.selection-actions button:hover:not(:disabled) { border-color: #9dbcf0; background: #f1f6ff; color: #315fa8; }
+.selection-actions button:last-child:hover:not(:disabled) { border-color: #efb8b8; background: #fff4f4; color: #ab4545; }
+.selection-actions button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }
+.selection-actions button:disabled { opacity: .5; cursor: default; }
 .object-inspector { margin-top: 18px; }
 .inspector-group + .inspector-group { margin-top: 18px; }
 .inspector-group h4 { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 9px; color: #34445e; font-size: 12px; }

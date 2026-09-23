@@ -96,7 +96,7 @@ export default function Workspace(props: WorkspaceProps) {
   const gizmoInteractionRef = useRef(false)
 
   return (
-    <div className="workspace-canvas" aria-label="3D workspace with a cube and grid">
+    <div className="workspace-canvas" aria-label={`3D workspace with ${props.objects.length} ${props.objects.length === 1 ? 'object' : 'objects'} and grid`}>
       <Canvas
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
         onPointerMissed={() => { if (!gizmoInteractionRef.current) props.onSelectObject(null) }}

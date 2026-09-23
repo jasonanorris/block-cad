@@ -47,6 +47,14 @@ export function setObjectDimension(object: CadObject, axis: keyof Vector3, value
   return { ...object, scale: { ...object.scale, [axis]: direction * value / base } }
 }
 
+export function duplicateCadObject(object: CadObject): CadObject {
+  const duplicate = structuredClone(object)
+  duplicate.id = crypto.randomUUID()
+  duplicate.position.x += 25
+  duplicate.position.z += 25
+  return duplicate
+}
+
 export function createCadObject(type: CadObjectType, x = 0, z = 0): CadObject {
   const base = {
     id: crypto.randomUUID(),

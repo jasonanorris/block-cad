@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
-import { createCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
+import { createCadObject, duplicateCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -31,6 +31,41 @@ export default function App() {
     setObjects([...objects, object])
     setSelectedObjectId(object.id)
   }
+
+  const duplicateSelected = useCallback(() => {
+    const source = objects.find((object) => object.id === selectedObjectId)
+    if (!source) return
+    const duplicate = duplicateCadObject(source)
+    setObjects((current) => [...current, duplicate])
+    setSelectedObjectId(duplicate.id)
+  }, [objects, selectedObjectId])
+
+  const deleteSelected = useCallback(() => {
+    if (!selectedObjectId) return
+    setObjects((current) => current.filter((object) => object.id !== selectedObjectId))
+    setSelectedObjectId(null)
+  }, [selectedObjectId])
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.altKey) return
+      const target = event.target
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
+
+      if (event.key === 'Escape') {
+        setSelectedObjectId(null)
+      } else if (selectedObjectId && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault()
+        if (!event.repeat) duplicateSelected()
+      } else if (selectedObjectId && !event.metaKey && !event.ctrlKey && (event.key === 'Delete' || event.key === 'Backspace')) {
+        event.preventDefault()
+        deleteSelected()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedObjectId, duplicateSelected, deleteSelected])
 
   return (
     <div className="app-shell">
@@ -96,11 +131,15 @@ export default function App() {
               ))}
             </div>
           </div>
-          <div className="panel-section selection-section" aria-live="polite">
+          <div className="panel-section selection-section">
             <h3>Selection</h3>
-            <div className={`selection-card${selectedObject ? ' is-selected' : ''}`}>
+            <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
               <span className="selection-indicator" aria-hidden="true" />
               <span>{selectedObject ? `${shapeLabels[selectedObject.type]} selected` : 'Nothing selected'}</span>
+            </div>
+            <div className="selection-actions">
+              <button type="button" disabled={!selectedObject} onClick={duplicateSelected} title="Duplicate (Ctrl/Cmd+D)">Duplicate</button>
+              <button type="button" disabled={!selectedObject} onClick={deleteSelected} title="Delete (Delete or Backspace)">Delete</button>
             </div>
             {selectedObject && <ObjectInspector key={selectedObject.id} object={selectedObject} onUpdate={updateObject} />}
           </div>
@@ -110,7 +149,7 @@ export default function App() {
             <div className="control-row"><span>Zoom</span><kbd>Scroll</kbd></div>
             <div className="control-row"><span>Pan</span><kbd>Right drag</kbd></div>
           </div>
-          <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Select a shape, choose a tool, and drag its handles to transform it.</p></div>
+          <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Ctrl/Cmd+D duplicates · Delete removes · Esc clears selection</p></div>
         </aside>
       </main>
     </div>
