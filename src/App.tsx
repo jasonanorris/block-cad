@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
+import ObjectInspector from './ObjectInspector'
 import { createCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 
 const shapeLabels: Record<CadObjectType, string> = {
@@ -15,11 +16,13 @@ export default function App() {
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
 
-  const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
-    setObjects((current) => current.map((object) => (
-      object.id === id ? { ...object, ...transform } : object
-    )))
+  const updateObject = useCallback((id: string, update: (current: CadObject) => CadObject) => {
+    setObjects((current) => current.map((object) => object.id === id ? update(object) : object))
   }, [])
+
+  const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
+    updateObject(id, (object) => ({ ...object, ...transform }))
+  }, [updateObject])
 
   function addObject(type: CadObjectType) {
     // Keep new shapes apart so each one can be seen and selected immediately.
@@ -74,11 +77,13 @@ export default function App() {
           </div>
         </section>
         <aside className="info-panel" aria-label="Workspace information">
-          <div className="panel-section">
-            <p className="eyebrow">Getting started</p>
-            <h2>Take a look around</h2>
-            <p>Add a shape below, then click any object to select it. Click empty space to clear your selection.</p>
-          </div>
+          {!selectedObject && (
+            <div className="panel-section">
+              <p className="eyebrow">Getting started</p>
+              <h2>Take a look around</h2>
+              <p>Add a shape below, then click any object to select it. Click empty space to clear your selection.</p>
+            </div>
+          )}
           <div className="panel-section shapes-section">
             <h3>Shapes</h3>
             <div className="shape-list">
@@ -97,6 +102,7 @@ export default function App() {
               <span className="selection-indicator" aria-hidden="true" />
               <span>{selectedObject ? `${shapeLabels[selectedObject.type]} selected` : 'Nothing selected'}</span>
             </div>
+            {selectedObject && <ObjectInspector key={selectedObject.id} object={selectedObject} onUpdate={updateObject} />}
           </div>
           <div className="panel-section controls-section">
             <h3>Camera controls</h3>

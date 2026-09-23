@@ -20,6 +20,33 @@ export type CadObject = BaseObject & (
 
 export type CadObjectType = CadObject['type']
 
+function baseDimensions(object: CadObject): Vector3 {
+  switch (object.type) {
+    case 'box':
+      return object.dimensions
+    case 'cylinder':
+      return { x: object.dimensions.diameter, y: object.dimensions.height, z: object.dimensions.diameter }
+    case 'sphere':
+      return { x: object.dimensions.diameter, y: object.dimensions.diameter, z: object.dimensions.diameter }
+  }
+}
+
+// Visible dimensions are the local shape dimensions after scaling, before rotation.
+export function getObjectDimensions(object: CadObject): Vector3 {
+  const base = baseDimensions(object)
+  return {
+    x: base.x * Math.abs(object.scale.x),
+    y: base.y * Math.abs(object.scale.y),
+    z: base.z * Math.abs(object.scale.z),
+  }
+}
+
+export function setObjectDimension(object: CadObject, axis: keyof Vector3, value: number): CadObject {
+  const base = baseDimensions(object)[axis]
+  const direction = Math.sign(object.scale[axis]) || 1
+  return { ...object, scale: { ...object.scale, [axis]: direction * value / base } }
+}
+
 export function createCadObject(type: CadObjectType, x = 0, z = 0): CadObject {
   const base = {
     id: crypto.randomUUID(),
