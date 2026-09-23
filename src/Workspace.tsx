@@ -53,6 +53,7 @@ function CadScene({
   selectedObjectId,
   onSelectObject,
   toolMode,
+  snapEnabled,
   onTransformObject,
   onTransformStart,
   onTransformEnd,
@@ -65,7 +66,7 @@ function CadScene({
       <color attach="background" args={['#f8faff']} />
       <ambientLight intensity={1.6} />
       <directionalLight position={[50, 90, 40]} intensity={2.4} />
-      <gridHelper args={[200, 20, '#a9b8cf', '#dce3ef']} position={[0, -0.01, 0]} />
+      <gridHelper args={[200, snapEnabled ? 40 : 20, '#a9b8cf', '#dce3ef']} position={[0, -0.01, 0]} />
       {objects.map((object) => (
         <CadObjectMesh
           key={object.id}
@@ -80,6 +81,7 @@ function CadScene({
         gizmoInteractionRef={gizmoInteractionRef}
         selectedObjectId={selectedObjectId}
         toolMode={toolMode}
+        snapEnabled={snapEnabled}
         onTransformObject={onTransformObject}
         onTransformStart={onTransformStart}
         onTransformEnd={onTransformEnd}
@@ -92,6 +94,7 @@ type WorkspaceProps = {
   objects: CadObject[]
   selectedObjectId: string | null
   toolMode: TransformControlsMode
+  snapEnabled: boolean
   onSelectObject: (id: string | null) => void
   onTransformObject: (id: string, transform: ObjectTransform) => void
   onTransformStart: () => void

@@ -10,6 +10,7 @@ type SceneControlsProps = {
   gizmoInteractionRef: RefObject<boolean>
   selectedObjectId: string | null
   toolMode: TransformControlsMode
+  snapEnabled: boolean
   onTransformObject: (id: string, transform: ObjectTransform) => void
   onTransformStart: () => void
   onTransformEnd: () => void
@@ -20,6 +21,7 @@ export default function SceneControls({
   gizmoInteractionRef,
   selectedObjectId,
   toolMode,
+  snapEnabled,
   onTransformObject,
   onTransformStart,
   onTransformEnd,
@@ -92,6 +94,13 @@ export default function SceneControls({
       controls.detach()
     }
   }, [selectedObjectId, selectedMeshRef, toolMode])
+
+  useEffect(() => {
+    const controls = transformRef.current
+    if (!controls) return
+    controls.setTranslationSnap(snapEnabled ? 5 : null)
+    controls.setRotationSnap(snapEnabled ? Math.PI / 12 : null)
+  }, [snapEnabled])
 
   return null
 }

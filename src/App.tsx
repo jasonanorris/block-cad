@@ -17,6 +17,7 @@ export default function App() {
   const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => [createCadObject('box')])
   const { objects, selectedObjectId } = scene
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
+  const [snapEnabled, setSnapEnabled] = useState(false)
   const [projectError, setProjectError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
@@ -157,6 +158,15 @@ export default function App() {
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              className={`tool-button snap-button${snapEnabled ? ' is-active' : ''}`}
+              aria-pressed={snapEnabled}
+              title="Snap moves to a 5 mm grid and rotations to 15° steps"
+              onClick={() => setSnapEnabled((enabled) => !enabled)}
+            >
+              Snap <span>5 mm · 15°</span>
+            </button>
             {!selectedObject && <span className="toolbar-hint">Select a shape to use these tools</span>}
             <div className="history-actions">
               <button type="button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl/Cmd+Z)">Undo</button>
@@ -168,6 +178,7 @@ export default function App() {
               objects={objects}
               selectedObjectId={selectedObjectId}
               toolMode={toolMode}
+              snapEnabled={snapEnabled}
               onSelectObject={select}
               onTransformObject={updateObjectTransform}
               onTransformStart={begin}
