@@ -1,6 +1,6 @@
 import { useRef, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
-import type { Mesh } from 'three'
+import type { BufferGeometry, Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import type { CadObject, ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
@@ -10,13 +10,16 @@ function CadObjectMesh({
   isSelected,
   onSelect,
   selectedMeshRef,
+  cutGeometry,
 }: {
   object: CadObject
   isSelected: boolean
   onSelect: (id: string) => void
   selectedMeshRef: RefObject<Mesh | null>
+  cutGeometry?: BufferGeometry
 }) {
   const { position, rotation, scale } = object
+  const isCutter = object.type === 'cylinder' && !!object.cutTargetId
 
   return (
     <mesh
@@ -24,12 +27,15 @@ function CadObjectMesh({
       position={[position.x, position.y, position.z]}
       rotation={[rotation.x, rotation.y, rotation.z]}
       scale={[scale.x, scale.y, scale.z]}
+      renderOrder={isCutter ? 1 : 0}
       onClick={(event) => {
         event.stopPropagation()
         onSelect(object.id)
       }}
     >
-      {object.type === 'box' && (
+      {cutGeometry ? (
+        <primitive object={cutGeometry} attach="geometry" />
+      ) : object.type === 'box' && (
         <boxGeometry args={[object.dimensions.x, object.dimensions.y, object.dimensions.z]} />
       )}
       {object.type === 'cylinder' && (
@@ -43,6 +49,12 @@ function CadObjectMesh({
         emissive={isSelected ? '#5c2d00' : '#000000'}
         emissiveIntensity={isSelected ? 0.18 : 0}
         roughness={0.75}
+        flatShading={!!cutGeometry}
+        wireframe={isCutter}
+        transparent={isCutter}
+        opacity={isCutter ? 0.55 : 1}
+        depthTest={!isCutter}
+        depthWrite={!isCutter}
       />
     </mesh>
   )
@@ -59,6 +71,7 @@ function CadScene({
   onTransformStart,
   onTransformEnd,
   gizmoInteractionRef,
+  booleanGeometries,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean> }) {
   const selectedMeshRef = useRef<Mesh | null>(null)
 
@@ -75,6 +88,7 @@ function CadScene({
           isSelected={object.id === selectedObjectId}
           onSelect={(id) => { if (!gizmoInteractionRef.current) onSelectObject(id) }}
           selectedMeshRef={selectedMeshRef}
+          cutGeometry={booleanGeometries.get(object.id)}
         />
       ))}
       <SceneControls
@@ -98,6 +112,7 @@ type WorkspaceProps = {
   toolMode: TransformControlsMode
   snapEnabled: boolean
   cameraView: CameraView
+  booleanGeometries: Map<string, BufferGeometry>
   onSelectObject: (id: string | null) => void
   onTransformObject: (id: string, transform: ObjectTransform) => void
   onTransformStart: () => void

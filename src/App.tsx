@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
-import { createCadObject, duplicateCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
+import { createCadObject, createCutExample, duplicateCadObject, isCylinderCutter, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
 import type { CameraView } from './SceneControls'
+import { useBooleanPreview } from './useBooleanPreview'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -28,13 +29,17 @@ export default function App() {
   const [snapEnabled, setSnapEnabled] = useState(false)
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
   const [projectError, setProjectError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
+  const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
+  const cutBoxCount = new Set(objects.filter(isCylinderCutter).map((object) => object.cutTargetId)).size
 
   function newProject() {
     reset([])
     setToolMode('translate')
     setProjectError(null)
+    setExportError(null)
   }
 
   function saveProject() {
@@ -52,9 +57,14 @@ export default function App() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  function exportModel() {
+  async function exportModel() {
     if (objects.length === 0) return
-    download(new Blob([exportStl(objects)], { type: 'model/stl' }), 'block-cad-model.stl')
+    try {
+      download(new Blob([await exportStl(objects)], { type: 'model/stl' }), 'block-cad-model.stl')
+      setExportError(null)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not export the model.')
+    }
   }
 
   async function loadProject(event: ChangeEvent<HTMLInputElement>) {
@@ -66,6 +76,7 @@ export default function App() {
       reset(loadedObjects)
       setToolMode('translate')
       setProjectError(null)
+      setExportError(null)
     } catch (error) {
       setProjectError(error instanceof Error ? error.message : 'Could not load this project file.')
     }
@@ -86,6 +97,13 @@ export default function App() {
     commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id }))
   }
 
+  function addCutExample() {
+    const x = (objects.length % 3) * 40
+    const z = Math.floor(objects.length / 3) * 40
+    const [box, cutter] = createCutExample(x, z)
+    commit((current) => ({ objects: [...current.objects, box, cutter], selectedObjectId: cutter.id }))
+  }
+
   const duplicateSelected = useCallback(() => {
     const source = objects.find((object) => object.id === selectedObjectId)
     if (!source) return
@@ -96,7 +114,11 @@ export default function App() {
   const deleteSelected = useCallback(() => {
     if (!selectedObjectId) return
     commit((current) => ({
-      objects: current.objects.filter((object) => object.id !== selectedObjectId),
+      objects: current.objects
+        .filter((object) => object.id !== selectedObjectId)
+        .map((object) => object.type === 'cylinder' && object.cutTargetId === selectedObjectId
+          ? { ...object, cutTargetId: undefined }
+          : object),
       selectedObjectId: null,
     }))
   }, [selectedObjectId, commit])
@@ -144,6 +166,8 @@ export default function App() {
         </div>
       </header>
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
+      {booleanError && <div className="project-error" role="alert">Could not calculate cut: {booleanError}</div>}
+      {exportError && <div className="project-error" role="alert">Could not export STL: {exportError}</div>}
       <main className="app-main">
         <section className="workspace-panel" aria-labelledby="workspace-title">
           <div className="workspace-heading">
@@ -193,6 +217,7 @@ export default function App() {
               toolMode={toolMode}
               snapEnabled={snapEnabled}
               cameraView={cameraView}
+              booleanGeometries={booleanGeometries}
               onSelectObject={select}
               onTransformObject={updateObjectTransform}
               onTransformStart={begin}
@@ -221,13 +246,30 @@ export default function App() {
                 </button>
               ))}
             </div>
+            <button className="cut-example-button" type="button" onClick={addCutExample}>Add cutout example</button>
+            <p className="cut-example-hint">Adds an editable box and cylinder cutter.</p>
+            {cutBoxCount > 0 && !booleanError && (
+              <p className="cut-status" role="status">
+                {booleanGeometries.size === cutBoxCount ? 'Cut preview ready' : 'Calculating cut…'}
+              </p>
+            )}
           </div>
           <div className="panel-section selection-section">
             <h3>Selection</h3>
             <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
               <span className="selection-indicator" aria-hidden="true" />
-              <span>{selectedObject ? `${shapeLabels[selectedObject.type]} selected` : 'Nothing selected'}</span>
+              <span>{selectedObject ? `${selectedObject.type === 'cylinder' && selectedObject.cutTargetId ? 'Cylinder cutter' : shapeLabels[selectedObject.type]} selected` : 'Nothing selected'}</span>
             </div>
+            {objects.length > 0 && (
+              <div className="object-list" role="group" aria-label="Objects">
+                {objects.map((object, index) => (
+                  <button key={object.id} type="button" aria-pressed={object.id === selectedObjectId} onClick={() => select(object.id)}>
+                    <span>{object.type === 'cylinder' && object.cutTargetId ? 'Cylinder cutter' : shapeLabels[object.type]}</span>
+                    <span>#{index + 1}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="selection-actions">
               <button type="button" disabled={!selectedObject} onClick={duplicateSelected} title="Duplicate (Ctrl/Cmd+D)">Duplicate</button>
               <button type="button" disabled={!selectedObject} onClick={deleteSelected} title="Delete (Delete or Backspace)">Delete</button>

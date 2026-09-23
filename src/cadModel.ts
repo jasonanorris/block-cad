@@ -14,11 +14,15 @@ export type ObjectTransform = Pick<BaseObject, 'position' | 'rotation' | 'scale'
 
 export type CadObject = BaseObject & (
   | { type: 'box'; dimensions: Vector3 }
-  | { type: 'cylinder'; dimensions: { diameter: number; height: number } }
+  | { type: 'cylinder'; dimensions: { diameter: number; height: number }; cutTargetId?: string }
   | { type: 'sphere'; dimensions: { diameter: number } }
 )
 
 export type CadObjectType = CadObject['type']
+
+export function isCylinderCutter(object: CadObject): object is Extract<CadObject, { type: 'cylinder' }> & { cutTargetId: string } {
+  return object.type === 'cylinder' && !!object.cutTargetId
+}
 
 function baseDimensions(object: CadObject): Vector3 {
   switch (object.type) {
@@ -71,4 +75,15 @@ export function createCadObject(type: CadObjectType, x = 0, z = 0): CadObject {
     case 'sphere':
       return { ...base, type, dimensions: { diameter: 20 } }
   }
+}
+
+// A small, editable subtraction example for the first Boolean milestone.
+export function createCutExample(x = 0, z = 0): [CadObject, CadObject] {
+  const box = createCadObject('box', x, z) as Extract<CadObject, { type: 'box' }>
+  box.dimensions = { x: 30, y: 20, z: 30 }
+
+  const cutter = createCadObject('cylinder', x, z) as Extract<CadObject, { type: 'cylinder' }>
+  cutter.dimensions = { diameter: 12, height: 30 }
+  cutter.cutTargetId = box.id
+  return [box, cutter]
 }

@@ -1,7 +1,7 @@
 import { MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 1
+const PROJECT_VERSION = 2
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -32,7 +32,7 @@ function vector(value: unknown, field: string): Vector3 {
   }
 }
 
-function objectFromFile(value: unknown, index: number): CadObject {
+function objectFromFile(value: unknown, index: number, version: number): CadObject {
   const data = record(value)
   const field = `objects[${index}]`
   if (!data || typeof data.id !== 'string' || !data.id.trim()) {
@@ -54,11 +54,16 @@ function objectFromFile(value: unknown, index: number): CadObject {
         y: positiveNumber(dimensions.y, `${field}.dimensions.y`),
         z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
       } }
-    case 'cylinder':
+    case 'cylinder': {
+      if (version === 2 && data.cutTargetId !== undefined &&
+        (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
+        throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      }
       return { ...base, type: 'cylinder', dimensions: {
         diameter: positiveNumber(dimensions.diameter, `${field}.dimensions.diameter`),
         height: positiveNumber(dimensions.height, `${field}.dimensions.height`),
-      } }
+      }, ...(version === 2 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+    }
     case 'sphere':
       return { ...base, type: 'sphere', dimensions: {
         diameter: positiveNumber(dimensions.diameter, `${field}.dimensions.diameter`),
@@ -82,12 +87,20 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== PROJECT_VERSION) throw new Error(`Unsupported project version: ${String(project.version)}.`)
+  if (project.version !== 1 && project.version !== PROJECT_VERSION) {
+    throw new Error(`Unsupported project version: ${String(project.version)}.`)
+  }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
   if (!Array.isArray(project.objects)) throw new Error('The project objects must be a list.')
 
-  const objects = project.objects.map(objectFromFile)
+  const objects = project.objects.map((object, index) => objectFromFile(object, index, project.version as number))
   const ids = new Set(objects.map((object) => object.id))
   if (ids.size !== objects.length) throw new Error('The project contains duplicate object IDs.')
+  for (const object of objects) {
+    if (object.type === 'cylinder' && object.cutTargetId &&
+      !objects.some((target) => target.id === object.cutTargetId && target.type === 'box')) {
+      throw new Error(`Cylinder ${object.id} must cut an existing box.`)
+    }
+  }
   return objects
 }

@@ -1,6 +1,8 @@
 import { BoxGeometry, CylinderGeometry, Mesh, Scene, SphereGeometry, type BufferGeometry } from 'three'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
-import type { CadObject } from './cadModel'
+import { isCylinderCutter, type CadObject } from './cadModel'
+import { subtractCylinders } from './booleanGeometry'
+import { loadManifold } from './manifoldRuntime'
 
 function geometryFor(object: CadObject): BufferGeometry {
   switch (object.type) {
@@ -34,13 +36,21 @@ function reverseWinding(geometry: BufferGeometry) {
 }
 
 // STL stores bare coordinates without units. One scene unit is one millimeter.
-export function exportStl(objects: CadObject[]): ArrayBuffer {
+export async function exportStl(objects: CadObject[]): Promise<ArrayBuffer> {
   const scene = new Scene()
   const geometries: BufferGeometry[] = []
+  const hasCuts = objects.some(isCylinderCutter)
+  const runtime = hasCuts ? await loadManifold() : null
 
   try {
     for (const object of objects) {
-      const geometry = geometryFor(object)
+      if (isCylinderCutter(object)) continue
+      const cutters = object.type === 'box'
+        ? objects.filter(isCylinderCutter).filter((candidate) => candidate.cutTargetId === object.id)
+        : []
+      const geometry = object.type === 'box' && cutters.length && runtime
+        ? subtractCylinders(object, cutters, runtime)
+        : geometryFor(object)
       geometries.push(geometry)
       if (object.scale.x * object.scale.y * object.scale.z < 0) reverseWinding(geometry)
 
