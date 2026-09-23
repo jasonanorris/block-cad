@@ -1,11 +1,25 @@
 import { useState } from 'react'
 import Workspace from './Workspace'
-import { createStarterBox, MODEL_UNIT, type CadObject } from './cadModel'
+import { createCadObject, MODEL_UNIT, type CadObject, type CadObjectType } from './cadModel'
+
+const shapeLabels: Record<CadObjectType, string> = {
+  box: 'Box',
+  cylinder: 'Cylinder',
+  sphere: 'Sphere',
+}
 
 export default function App() {
-  const [objects] = useState<CadObject[]>(() => [createStarterBox()])
+  const [objects, setObjects] = useState<CadObject[]>(() => [createCadObject('box')])
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
+
+  function addObject(type: CadObjectType) {
+    // Keep new shapes apart so each one can be seen and selected immediately.
+    const index = objects.length
+    const object = createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30)
+    setObjects([...objects, object])
+    setSelectedObjectId(object.id)
+  }
 
   return (
     <div className="app-shell">
@@ -34,13 +48,25 @@ export default function App() {
           <div className="panel-section">
             <p className="eyebrow">Getting started</p>
             <h2>Take a look around</h2>
-            <p>Click the box to select it. Click empty space to clear your selection.</p>
+            <p>Add a shape below, then click any object to select it. Click empty space to clear your selection.</p>
+          </div>
+          <div className="panel-section shapes-section">
+            <h3>Shapes</h3>
+            <div className="shape-list">
+              {(['box', 'cylinder', 'sphere'] as const).map((type) => (
+                <button className="shape-button" key={type} type="button" onClick={() => addObject(type)}>
+                  <span className={`shape-glyph ${type}`} aria-hidden="true" />
+                  <span>{shapeLabels[type]}</span>
+                  <span className="shape-add" aria-hidden="true">+</span>
+                </button>
+              ))}
+            </div>
           </div>
           <div className="panel-section selection-section" aria-live="polite">
             <h3>Selection</h3>
             <div className={`selection-card${selectedObject ? ' is-selected' : ''}`}>
               <span className="selection-indicator" aria-hidden="true" />
-              <span>{selectedObject ? 'Box selected' : 'Nothing selected'}</span>
+              <span>{selectedObject ? `${shapeLabels[selectedObject.type]} selected` : 'Nothing selected'}</span>
             </div>
           </div>
           <div className="panel-section controls-section">

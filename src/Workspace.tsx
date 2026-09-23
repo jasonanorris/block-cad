@@ -27,7 +27,7 @@ function CadObjectMesh({
   isSelected: boolean
   onSelect: (id: string) => void
 }) {
-  const { position, rotation, scale, dimensions } = object
+  const { position, rotation, scale } = object
 
   return (
     <mesh
@@ -39,7 +39,15 @@ function CadObjectMesh({
         onSelect(object.id)
       }}
     >
-      <boxGeometry args={[dimensions.x, dimensions.y, dimensions.z]} />
+      {object.type === 'box' && (
+        <boxGeometry args={[object.dimensions.x, object.dimensions.y, object.dimensions.z]} />
+      )}
+      {object.type === 'cylinder' && (
+        <cylinderGeometry args={[object.dimensions.diameter / 2, object.dimensions.diameter / 2, object.dimensions.height, 32]} />
+      )}
+      {object.type === 'sphere' && (
+        <sphereGeometry args={[object.dimensions.diameter / 2, 32, 16]} />
+      )}
       <meshStandardMaterial
         color={isSelected ? '#f3a447' : '#6797ef'}
         emissive={isSelected ? '#5c2d00' : '#000000'}
