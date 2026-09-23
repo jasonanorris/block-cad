@@ -15,7 +15,11 @@ body { margin: 0; min-width: 320px; }
 .brand-copy { display: flex; flex-direction: column; gap: 2px; }
 .brand-copy strong { font-size: 17px; letter-spacing: -.03em; line-height: 1; }
 .brand-copy span { font-size: 11px; color: #8190a5; }
-.foundation-badge { margin-left: auto; padding: 8px 11px; border-radius: 7px; color: #5276b2; background: #edf4ff; font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.project-actions { display: flex; gap: 8px; margin-left: auto; }
+.project-actions button { padding: 8px 13px; border: 1px solid #dfe6f0; border-radius: 7px; background: #fff; color: #52657e; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.project-actions button:hover { border-color: #9dbcf0; background: #f1f6ff; color: #315fa8; }
+.project-actions button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }
+.project-error { padding: 10px 30px; border-bottom: 1px solid #f1cccc; background: #fff4f4; color: #a43e3e; font-size: 12px; }
 
 .app-main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 18px; padding: 22px; min-height: 0; }
 .workspace-panel { min-width: 0; height: calc(100vh - 120px); min-height: 560px; align-self: start; display: flex; flex-direction: column; }
@@ -97,7 +101,9 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 
 @media (max-width: 500px) {
   .app-header { height: 68px; padding: 0 16px; }
-  .foundation-badge { font-size: 9px; }
+  .project-actions { gap: 4px; }
+  .project-actions button { padding: 7px 8px; font-size: 11px; }
+  .project-error { padding: 10px 16px; }
   .workspace-heading { align-items: center; }
   .view-label { font-size: 10px; }
   .toolbar-hint { display: none; }

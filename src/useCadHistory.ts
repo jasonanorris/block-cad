@@ -18,6 +18,7 @@ export type CadHistoryState = {
 export type CadHistoryAction =
   | { type: 'commit' | 'edit'; change: SceneChange }
   | { type: 'select'; id: string | null }
+  | { type: 'reset'; objects: CadObject[] }
   | { type: 'begin' | 'end' | 'undo' | 'redo' }
 
 const HISTORY_LIMIT = 100
@@ -48,6 +49,8 @@ function recordChange(state: CadHistoryState, before: SceneSnapshot, after: Scen
 
 export function cadHistoryReducer(state: CadHistoryState, action: CadHistoryAction): CadHistoryState {
   switch (action.type) {
+    case 'reset':
+      return createInitialHistory(action.objects)
     case 'select':
       return { ...state, present: { ...state.present, selectedObjectId: action.id } }
     case 'begin':
@@ -110,6 +113,7 @@ export function useCadHistory(createObjects: () => CadObject[]) {
   const end = useCallback(() => dispatch({ type: 'end' }), [])
   const undo = useCallback(() => dispatch({ type: 'undo' }), [])
   const redo = useCallback(() => dispatch({ type: 'redo' }), [])
+  const reset = useCallback((objects: CadObject[]) => dispatch({ type: 'reset', objects }), [])
 
   return {
     scene: state.present,
@@ -122,5 +126,6 @@ export function useCadHistory(createObjects: () => CadObject[]) {
     end,
     undo,
     redo,
+    reset,
   }
 }

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
 import { createCadObject, duplicateCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 import { useCadHistory } from './useCadHistory'
+import { parseProject, serializeProject } from './projectFile'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -12,10 +13,43 @@ const shapeLabels: Record<CadObjectType, string> = {
 }
 
 export default function App() {
-  const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo } = useCadHistory(() => [createCadObject('box')])
+  const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => [createCadObject('box')])
   const { objects, selectedObjectId } = scene
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
+  const [projectError, setProjectError] = useState<string | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
+
+  function newProject() {
+    reset([])
+    setToolMode('translate')
+    setProjectError(null)
+  }
+
+  function saveProject() {
+    const url = URL.createObjectURL(new Blob([serializeProject(objects)], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'block-cad-project.json'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  async function loadProject(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const loadedObjects = parseProject(await file.text())
+      reset(loadedObjects)
+      setToolMode('translate')
+      setProjectError(null)
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : 'Could not load this project file.')
+    }
+  }
 
   const updateObject = useCallback((id: string, update: (current: CadObject) => CadObject) => {
     editObjects((current) => current.map((object) => object.id === id ? update(object) : object))
@@ -81,8 +115,14 @@ export default function App() {
       <header className="app-header">
         <div className="brand-mark" aria-hidden="true"><span /></div>
         <div className="brand-copy"><strong>Block CAD</strong><span>Simple 3D modeling</span></div>
-        <span className="foundation-badge">Workspace preview</span>
+        <div className="project-actions" role="group" aria-label="Project files">
+          <button type="button" onClick={newProject}>New</button>
+          <button type="button" onClick={saveProject}>Save</button>
+          <button type="button" onClick={() => fileInput.current?.click()}>Load</button>
+          <input ref={fileInput} type="file" accept=".json,application/json" onChange={loadProject} hidden aria-label="Choose a Block CAD project file" />
+        </div>
       </header>
+      {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
       <main className="app-main">
         <section className="workspace-panel" aria-labelledby="workspace-title">
           <div className="workspace-heading">
