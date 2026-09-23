@@ -18,7 +18,15 @@ function CameraControls() {
   return null
 }
 
-function CadObjectMesh({ object }: { object: CadObject }) {
+function CadObjectMesh({
+  object,
+  isSelected,
+  onSelect,
+}: {
+  object: CadObject
+  isSelected: boolean
+  onSelect: (id: string) => void
+}) {
   const { position, rotation, scale, dimensions } = object
 
   return (
@@ -26,31 +34,60 @@ function CadObjectMesh({ object }: { object: CadObject }) {
       position={[position.x, position.y, position.z]}
       rotation={[rotation.x, rotation.y, rotation.z]}
       scale={[scale.x, scale.y, scale.z]}
+      onClick={(event) => {
+        event.stopPropagation()
+        onSelect(object.id)
+      }}
     >
       <boxGeometry args={[dimensions.x, dimensions.y, dimensions.z]} />
-      <meshStandardMaterial color="#6797ef" roughness={0.75} />
+      <meshStandardMaterial
+        color={isSelected ? '#f3a447' : '#6797ef'}
+        emissive={isSelected ? '#5c2d00' : '#000000'}
+        emissiveIntensity={isSelected ? 0.18 : 0}
+        roughness={0.75}
+      />
     </mesh>
   )
 }
 
-function CadScene({ objects }: { objects: CadObject[] }) {
+function CadScene({
+  objects,
+  selectedObjectId,
+  onSelectObject,
+}: WorkspaceProps) {
   return (
     <>
       <color attach="background" args={['#f8faff']} />
       <ambientLight intensity={1.6} />
       <directionalLight position={[50, 90, 40]} intensity={2.4} />
       <gridHelper args={[200, 20, '#a9b8cf', '#dce3ef']} position={[0, -0.01, 0]} />
-      {objects.map((object) => <CadObjectMesh key={object.id} object={object} />)}
+      {objects.map((object) => (
+        <CadObjectMesh
+          key={object.id}
+          object={object}
+          isSelected={object.id === selectedObjectId}
+          onSelect={onSelectObject}
+        />
+      ))}
       <CameraControls />
     </>
   )
 }
 
-export default function Workspace({ objects }: { objects: CadObject[] }) {
+type WorkspaceProps = {
+  objects: CadObject[]
+  selectedObjectId: string | null
+  onSelectObject: (id: string | null) => void
+}
+
+export default function Workspace(props: WorkspaceProps) {
   return (
     <div className="workspace-canvas" aria-label="3D workspace with a cube and grid">
-      <Canvas camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}>
-        <CadScene objects={objects} />
+      <Canvas
+        camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
+        onPointerMissed={() => props.onSelectObject(null)}
+      >
+        <CadScene {...props} />
       </Canvas>
     </div>
   )

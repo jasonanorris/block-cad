@@ -4,6 +4,8 @@ import { createStarterBox, MODEL_UNIT, type CadObject } from './cadModel'
 
 export default function App() {
   const [objects] = useState<CadObject[]>(() => [createStarterBox()])
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
+  const selectedObject = objects.find((object) => object.id === selectedObjectId)
 
   return (
     <div className="app-shell">
@@ -19,7 +21,11 @@ export default function App() {
             <div className="view-label"><span className="view-dot" /> Perspective view</div>
           </div>
           <div className="workspace-frame">
-            <Workspace objects={objects} />
+            <Workspace
+              objects={objects}
+              selectedObjectId={selectedObjectId}
+              onSelectObject={setSelectedObjectId}
+            />
             <div className="workspace-hint">Drag to orbit · Scroll to zoom · Right drag to pan</div>
             <div className="axis-label">X / Y / Z <span>·</span> {MODEL_UNIT}</div>
           </div>
@@ -28,7 +34,14 @@ export default function App() {
           <div className="panel-section">
             <p className="eyebrow">Getting started</p>
             <h2>Take a look around</h2>
-            <p>The starter box sits on the workplane. Explore the scene using the camera controls.</p>
+            <p>Click the box to select it. Click empty space to clear your selection.</p>
+          </div>
+          <div className="panel-section selection-section" aria-live="polite">
+            <h3>Selection</h3>
+            <div className={`selection-card${selectedObject ? ' is-selected' : ''}`}>
+              <span className="selection-indicator" aria-hidden="true" />
+              <span>{selectedObject ? 'Box selected' : 'Nothing selected'}</span>
+            </div>
           </div>
           <div className="panel-section controls-section">
             <h3>Camera controls</h3>
