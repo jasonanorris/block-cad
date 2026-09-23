@@ -25,13 +25,18 @@ h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 0; font-size: 23px; letter-spacing: -.035em; line-height: 1.1; }
 .view-label { display: flex; align-items: center; gap: 7px; color: #71829c; font-size: 12px; white-space: nowrap; padding-bottom: 3px; }
 .view-dot { width: 7px; height: 7px; border-radius: 50%; background: #5ea782; }
-.workspace-toolbar { display: flex; align-items: center; gap: 7px; margin-bottom: 11px; }
+.workspace-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-bottom: 11px; }
 .tool-button { padding: 8px 12px; border: 1px solid #dfe6f0; border-radius: 7px; background: #fff; color: #60728d; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
 .tool-button:hover:not(:disabled) { border-color: #9dbcf0; color: #315fa8; }
 .tool-button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }
 .tool-button.is-active:not(:disabled) { border-color: #8fb4f0; background: #eaf2ff; color: #275cae; }
 .tool-button:disabled { cursor: default; opacity: .5; }
 .toolbar-hint { margin-left: 5px; color: #8c9aaf; font-size: 11px; }
+.history-actions { display: flex; gap: 7px; margin-left: auto; }
+.history-actions button { padding: 8px 12px; border: 1px solid #dfe6f0; border-radius: 7px; background: #fff; color: #60728d; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.history-actions button:hover:not(:disabled) { border-color: #9dbcf0; color: #315fa8; }
+.history-actions button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }
+.history-actions button:disabled { cursor: default; opacity: .5; }
 .workspace-frame { position: relative; flex: 1; min-height: 500px; overflow: hidden; border: 1px solid #e1e8f2; border-radius: 14px; background: #f8faff; box-shadow: 0 6px 24px #22334c0a; }
 .workspace-canvas { position: absolute; inset: 0; }
 .workspace-canvas canvas { display: block; }

@@ -11,6 +11,8 @@ type SceneControlsProps = {
   selectedObjectId: string | null
   toolMode: TransformControlsMode
   onTransformObject: (id: string, transform: ObjectTransform) => void
+  onTransformStart: () => void
+  onTransformEnd: () => void
 }
 
 export default function SceneControls({
@@ -19,6 +21,8 @@ export default function SceneControls({
   selectedObjectId,
   toolMode,
   onTransformObject,
+  onTransformStart,
+  onTransformEnd,
 }: SceneControlsProps) {
   const { camera, gl, scene } = useThree()
   const transformRef = useRef<TransformControls | null>(null)
@@ -44,10 +48,12 @@ export default function SceneControls({
     const onMouseDown = () => {
       window.clearTimeout(clearInteraction)
       gizmoInteractionRef.current = true
+      onTransformStart()
     }
     const onMouseUp = () => {
       // A click follows pointer-up; keep the gizmo from counting as empty workspace.
       clearInteraction = window.setTimeout(() => { gizmoInteractionRef.current = false }, 0)
+      onTransformEnd()
     }
     const onObjectChange = () => {
       const mesh = controls.object
@@ -74,7 +80,7 @@ export default function SceneControls({
       orbit.dispose()
       transformRef.current = null
     }
-  }, [camera, gl, scene, gizmoInteractionRef, onTransformObject])
+  }, [camera, gl, scene, gizmoInteractionRef, onTransformObject, onTransformStart, onTransformEnd])
 
   useEffect(() => {
     const controls = transformRef.current

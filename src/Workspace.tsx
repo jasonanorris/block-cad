@@ -54,6 +54,8 @@ function CadScene({
   onSelectObject,
   toolMode,
   onTransformObject,
+  onTransformStart,
+  onTransformEnd,
   gizmoInteractionRef,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean> }) {
   const selectedMeshRef = useRef<Mesh | null>(null)
@@ -79,6 +81,8 @@ function CadScene({
         selectedObjectId={selectedObjectId}
         toolMode={toolMode}
         onTransformObject={onTransformObject}
+        onTransformStart={onTransformStart}
+        onTransformEnd={onTransformEnd}
       />
     </>
   )
@@ -90,6 +94,8 @@ type WorkspaceProps = {
   toolMode: TransformControlsMode
   onSelectObject: (id: string | null) => void
   onTransformObject: (id: string, transform: ObjectTransform) => void
+  onTransformStart: () => void
+  onTransformEnd: () => void
 }
 
 export default function Workspace(props: WorkspaceProps) {

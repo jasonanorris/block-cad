@@ -3,6 +3,7 @@ import type { TransformControlsMode } from 'three/addons/controls/TransformContr
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
 import { createCadObject, duplicateCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
+import { useCadHistory } from './useCadHistory'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -11,14 +12,14 @@ const shapeLabels: Record<CadObjectType, string> = {
 }
 
 export default function App() {
-  const [objects, setObjects] = useState<CadObject[]>(() => [createCadObject('box')])
-  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
+  const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo } = useCadHistory(() => [createCadObject('box')])
+  const { objects, selectedObjectId } = scene
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
 
   const updateObject = useCallback((id: string, update: (current: CadObject) => CadObject) => {
-    setObjects((current) => current.map((object) => object.id === id ? update(object) : object))
-  }, [])
+    editObjects((current) => current.map((object) => object.id === id ? update(object) : object))
+  }, [editObjects])
 
   const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
     updateObject(id, (object) => ({ ...object, ...transform }))
@@ -28,23 +29,23 @@ export default function App() {
     // Keep new shapes apart so each one can be seen and selected immediately.
     const index = objects.length
     const object = createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30)
-    setObjects([...objects, object])
-    setSelectedObjectId(object.id)
+    commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id }))
   }
 
   const duplicateSelected = useCallback(() => {
     const source = objects.find((object) => object.id === selectedObjectId)
     if (!source) return
     const duplicate = duplicateCadObject(source)
-    setObjects((current) => [...current, duplicate])
-    setSelectedObjectId(duplicate.id)
-  }, [objects, selectedObjectId])
+    commit((current) => ({ objects: [...current.objects, duplicate], selectedObjectId: duplicate.id }))
+  }, [objects, selectedObjectId, commit])
 
   const deleteSelected = useCallback(() => {
     if (!selectedObjectId) return
-    setObjects((current) => current.filter((object) => object.id !== selectedObjectId))
-    setSelectedObjectId(null)
-  }, [selectedObjectId])
+    commit((current) => ({
+      objects: current.objects.filter((object) => object.id !== selectedObjectId),
+      selectedObjectId: null,
+    }))
+  }, [selectedObjectId, commit])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -52,12 +53,20 @@ export default function App() {
       const target = event.target
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
 
-      if (event.key === 'Escape') {
-        setSelectedObjectId(null)
-      } else if (selectedObjectId && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+      const modifier = event.metaKey || event.ctrlKey
+      const key = event.key.toLowerCase()
+      if (modifier && key === 'z') {
+        event.preventDefault()
+        if (!event.repeat) (event.shiftKey ? redo : undo)()
+      } else if (modifier && key === 'y') {
+        event.preventDefault()
+        if (!event.repeat) redo()
+      } else if (event.key === 'Escape') {
+        select(null)
+      } else if (selectedObjectId && modifier && key === 'd') {
         event.preventDefault()
         if (!event.repeat) duplicateSelected()
-      } else if (selectedObjectId && !event.metaKey && !event.ctrlKey && (event.key === 'Delete' || event.key === 'Backspace')) {
+      } else if (selectedObjectId && !modifier && (event.key === 'Delete' || event.key === 'Backspace')) {
         event.preventDefault()
         deleteSelected()
       }
@@ -65,7 +74,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedObjectId, duplicateSelected, deleteSelected])
+  }, [selectedObjectId, duplicateSelected, deleteSelected, select, undo, redo])
 
   return (
     <div className="app-shell">
@@ -98,14 +107,20 @@ export default function App() {
               </button>
             ))}
             {!selectedObject && <span className="toolbar-hint">Select a shape to use these tools</span>}
+            <div className="history-actions">
+              <button type="button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl/Cmd+Z)">Undo</button>
+              <button type="button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl/Cmd+Shift+Z or Ctrl+Y)">Redo</button>
+            </div>
           </div>
           <div className="workspace-frame">
             <Workspace
               objects={objects}
               selectedObjectId={selectedObjectId}
               toolMode={toolMode}
-              onSelectObject={setSelectedObjectId}
+              onSelectObject={select}
               onTransformObject={updateObjectTransform}
+              onTransformStart={begin}
+              onTransformEnd={end}
             />
             <div className="workspace-hint">Drag to orbit · Scroll to zoom · Right drag to pan</div>
             <div className="axis-label">X / Y / Z <span>·</span> {MODEL_UNIT}</div>
@@ -141,7 +156,15 @@ export default function App() {
               <button type="button" disabled={!selectedObject} onClick={duplicateSelected} title="Duplicate (Ctrl/Cmd+D)">Duplicate</button>
               <button type="button" disabled={!selectedObject} onClick={deleteSelected} title="Delete (Delete or Backspace)">Delete</button>
             </div>
-            {selectedObject && <ObjectInspector key={selectedObject.id} object={selectedObject} onUpdate={updateObject} />}
+            {selectedObject && (
+              <ObjectInspector
+                key={selectedObject.id}
+                object={selectedObject}
+                onUpdate={updateObject}
+                onEditStart={begin}
+                onEditEnd={end}
+              />
+            )}
           </div>
           <div className="panel-section controls-section">
             <h3>Camera controls</h3>
@@ -149,7 +172,7 @@ export default function App() {
             <div className="control-row"><span>Zoom</span><kbd>Scroll</kbd></div>
             <div className="control-row"><span>Pan</span><kbd>Right drag</kbd></div>
           </div>
-          <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Ctrl/Cmd+D duplicates · Delete removes · Esc clears selection</p></div>
+          <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Ctrl/Cmd+Z undoes · Ctrl/Cmd+Shift+Z redoes</p></div>
         </aside>
       </main>
     </div>

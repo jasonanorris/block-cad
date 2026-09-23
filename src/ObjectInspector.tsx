@@ -14,12 +14,16 @@ function NumericField({
   value,
   positive = false,
   onChange,
+  onEditStart,
+  onEditEnd,
 }: {
   label: string
   ariaLabel: string
   value: number
   positive?: boolean
   onChange: (value: number) => void
+  onEditStart: () => void
+  onEditEnd: () => void
 }) {
   const [draft, setDraft] = useState(() => displayNumber(value))
   const editing = useRef(false)
@@ -42,7 +46,10 @@ function NumericField({
         step="any"
         min={positive ? '0.001' : undefined}
         value={draft}
-        onFocus={() => { editing.current = true }}
+        onFocus={() => {
+          editing.current = true
+          onEditStart()
+        }}
         onChange={(event) => {
           const text = event.target.value
           setDraft(text)
@@ -51,6 +58,7 @@ function NumericField({
         onBlur={() => {
           editing.current = false
           if (!validNumber(draft)) setDraft(displayNumber(value))
+          onEditEnd()
         }}
       />
     </label>
@@ -60,9 +68,13 @@ function NumericField({
 export default function ObjectInspector({
   object,
   onUpdate,
+  onEditStart,
+  onEditEnd,
 }: {
   object: CadObject
   onUpdate: (id: string, update: (current: CadObject) => CadObject) => void
+  onEditStart: () => void
+  onEditEnd: () => void
 }) {
   const dimensions = getObjectDimensions(object)
 
@@ -77,6 +89,8 @@ export default function ObjectInspector({
               label={axis.toUpperCase()}
               ariaLabel={`Position ${axis.toUpperCase()} in millimeters`}
               value={object.position[axis]}
+              onEditStart={onEditStart}
+              onEditEnd={onEditEnd}
               onChange={(value) => onUpdate(object.id, (current) => ({
                 ...current,
                 position: { ...current.position, [axis]: value },
@@ -94,6 +108,8 @@ export default function ObjectInspector({
               label={axis.toUpperCase()}
               ariaLabel={`Rotation ${axis.toUpperCase()} in degrees`}
               value={object.rotation[axis] * 180 / Math.PI}
+              onEditStart={onEditStart}
+              onEditEnd={onEditEnd}
               onChange={(value) => onUpdate(object.id, (current) => ({
                 ...current,
                 rotation: { ...current.rotation, [axis]: value * Math.PI / 180 },
@@ -112,6 +128,8 @@ export default function ObjectInspector({
               ariaLabel={`Dimension ${axis.toUpperCase()} in millimeters`}
               value={dimensions[axis]}
               positive
+              onEditStart={onEditStart}
+              onEditEnd={onEditEnd}
               onChange={(value) => onUpdate(object.id, (current) => setObjectDimension(current, axis, value))}
             />
           ))}
