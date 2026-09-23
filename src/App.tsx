@@ -5,6 +5,7 @@ import ObjectInspector from './ObjectInspector'
 import { createCadObject, duplicateCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
+import { exportStl } from './stlExport'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -27,14 +28,23 @@ export default function App() {
   }
 
   function saveProject() {
-    const url = URL.createObjectURL(new Blob([serializeProject(objects)], { type: 'application/json' }))
+    download(new Blob([serializeProject(objects)], { type: 'application/json' }), 'block-cad-project.json')
+  }
+
+  function download(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'block-cad-project.json'
+    link.download = filename
     document.body.append(link)
     link.click()
     link.remove()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  function exportModel() {
+    if (objects.length === 0) return
+    download(new Blob([exportStl(objects)], { type: 'model/stl' }), 'block-cad-model.stl')
   }
 
   async function loadProject(event: ChangeEvent<HTMLInputElement>) {
@@ -119,6 +129,7 @@ export default function App() {
           <button type="button" onClick={newProject}>New</button>
           <button type="button" onClick={saveProject}>Save</button>
           <button type="button" onClick={() => fileInput.current?.click()}>Load</button>
+          <button type="button" onClick={exportModel} disabled={objects.length === 0} title="Export all shapes as a binary STL (millimeters)">Export STL</button>
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={loadProject} hidden aria-label="Choose a Block CAD project file" />
         </div>
       </header>
