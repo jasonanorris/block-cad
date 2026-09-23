@@ -10,6 +10,8 @@ type BaseObject = {
   scale: Vector3
 }
 
+export type ObjectTransform = Pick<BaseObject, 'position' | 'rotation' | 'scale'>
+
 export type CadObject = BaseObject & (
   | { type: 'box'; dimensions: Vector3 }
   | { type: 'cylinder'; dimensions: { diameter: number; height: number } }

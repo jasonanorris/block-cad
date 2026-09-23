@@ -1,36 +1,26 @@
-import { useEffect } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import type { CadObject } from './cadModel'
-
-function CameraControls() {
-  const { camera, gl } = useThree()
-
-  useEffect(() => {
-    const controls = new OrbitControls(camera, gl.domElement)
-    controls.target.set(0, 8, 0)
-    controls.minDistance = 25
-    controls.maxDistance = 400
-    controls.update()
-    return () => controls.dispose()
-  }, [camera, gl])
-
-  return null
-}
+import { useRef, type RefObject } from 'react'
+import { Canvas } from '@react-three/fiber'
+import type { Mesh } from 'three'
+import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
+import type { CadObject, ObjectTransform } from './cadModel'
+import SceneControls from './SceneControls'
 
 function CadObjectMesh({
   object,
   isSelected,
   onSelect,
+  selectedMeshRef,
 }: {
   object: CadObject
   isSelected: boolean
   onSelect: (id: string) => void
+  selectedMeshRef: RefObject<Mesh | null>
 }) {
   const { position, rotation, scale } = object
 
   return (
     <mesh
+      ref={isSelected ? selectedMeshRef : undefined}
       position={[position.x, position.y, position.z]}
       rotation={[rotation.x, rotation.y, rotation.z]}
       scale={[scale.x, scale.y, scale.z]}
@@ -62,7 +52,12 @@ function CadScene({
   objects,
   selectedObjectId,
   onSelectObject,
-}: WorkspaceProps) {
+  toolMode,
+  onTransformObject,
+  gizmoInteractionRef,
+}: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean> }) {
+  const selectedMeshRef = useRef<Mesh | null>(null)
+
   return (
     <>
       <color attach="background" args={['#f8faff']} />
@@ -74,10 +69,17 @@ function CadScene({
           key={object.id}
           object={object}
           isSelected={object.id === selectedObjectId}
-          onSelect={onSelectObject}
+          onSelect={(id) => { if (!gizmoInteractionRef.current) onSelectObject(id) }}
+          selectedMeshRef={selectedMeshRef}
         />
       ))}
-      <CameraControls />
+      <SceneControls
+        selectedMeshRef={selectedMeshRef}
+        gizmoInteractionRef={gizmoInteractionRef}
+        selectedObjectId={selectedObjectId}
+        toolMode={toolMode}
+        onTransformObject={onTransformObject}
+      />
     </>
   )
 }
@@ -85,17 +87,21 @@ function CadScene({
 type WorkspaceProps = {
   objects: CadObject[]
   selectedObjectId: string | null
+  toolMode: TransformControlsMode
   onSelectObject: (id: string | null) => void
+  onTransformObject: (id: string, transform: ObjectTransform) => void
 }
 
 export default function Workspace(props: WorkspaceProps) {
+  const gizmoInteractionRef = useRef(false)
+
   return (
     <div className="workspace-canvas" aria-label="3D workspace with a cube and grid">
       <Canvas
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
-        onPointerMissed={() => props.onSelectObject(null)}
+        onPointerMissed={() => { if (!gizmoInteractionRef.current) props.onSelectObject(null) }}
       >
-        <CadScene {...props} />
+        <CadScene {...props} gizmoInteractionRef={gizmoInteractionRef} />
       </Canvas>
     </div>
   )

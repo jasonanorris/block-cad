@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
-import { createCadObject, MODEL_UNIT, type CadObject, type CadObjectType } from './cadModel'
+import { createCadObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -11,7 +12,14 @@ const shapeLabels: Record<CadObjectType, string> = {
 export default function App() {
   const [objects, setObjects] = useState<CadObject[]>(() => [createCadObject('box')])
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
+  const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
+
+  const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
+    setObjects((current) => current.map((object) => (
+      object.id === id ? { ...object, ...transform } : object
+    )))
+  }, [])
 
   function addObject(type: CadObjectType) {
     // Keep new shapes apart so each one can be seen and selected immediately.
@@ -34,11 +42,32 @@ export default function App() {
             <div><p className="eyebrow">Workspace</p><h1 id="workspace-title">Your canvas</h1></div>
             <div className="view-label"><span className="view-dot" /> Perspective view</div>
           </div>
+          <div className="workspace-toolbar" aria-label="Transform tools">
+            {([
+              ['translate', 'Move'],
+              ['rotate', 'Rotate'],
+              ['scale', 'Scale'],
+            ] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                className={`tool-button${toolMode === mode ? ' is-active' : ''}`}
+                aria-pressed={toolMode === mode}
+                disabled={!selectedObject}
+                onClick={() => setToolMode(mode)}
+              >
+                {label}
+              </button>
+            ))}
+            {!selectedObject && <span className="toolbar-hint">Select a shape to use these tools</span>}
+          </div>
           <div className="workspace-frame">
             <Workspace
               objects={objects}
               selectedObjectId={selectedObjectId}
+              toolMode={toolMode}
               onSelectObject={setSelectedObjectId}
+              onTransformObject={updateObjectTransform}
             />
             <div className="workspace-hint">Drag to orbit · Scroll to zoom · Right drag to pan</div>
             <div className="axis-label">X / Y / Z <span>·</span> {MODEL_UNIT}</div>
@@ -75,7 +104,7 @@ export default function App() {
             <div className="control-row"><span>Zoom</span><kbd>Scroll</kbd></div>
             <div className="control-row"><span>Pan</span><kbd>Right drag</kbd></div>
           </div>
-          <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Modeling tools will arrive in upcoming milestones.</p></div>
+          <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Select a shape, choose a tool, and drag its handles to transform it.</p></div>
         </aside>
       </main>
     </div>
