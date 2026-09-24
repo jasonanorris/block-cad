@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
-import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type CadObjectType, type ObjectTransform, type Vector3 } from './cadModel'
+import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type CadObjectType, type ObjectTransform, type PrimitiveType, type Vector3 } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
@@ -14,11 +14,13 @@ import { nudgeSelectedObjects } from './selectionOperations'
 import MeasurementPanel from './MeasurementPanel'
 import ViewCube from './ViewCube'
 import { getObjectTopHeight } from './workplane'
+import { importSvg } from './svgImport'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
   cylinder: 'Cylinder',
   sphere: 'Sphere',
+  svg: 'SVG',
 }
 
 function objectLabel(object: CadObject, objects: CadObject[]) {
@@ -52,8 +54,10 @@ export default function App() {
   const [cameraOrientation, setCameraOrientation] = useState('rotateX(-25deg) rotateY(-35deg)')
   const [projectError, setProjectError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [svgError, setSvgError] = useState<string | null>(null)
   const [hasCopiedObjects, setHasCopiedObjects] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const svgInput = useRef<HTMLInputElement>(null)
   const copiedObjects = useRef<{ sources: CadObject[]; activeId: string | null; pasteCount: number } | null>(null)
   const nudgeKeys = useRef(new Set<string>())
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
@@ -100,6 +104,7 @@ export default function App() {
     setWorkplane(0)
     setProjectError(null)
     setExportError(null)
+    setSvgError(null)
   }
 
   function setWorkplane(height: number) {
@@ -135,8 +140,28 @@ export default function App() {
     try {
       download(new Blob([await exportStl(objects)], { type: 'model/stl' }), 'block-cad-model.stl')
       setExportError(null)
+      setSvgError(null)
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Could not export the model.')
+    }
+  }
+
+  async function importSvgFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const index = objects.length
+      const imported = importSvg(await file.text(), file.name, workplaneHeight,
+        (index % 3) * 30, Math.floor(index / 3) * 30)
+      commit((current) => ({ ...current,
+        objects: [...current.objects, ...imported],
+        selectedObjectIds: imported.map((object) => object.id),
+        selectedObjectId: imported[0].id,
+      }))
+      setSvgError(null)
+    } catch (error) {
+      setSvgError(error instanceof Error ? error.message : 'Could not import this SVG file.')
     }
   }
 
@@ -191,7 +216,7 @@ export default function App() {
     })
   }
 
-  function addObject(type: CadObjectType) {
+  function addObject(type: PrimitiveType) {
     // Keep new shapes apart so each one can be seen and selected immediately.
     const index = objects.length
     const object = createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30, workplaneHeight)
@@ -454,6 +479,7 @@ export default function App() {
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
       {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
       {exportError && <div className="project-error" role="alert">Could not export STL: {exportError}</div>}
+      {svgError && <div className="project-error" role="alert">Could not import SVG: {svgError}</div>}
       <main className="app-main">
         <section className="workspace-panel" aria-labelledby="workspace-title">
           <div className="workspace-heading">
@@ -544,6 +570,9 @@ export default function App() {
             </div>
             <button className="cut-example-button" type="button" onClick={addCutExample}>Add cutout example</button>
             <p className="cut-example-hint">Adds an editable box and cylinder cutter.</p>
+            <button className="cut-example-button" type="button" onClick={() => svgInput.current?.click()}>Import SVG</button>
+            <input ref={svgInput} type="file" accept=".svg,image/svg+xml" onChange={importSvgFile} hidden aria-label="Choose an SVG file" />
+            <p className="cut-example-hint">Filled SVG shapes import as 5 mm tall solids.</p>
             {derivedBodies.length > 0 && !booleanError && (
               <p className="cut-status" role="status">
                 {booleanGeometries.size === derivedBodies.length

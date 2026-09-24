@@ -35,6 +35,17 @@ export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): 
       }
       case 'sphere':
         return track(runtime.Manifold.sphere(object.dimensions.diameter / 2, 32))
+      case 'svg': {
+        const polygons = [object.contours.outline, ...object.contours.holes]
+          .map((contour) => contour.map((point): [number, number] => [point.x, point.y]))
+        const section = new runtime.CrossSection(polygons, 'EvenOdd')
+        try {
+          const extruded = track(section.extrude(object.dimensions.y, 0, 0, [1, 1], true))
+          return track(extruded.transform(CYLINDER_TO_Y.elements as Mat4))
+        } finally {
+          section.delete()
+        }
+      }
     }
   }
 

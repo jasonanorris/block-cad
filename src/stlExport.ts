@@ -3,6 +3,7 @@ import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { getSolidBodies, type CadObject } from './cadModel'
 import { buildSolidGeometry } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
+import { svgGeometry } from './svgGeometry'
 
 function geometryFor(object: CadObject): BufferGeometry {
   switch (object.type) {
@@ -12,6 +13,8 @@ function geometryFor(object: CadObject): BufferGeometry {
       return new CylinderGeometry(object.dimensions.diameter / 2, object.dimensions.diameter / 2, object.dimensions.height, 32)
     case 'sphere':
       return new SphereGeometry(object.dimensions.diameter / 2, 32, 16)
+    case 'svg':
+      return svgGeometry(object.contours, object.dimensions)
   }
 }
 

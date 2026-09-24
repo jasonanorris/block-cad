@@ -11,7 +11,7 @@ export function getObjectTopHeight(object: CadObject): number {
   const [x, y, z] = [rotation[1], rotation[5], rotation[9]]
   let radius: number
 
-  if (object.type === 'box') {
+  if (object.type === 'box' || object.type === 'svg') {
     radius = (Math.abs(x) * size.x + Math.abs(y) * size.y + Math.abs(z) * size.z) / 2
   } else if (object.type === 'cylinder') {
     radius = (Math.hypot(x * size.x, z * size.z) + Math.abs(y) * size.y) / 2

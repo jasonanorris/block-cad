@@ -83,7 +83,7 @@ export default function ObjectInspector({
   disabled?: boolean
 }) {
   const dimensions = getObjectDimensions(object)
-  const shapeName = object.type[0].toUpperCase() + object.type.slice(1)
+  const shapeName = object.type === 'svg' ? 'SVG' : object.type[0].toUpperCase() + object.type.slice(1)
 
   return (
     <fieldset className="object-inspector" disabled={disabled}>

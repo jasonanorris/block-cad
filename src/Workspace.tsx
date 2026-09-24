@@ -1,9 +1,10 @@
-import { useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import type { BufferGeometry, Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
+import { svgGeometry } from './svgGeometry'
 
 function CadObjectMesh({
   object,
@@ -22,6 +23,9 @@ function CadObjectMesh({
   selectedMeshRef: RefObject<Mesh | null>
   cutGeometry?: BufferGeometry
 }) {
+  const importedGeometry = useMemo(() => object.type === 'svg'
+    ? svgGeometry(object.contours, object.dimensions) : null, [object])
+  useEffect(() => () => importedGeometry?.dispose(), [importedGeometry])
   if (object.hidden) return null
   const { position, rotation, scale } = object
   const isCutter = isHoleObject(object)
@@ -43,6 +47,8 @@ function CadObjectMesh({
     >
       {cutGeometry ? (
         <primitive object={cutGeometry} attach="geometry" />
+      ) : importedGeometry ? (
+        <primitive object={importedGeometry} attach="geometry" />
       ) : object.type === 'box' && (
         <boxGeometry args={[object.dimensions.x, object.dimensions.y, object.dimensions.z]} />
       )}

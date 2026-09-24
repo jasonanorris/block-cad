@@ -1,4 +1,6 @@
 export type Vector3 = { x: number; y: number; z: number }
+export type Point2 = { x: number; y: number }
+export type SvgContours = { outline: Point2[]; holes: Point2[][] }
 
 // One scene length unit equals one millimeter. Rotation values are radians.
 export const MODEL_UNIT = 'mm' as const
@@ -22,9 +24,11 @@ export type CadObject = BaseObject & (
   | { type: 'box'; dimensions: Vector3 }
   | { type: 'cylinder'; dimensions: { diameter: number; height: number } }
   | { type: 'sphere'; dimensions: { diameter: number } }
+  | { type: 'svg'; dimensions: Vector3; contours: SvgContours }
 )
 
 export type CadObjectType = CadObject['type']
+export type PrimitiveType = Exclude<CadObjectType, 'svg'>
 
 export type HoleObject = CadObject & { cutTargetId: string }
 
@@ -83,6 +87,8 @@ function baseDimensions(object: CadObject): Vector3 {
       return { x: object.dimensions.diameter, y: object.dimensions.height, z: object.dimensions.diameter }
     case 'sphere':
       return { x: object.dimensions.diameter, y: object.dimensions.diameter, z: object.dimensions.diameter }
+    case 'svg':
+      return object.dimensions
   }
 }
 
@@ -110,7 +116,7 @@ export function duplicateCadObject(object: CadObject, offset = 25): CadObject {
   return duplicate
 }
 
-export function createCadObject(type: CadObjectType, x = 0, z = 0, workplaneHeight = 0): CadObject {
+export function createCadObject(type: PrimitiveType, x = 0, z = 0, workplaneHeight = 0): CadObject {
   const base = {
     id: crypto.randomUUID(),
     position: { x, y: workplaneHeight + 10, z },

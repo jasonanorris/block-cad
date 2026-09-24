@@ -1,7 +1,7 @@
-import { isHoleObject, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
+import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 9
+const PROJECT_VERSION = 10
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -30,6 +30,30 @@ function vector(value: unknown, field: string): Vector3 {
     y: finiteNumber(data.y, `${field}.y`),
     z: finiteNumber(data.z, `${field}.z`),
   }
+}
+
+function contour(value: unknown, field: string): Point2[] {
+  if (!Array.isArray(value) || value.length < 3 || value.length > 20_000) {
+    throw new Error(`${field} must contain 3 to 20,000 points.`)
+  }
+  return value.map((point, index) => {
+    const data = record(point)
+    if (!data) throw new Error(`${field}[${index}] must have x and y coordinates.`)
+    return { x: finiteNumber(data.x, `${field}[${index}].x`), y: finiteNumber(data.y, `${field}[${index}].y`) }
+  })
+}
+
+function svgContours(value: unknown, field: string): SvgContours {
+  const data = record(value)
+  if (!data || !Array.isArray(data.holes) || data.holes.length > 100) {
+    throw new Error(`${field} must have an outline and up to 100 holes.`)
+  }
+  const outline = contour(data.outline, `${field}.outline`)
+  const holes = data.holes.map((hole, index) => contour(hole, `${field}.holes[${index}]`))
+  if (outline.length + holes.reduce((count, hole) => count + hole.length, 0) > 20_000) {
+    throw new Error(`${field} has too many points.`)
+  }
+  return { outline, holes }
 }
 
 function objectFromFile(value: unknown, index: number, version: number): CadObject {
@@ -100,6 +124,18 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
         diameter: positiveNumber(dimensions.diameter, `${field}.dimensions.diameter`),
       }, ...(version >= 5 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
     }
+    case 'svg': {
+      if (version < 10) throw new Error(`${field} has an unsupported shape type.`)
+      if (data.cutTargetId !== undefined && (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
+        throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      }
+      return { ...base, type: 'svg', dimensions: {
+        x: positiveNumber(dimensions.x, `${field}.dimensions.x`),
+        y: positiveNumber(dimensions.y, `${field}.dimensions.y`),
+        z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
+      }, contours: svgContours(data.contours, `${field}.contours`),
+      ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+    }
     default:
       throw new Error(`${field} has an unsupported shape type.`)
   }
@@ -119,7 +155,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== 8 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== 8 && project.version !== 9 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
