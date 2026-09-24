@@ -110,7 +110,27 @@ export default function App() {
   }
 
   const updateObject = useCallback((id: string, update: (current: CadObject) => CadObject) => {
-    editObjects((current) => current.map((object) => object.id === id ? update(object) : object))
+    editObjects((current) => {
+      const source = current.find((object) => object.id === id)
+      if (!source) return current
+      const changed = update(source)
+      const offset = {
+        x: changed.position.x - source.position.x,
+        y: changed.position.y - source.position.y,
+        z: changed.position.z - source.position.z,
+      }
+      const moved = offset.x !== 0 || offset.y !== 0 || offset.z !== 0
+      return current.map((object) => {
+        if (object.id === id) return changed
+        if (!moved || isHoleObject(source) || !isHoleObject(object) ||
+          !object.groupedWithTarget || object.cutTargetId !== id) return object
+        return { ...object, position: {
+          x: object.position.x + offset.x,
+          y: object.position.y + offset.y,
+          z: object.position.z + offset.z,
+        } }
+      })
+    })
   }, [editObjects])
 
   const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
