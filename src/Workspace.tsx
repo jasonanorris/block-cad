@@ -2,7 +2,7 @@ import { useRef, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import type { BufferGeometry, Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
-import type { CadObject, ObjectTransform } from './cadModel'
+import { isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
 
 function CadObjectMesh({
@@ -19,7 +19,7 @@ function CadObjectMesh({
   cutGeometry?: BufferGeometry
 }) {
   const { position, rotation, scale } = object
-  const isCutter = object.type === 'cylinder' && !!object.cutTargetId
+  const isCutter = isHoleObject(object)
 
   return (
     <mesh

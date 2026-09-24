@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { BufferGeometry } from 'three'
-import { isCylinderCutter, type CadObject } from './cadModel'
-import { subtractCylinders } from './booleanGeometry'
+import { isHoleObject, type CadObject } from './cadModel'
+import { subtractHoles } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
 
 type Preview = { geometries: Map<string, BufferGeometry>; error: string | null }
@@ -10,8 +10,8 @@ export function useBooleanPreview(objects: CadObject[]): Preview {
   const [preview, setPreview] = useState<Preview>(() => ({ geometries: new Map(), error: null }))
 
   useEffect(() => {
-    const cutters = objects.filter(isCylinderCutter)
-    if (cutters.length === 0) {
+    const holes = objects.filter(isHoleObject)
+    if (holes.length === 0) {
       setPreview((current) => current.geometries.size || current.error
         ? { geometries: new Map(), error: null }
         : current)
@@ -23,9 +23,9 @@ export function useBooleanPreview(objects: CadObject[]): Preview {
       const geometries = new Map<string, BufferGeometry>()
       try {
         for (const object of objects) {
-          if (isCylinderCutter(object)) continue
-          const targetCutters = cutters.filter((cutter) => cutter.cutTargetId === object.id)
-          if (targetCutters.length) geometries.set(object.id, subtractCylinders(object, targetCutters, runtime))
+          if (isHoleObject(object)) continue
+          const targetHoles = holes.filter((hole) => hole.cutTargetId === object.id)
+          if (targetHoles.length) geometries.set(object.id, subtractHoles(object, targetHoles, runtime))
         }
         if (cancelled) {
           for (const geometry of geometries.values()) geometry.dispose()

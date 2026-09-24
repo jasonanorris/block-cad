@@ -1,7 +1,7 @@
-import { isCylinderCutter, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
+import { isHoleObject, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 3
+const PROJECT_VERSION = 4
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -48,12 +48,17 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
   if (!dimensions) throw new Error(`${field}.dimensions is missing.`)
 
   switch (data.type) {
-    case 'box':
+    case 'box': {
+      if (version >= 4 && data.cutTargetId !== undefined &&
+        (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
+        throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      }
       return { ...base, type: 'box', dimensions: {
         x: positiveNumber(dimensions.x, `${field}.dimensions.x`),
         y: positiveNumber(dimensions.y, `${field}.dimensions.y`),
         z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
-      } }
+      }, ...(version >= 4 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+    }
     case 'cylinder': {
       if (version >= 2 && data.cutTargetId !== undefined &&
         (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
@@ -87,7 +92,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
@@ -97,10 +102,10 @@ export function parseProject(text: string): CadObject[] {
   const ids = new Set(objects.map((object) => object.id))
   if (ids.size !== objects.length) throw new Error('The project contains duplicate object IDs.')
   for (const object of objects) {
-    if (object.type === 'cylinder' && object.cutTargetId &&
+    if (isHoleObject(object) &&
       !objects.some((target) => target.id === object.cutTargetId &&
-        (project.version === 2 ? target.type === 'box' : !isCylinderCutter(target)))) {
-      throw new Error(`Cylinder ${object.id} must cut an existing solid target.`)
+        (project.version === 2 ? target.type === 'box' : !isHoleObject(target)))) {
+      throw new Error(`Hole ${object.id} must cut an existing solid target.`)
     }
   }
   return objects

@@ -1,7 +1,7 @@
 import { BoxGeometry, CylinderGeometry, Mesh, Scene, SphereGeometry, type BufferGeometry } from 'three'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
-import { isCylinderCutter, type CadObject } from './cadModel'
-import { subtractCylinders } from './booleanGeometry'
+import { isHoleObject, type CadObject } from './cadModel'
+import { subtractHoles } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
 
 function geometryFor(object: CadObject): BufferGeometry {
@@ -39,15 +39,16 @@ function reverseWinding(geometry: BufferGeometry) {
 export async function exportStl(objects: CadObject[]): Promise<ArrayBuffer> {
   const scene = new Scene()
   const geometries: BufferGeometry[] = []
-  const hasCuts = objects.some(isCylinderCutter)
+  const holes = objects.filter(isHoleObject)
+  const hasCuts = holes.length > 0
   const runtime = hasCuts ? await loadManifold() : null
 
   try {
     for (const object of objects) {
-      if (isCylinderCutter(object)) continue
-      const cutters = objects.filter(isCylinderCutter).filter((candidate) => candidate.cutTargetId === object.id)
-      const geometry = cutters.length && runtime
-        ? subtractCylinders(object, cutters, runtime)
+      if (isHoleObject(object)) continue
+      const targetHoles = holes.filter((hole) => hole.cutTargetId === object.id)
+      const geometry = targetHoles.length && runtime
+        ? subtractHoles(object, targetHoles, runtime)
         : geometryFor(object)
       geometries.push(geometry)
       if (object.scale.x * object.scale.y * object.scale.z < 0) reverseWinding(geometry)

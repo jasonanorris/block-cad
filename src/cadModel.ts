@@ -13,15 +13,17 @@ type BaseObject = {
 export type ObjectTransform = Pick<BaseObject, 'position' | 'rotation' | 'scale'>
 
 export type CadObject = BaseObject & (
-  | { type: 'box'; dimensions: Vector3 }
+  | { type: 'box'; dimensions: Vector3; cutTargetId?: string }
   | { type: 'cylinder'; dimensions: { diameter: number; height: number }; cutTargetId?: string }
   | { type: 'sphere'; dimensions: { diameter: number } }
 )
 
 export type CadObjectType = CadObject['type']
 
-export function isCylinderCutter(object: CadObject): object is Extract<CadObject, { type: 'cylinder' }> & { cutTargetId: string } {
-  return object.type === 'cylinder' && !!object.cutTargetId
+export type HoleObject = Extract<CadObject, { type: 'box' | 'cylinder' }> & { cutTargetId: string }
+
+export function isHoleObject(object: CadObject): object is HoleObject {
+  return (object.type === 'box' || object.type === 'cylinder') && !!object.cutTargetId
 }
 
 function baseDimensions(object: CadObject): Vector3 {

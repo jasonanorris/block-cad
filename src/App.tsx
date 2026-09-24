@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
-import { createCadObject, createCutExample, duplicateCadObject, isCylinderCutter, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
+import { createCadObject, createCutExample, duplicateCadObject, isHoleObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
@@ -13,6 +13,10 @@ const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
   cylinder: 'Cylinder',
   sphere: 'Sphere',
+}
+
+function objectLabel(object: CadObject) {
+  return `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}`
 }
 
 const cameraViews: { view: CameraView; label: string }[] = [
@@ -32,11 +36,11 @@ export default function App() {
   const [exportError, setExportError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
-  const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isCylinderCutter(object)
+  const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isHoleObject(object)
     ? [{ id: object.id, label: `${shapeLabels[object.type]} #${index + 1}` }]
     : [])
   const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
-  const cutTargetCount = new Set(objects.filter(isCylinderCutter).map((object) => object.cutTargetId)).size
+  const cutTargetCount = new Set(objects.filter(isHoleObject).map((object) => object.cutTargetId)).size
 
   function newProject() {
     reset([])
@@ -95,16 +99,18 @@ export default function App() {
 
   function setCutTarget(id: string, targetId: string | null) {
     commit((current) => {
+      const source = current.objects.find((object) => object.id === id)
+      if (!source || source.type === 'sphere') return current
       if (targetId && !current.objects.some((object) => object.id === targetId &&
-        object.id !== id && !isCylinderCutter(object))) return current
+        object.id !== id && !isHoleObject(object))) return current
       return {
         ...current,
         objects: current.objects.map((object) => {
-          if (object.id === id && object.type === 'cylinder') {
+          if (object.id === id && object.type !== 'sphere') {
             return { ...object, cutTargetId: targetId ?? undefined }
           }
           // A hole cannot also be the target of another hole.
-          if (targetId && object.type === 'cylinder' && object.cutTargetId === id) {
+          if (targetId && isHoleObject(object) && object.cutTargetId === id) {
             return { ...object, cutTargetId: undefined }
           }
           return object
@@ -139,7 +145,7 @@ export default function App() {
     commit((current) => ({
       objects: current.objects
         .filter((object) => object.id !== selectedObjectId)
-        .map((object) => object.type === 'cylinder' && object.cutTargetId === selectedObjectId
+        .map((object) => isHoleObject(object) && object.cutTargetId === selectedObjectId
           ? { ...object, cutTargetId: undefined }
           : object),
       selectedObjectId: null,
@@ -281,13 +287,13 @@ export default function App() {
             <h3>Selection</h3>
             <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
               <span className="selection-indicator" aria-hidden="true" />
-              <span>{selectedObject ? `${selectedObject.type === 'cylinder' && selectedObject.cutTargetId ? 'Cylinder cutter' : shapeLabels[selectedObject.type]} selected` : 'Nothing selected'}</span>
+              <span>{selectedObject ? `${objectLabel(selectedObject)} selected` : 'Nothing selected'}</span>
             </div>
             {objects.length > 0 && (
               <div className="object-list" role="group" aria-label="Objects">
                 {objects.map((object, index) => (
                   <button key={object.id} type="button" aria-pressed={object.id === selectedObjectId} onClick={() => select(object.id)}>
-                    <span>{object.type === 'cylinder' && object.cutTargetId ? 'Cylinder cutter' : shapeLabels[object.type]}</span>
+                    <span>{objectLabel(object)}</span>
                     <span>#{index + 1}</span>
                   </button>
                 ))}
