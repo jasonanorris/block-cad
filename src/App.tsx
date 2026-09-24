@@ -30,7 +30,7 @@ function objectLabel(object: CadObject, objects: CadObject[]) {
   const shape = `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}`
   const grouped = isHoleObject(object) ? object.groupedWithTarget :
     objects.some((hole) => isHoleObject(hole) && hole.groupedWithTarget && hole.cutTargetId === object.id)
-  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? ' · Joined' : ''}${grouped ? ' · Grouped' : ''}${object.hidden ? ' · Hidden' : ''}${object.locked ? ' · Locked' : ''}`
+  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? object.joinMode === 'intersection' ? ' · Intersected' : ' · Joined' : ''}${grouped ? ' · Grouped' : ''}${object.hidden ? ' · Hidden' : ''}${object.locked ? ' · Locked' : ''}`
 }
 
 const cameraViews: { view: CameraView; label: string }[] = [
@@ -103,6 +103,9 @@ export default function App() {
   const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
   const derivedBodies = getSolidBodies(objects).filter((body) => body.members.length > 1 || body.holes.length > 0)
   const hasJoinedBodies = derivedBodies.some((body) => body.members.length > 1)
+  const hasIntersectedBodies = derivedBodies.some((body) => body.anchor.joinMode === 'intersection')
+  const hasEmptyIntersection = derivedBodies.some((body) => body.anchor.joinMode === 'intersection' &&
+    booleanGeometries.get(body.anchor.id)?.getAttribute('position').count === 0)
 
   function newProject() {
     reset([])
@@ -366,7 +369,7 @@ export default function App() {
     })
   }, [editObjects, selectedObjectIds])
 
-  function joinSelected() {
+  function combineSelected(mode: 'union' | 'intersection') {
     const groupId = crypto.randomUUID()
     commit((current) => {
       const ids = new Set(current.selectedObjectIds)
@@ -378,7 +381,9 @@ export default function App() {
       if (members.length < 2 || members.some((object) => object.joinGroupId) ||
         selected.some((object) => isHoleObject(object) && !memberIds.has(object.cutTargetId))) return current
       return {
-        objects: current.objects.map((object) => memberIds.has(object.id) ? { ...object, joinGroupId: groupId } : object),
+        objects: current.objects.map((object) => memberIds.has(object.id)
+          ? { ...object, joinGroupId: groupId, joinMode: mode === 'intersection' ? 'intersection' as const : undefined }
+          : object),
         selectedObjectId: members[0].id,
         selectedObjectIds: [members[0].id],
       }
@@ -396,7 +401,7 @@ export default function App() {
       return {
         ...current,
         objects: current.objects.map((object) => object.joinGroupId && groups.has(object.joinGroupId)
-          ? { ...object, joinGroupId: undefined }
+          ? { ...object, joinGroupId: undefined, joinMode: undefined }
           : object),
       }
     })
@@ -621,7 +626,9 @@ export default function App() {
             {derivedBodies.length > 0 && !booleanError && (
               <p className="cut-status" role="status">
                 {booleanGeometries.size === derivedBodies.length
-                  ? hasJoinedBodies ? 'Join preview ready' : 'Cut preview ready'
+                  ? hasEmptyIntersection ? 'Intersection is empty; select a member to Separate or move the shapes'
+                    : hasIntersectedBodies ? 'Intersection preview ready'
+                      : hasJoinedBodies ? 'Join preview ready' : 'Cut preview ready'
                   : 'Calculating model…'}
               </p>
             )}
@@ -673,9 +680,10 @@ export default function App() {
               <button type="button" disabled={!selectedAssembly.some((object) => !object.locked)} onClick={() => setLocked(true)}>Lock</button>
               <button type="button" disabled={!selectedAssembly.some((object) => object.locked)} onClick={() => setLocked(false)}>Unlock</button>
             </div>
-            <div className="join-actions">
-              <button type="button" disabled={!canJoin} onClick={joinSelected} title="Join two or more selected solids, including their selected holes">Join</button>
-              <button type="button" disabled={!canSeparate} onClick={separateSelected} title="Separate the selected joined shapes">Separate</button>
+            <div className="join-actions combine-actions">
+              <button type="button" disabled={!canJoin} onClick={() => combineSelected('union')} title="Join two or more selected solids, including their selected holes">Join</button>
+              <button type="button" disabled={!canJoin} onClick={() => combineSelected('intersection')} title="Keep only the volume shared by two or more selected solids, then cut their linked holes">Intersect</button>
+              <button type="button" disabled={!canSeparate} onClick={separateSelected} title="Separate the selected combined shapes">Separate</button>
             </div>
             <div className="join-actions">
               <button type="button" disabled={!canGroupCut} onClick={groupCutSelected} title="Group one selected solid with its selected holes">Group</button>

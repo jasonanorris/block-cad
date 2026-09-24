@@ -56,6 +56,7 @@ export function copyCadObjects(sources: CadObject[], offset: number, destination
         cutTargetId: target,
         groupedWithTarget: object.groupedWithTarget && targetCopied ? true : undefined,
         joinGroupId: group ? copiedGroups.get(group) : undefined,
+        joinMode: group && copiedGroups.has(group) ? object.joinMode : undefined,
         hidden: undefined,
         locked: undefined,
       }

@@ -2,7 +2,7 @@ import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 11
+const PROJECT_VERSION = 12
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -67,6 +67,9 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
     (typeof data.joinGroupId !== 'string' || !data.joinGroupId.trim())) {
     throw new Error(`${field}.joinGroupId must be a nonempty ID.`)
   }
+  if (version >= 12 && data.joinMode !== undefined && data.joinMode !== 'intersection') {
+    throw new Error(`${field}.joinMode must be intersection.`)
+  }
   if (version >= 7 && data.name !== undefined &&
     (typeof data.name !== 'string' || !data.name.trim() || data.name.length > 80)) {
     throw new Error(`${field}.name must be 1 to 80 characters.`)
@@ -90,6 +93,7 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
     rotation: vector(data.rotation, `${field}.rotation`),
     scale: vector(data.scale, `${field}.scale`),
     ...(version >= 6 && data.joinGroupId ? { joinGroupId: data.joinGroupId as string } : {}),
+    ...(version >= 12 && data.joinMode === 'intersection' ? { joinMode: 'intersection' as const } : {}),
   }
   const dimensions = record(data.dimensions)
   if (!dimensions) throw new Error(`${field}.dimensions is missing.`)
@@ -174,7 +178,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== 8 && project.version !== 9 && project.version !== 10 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== 8 && project.version !== 9 && project.version !== 10 && project.version !== 11 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
@@ -194,9 +198,17 @@ export function parseProject(text: string): CadObject[] {
     }
   }
   const joinCounts = new Map<string, number>()
+  const joinModes = new Map<string, CadObject['joinMode']>()
   for (const object of objects) {
-    if (!object.joinGroupId) continue
+    if (!object.joinGroupId) {
+      if (object.joinMode) throw new Error(`Shape ${object.id} cannot have an intersection mode without a group.`)
+      continue
+    }
     if (isHoleObject(object)) throw new Error(`Hole ${object.id} cannot be joined as a solid.`)
+    if (joinModes.has(object.joinGroupId) && joinModes.get(object.joinGroupId) !== object.joinMode) {
+      throw new Error(`Join ${object.joinGroupId} must use one combine mode.`)
+    }
+    joinModes.set(object.joinGroupId, object.joinMode)
     joinCounts.set(object.joinGroupId, (joinCounts.get(object.joinGroupId) ?? 0) + 1)
   }
   for (const [groupId, count] of joinCounts) {

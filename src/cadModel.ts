@@ -16,6 +16,7 @@ type BaseObject = {
   cutTargetId?: string
   groupedWithTarget?: boolean
   joinGroupId?: string
+  joinMode?: 'intersection'
 }
 
 export type ObjectTransform = Pick<BaseObject, 'position' | 'rotation' | 'scale'>
@@ -43,7 +44,7 @@ export type SolidBody = {
   holes: HoleObject[]
 }
 
-// Joined solids form one derived body. A hole linked to any member cuts the whole body.
+// Combined solids form one derived body. A hole linked to any member cuts the whole body.
 export function getSolidBodies(objects: CadObject[]): SolidBody[] {
   const bodies: SolidBody[] = []
   const joined = new Map<string, SolidBody>()
@@ -76,7 +77,7 @@ export function normalizeJoinGroups(objects: CadObject[]): CadObject[] {
   }
   return objects.map((object) => object.joinGroupId &&
     (isHoleObject(object) || (counts.get(object.joinGroupId) ?? 0) < 2)
-    ? { ...object, joinGroupId: undefined }
+    ? { ...object, joinGroupId: undefined, joinMode: undefined }
     : object)
 }
 

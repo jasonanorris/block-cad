@@ -64,7 +64,9 @@ export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): 
       const shape = primitive(member)
       const relativeMatrix = worldToAnchor.clone().multiply(objectMatrix(member))
       const transformed = track(shape.transform(relativeMatrix.elements as Mat4))
-      result = track(result.add(transformed))
+      result = track(body.anchor.joinMode === 'intersection'
+        ? result.intersect(transformed)
+        : result.add(transformed))
     }
 
     for (const hole of body.holes) {

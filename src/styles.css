@@ -136,6 +136,7 @@ h1 { margin-bottom: 0; font-size: 23px; letter-spacing: -.035em; line-height: 1.
 .clipboard-actions button:focus-visible, .visibility-actions button:focus-visible, .align-actions button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }
 .clipboard-actions button:disabled, .visibility-actions button:disabled, .align-actions button:disabled { opacity: .5; cursor: default; }
 .join-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.combine-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .join-actions button { padding: 8px 10px; border: 1px solid #b7cdf0; border-radius: 7px; background: #eef5ff; color: #315fa8; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
 .join-actions button:hover:not(:disabled) { background: #e1efff; }
 .join-actions button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }
