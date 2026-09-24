@@ -6,6 +6,7 @@ import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
+import { export3mf } from './threeMfExport'
 import type { CameraView } from './SceneControls'
 import { useBooleanPreview } from './useBooleanPreview'
 import { updateObjectWithGroups } from './groupTransforms'
@@ -148,6 +149,16 @@ export default function App() {
       setExportError(null)
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Could not export the model.')
+    }
+  }
+
+  async function exportPrintModel() {
+    if (objects.length === 0) return
+    try {
+      download(new Blob([await export3mf(objects)], { type: 'model/3mf' }), 'block-cad-model.model.3mf')
+      setExportError(null)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not export the 3MF model.')
     }
   }
 
@@ -502,12 +513,13 @@ export default function App() {
           <button type="button" onClick={saveProject}>Save</button>
           <button type="button" onClick={() => fileInput.current?.click()}>Load</button>
           <button type="button" onClick={exportModel} disabled={objects.length === 0} title="Export all shapes as a binary STL (millimeters)">Export STL</button>
+          <button type="button" onClick={exportPrintModel} disabled={objects.length === 0} title="Export finished solids as a 3MF model (millimeters)">Export 3MF</button>
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={loadProject} hidden aria-label="Choose a Block CAD project file" />
         </div>
       </header>
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
       {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
-      {exportError && <div className="project-error" role="alert">Could not export STL: {exportError}</div>}
+      {exportError && <div className="project-error" role="alert">Could not export model: {exportError}</div>}
       {svgError && <div className="project-error" role="alert">Could not import SVG: {svgError}</div>}
       {stlError && <div className="project-error" role="alert">Could not import STL: {stlError}</div>}
       <main className="app-main">
