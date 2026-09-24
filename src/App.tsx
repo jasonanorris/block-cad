@@ -15,9 +15,11 @@ const shapeLabels: Record<CadObjectType, string> = {
   sphere: 'Sphere',
 }
 
-function objectLabel(object: CadObject) {
+function objectLabel(object: CadObject, objects: CadObject[]) {
   const shape = `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}`
-  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? ' · Joined' : ''}`
+  const grouped = isHoleObject(object) ? object.groupedWithTarget :
+    objects.some((hole) => isHoleObject(hole) && hole.groupedWithTarget && hole.cutTargetId === object.id)
+  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? ' · Joined' : ''}${grouped ? ' · Grouped' : ''}`
 }
 
 const cameraViews: { view: CameraView; label: string }[] = [
@@ -40,10 +42,19 @@ export default function App() {
   const selectedIds = new Set(selectedObjectIds)
   const selectedObjects = objects.filter((object) => selectedIds.has(object.id))
   const selectedSolids = selectedObjects.filter((object) => !isHoleObject(object))
+  const selectedHoles = selectedObjects.filter(isHoleObject)
   const selectedSolidIds = new Set(selectedSolids.map((object) => object.id))
   const canJoin = selectedSolids.length >= 2 && selectedSolids.every((object) => !object.joinGroupId) &&
     selectedObjects.every((object) => !isHoleObject(object) || selectedSolidIds.has(object.cutTargetId))
   const canSeparate = selectedObjects.some((object) => !!object.joinGroupId)
+  const canGroupCut = selectedSolids.length === 1 && selectedHoles.length > 0 &&
+    selectedHoles.every((hole) => hole.cutTargetId === selectedSolids[0].id) &&
+    selectedHoles.some((hole) => !hole.groupedWithTarget)
+  const groupedCutTargets = new Set(objects.filter(isHoleObject).filter((hole) => hole.groupedWithTarget)
+    .map((hole) => hole.cutTargetId))
+  const canUngroupCut = selectedObjects.some((object) => isHoleObject(object)
+    ? !!object.groupedWithTarget
+    : groupedCutTargets.has(object.id))
   const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isHoleObject(object)
     ? [{ id: object.id, label: `${object.name ? `${object.name} · ` : ''}${shapeLabels[object.type]} #${index + 1}` }]
     : [])
@@ -116,11 +127,12 @@ export default function App() {
         ...current,
         objects: normalizeJoinGroups(current.objects.map((object) => {
           if (object.id === id) {
-            return { ...object, cutTargetId: targetId ?? undefined }
+            return { ...object, cutTargetId: targetId ?? undefined,
+              groupedWithTarget: targetId === object.cutTargetId ? object.groupedWithTarget : undefined }
           }
           // A hole cannot also be the target of another hole.
           if (targetId && isHoleObject(object) && object.cutTargetId === id) {
-            return { ...object, cutTargetId: undefined }
+            return { ...object, cutTargetId: undefined, groupedWithTarget: undefined }
           }
           return object
         })),
@@ -162,6 +174,7 @@ export default function App() {
         return {
           ...object,
           cutTargetId: object.cutTargetId ? copiedIds.get(object.cutTargetId) ?? object.cutTargetId : undefined,
+          groupedWithTarget: object.groupedWithTarget && object.cutTargetId && copiedIds.has(object.cutTargetId) ? true : undefined,
           joinGroupId: groupId ? copiedGroupIds.get(groupId) : undefined,
         }
       })
@@ -183,7 +196,7 @@ export default function App() {
         objects: normalizeJoinGroups(current.objects
           .filter((object) => !selectedIds.has(object.id))
           .map((object) => isHoleObject(object) && selectedIds.has(object.cutTargetId)
-            ? { ...object, cutTargetId: undefined }
+            ? { ...object, cutTargetId: undefined, groupedWithTarget: undefined }
             : object)),
         selectedObjectId: null,
         selectedObjectIds: [],
@@ -218,6 +231,40 @@ export default function App() {
         ...current,
         objects: current.objects.map((object) => object.joinGroupId && groups.has(object.joinGroupId)
           ? { ...object, joinGroupId: undefined }
+          : object),
+      }
+    })
+  }
+
+  function groupCutSelected() {
+    commit((current) => {
+      const ids = new Set(current.selectedObjectIds)
+      const selected = current.objects.filter((object) => ids.has(object.id))
+      const solids = selected.filter((object) => !isHoleObject(object))
+      const holes = selected.filter(isHoleObject)
+      if (solids.length !== 1 || holes.length === 0 ||
+        holes.some((hole) => hole.cutTargetId !== solids[0].id) ||
+        holes.every((hole) => hole.groupedWithTarget)) return current
+      return {
+        objects: current.objects.map((object) => ids.has(object.id) && isHoleObject(object)
+          ? { ...object, groupedWithTarget: true }
+          : object),
+        selectedObjectId: solids[0].id,
+        selectedObjectIds: [solids[0].id],
+      }
+    })
+  }
+
+  function ungroupCutSelected() {
+    commit((current) => {
+      const ids = new Set(current.selectedObjectIds)
+      const targets = new Set(current.objects.filter((object) => ids.has(object.id))
+        .map((object) => isHoleObject(object) ? object.cutTargetId : object.id))
+      if (!current.objects.some((object) => isHoleObject(object) && object.groupedWithTarget && targets.has(object.cutTargetId))) return current
+      return {
+        ...current,
+        objects: current.objects.map((object) => isHoleObject(object) && object.groupedWithTarget && targets.has(object.cutTargetId)
+          ? { ...object, groupedWithTarget: undefined }
           : object),
       }
     })
@@ -362,15 +409,15 @@ export default function App() {
             <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
               <span className="selection-indicator" aria-hidden="true" />
               <span>{selectedObjectIds.length > 1
-                ? `${selectedObjectIds.length} objects selected · ${selectedObject ? objectLabel(selectedObject) : 'Shape'} active`
-                : selectedObject ? `${objectLabel(selectedObject)} selected` : 'Nothing selected'}</span>
+                ? `${selectedObjectIds.length} objects selected · ${selectedObject ? objectLabel(selectedObject, objects) : 'Shape'} active`
+                : selectedObject ? `${objectLabel(selectedObject, objects)} selected` : 'Nothing selected'}</span>
             </div>
             <p className="selection-hint">Shift+click shapes or the list to select more than one.</p>
             {objects.length > 0 && (
               <div className="object-list" role="group" aria-label="Objects">
                 {objects.map((object, index) => (
                   <button key={object.id} type="button" aria-pressed={selectedObjectIds.includes(object.id)} onClick={(event) => select(object.id, event.shiftKey)}>
-                    <span>{objectLabel(object)}</span>
+                    <span>{objectLabel(object, objects)}</span>
                     <span>#{index + 1}</span>
                   </button>
                 ))}
@@ -383,6 +430,10 @@ export default function App() {
             <div className="join-actions">
               <button type="button" disabled={!canJoin} onClick={joinSelected} title="Join two or more selected solids, including their selected holes">Join</button>
               <button type="button" disabled={!canSeparate} onClick={separateSelected} title="Separate the selected joined shapes">Separate</button>
+            </div>
+            <div className="join-actions">
+              <button type="button" disabled={!canGroupCut} onClick={groupCutSelected} title="Group one selected solid with its selected holes">Group</button>
+              <button type="button" disabled={!canUngroupCut} onClick={ungroupCutSelected} title="Reveal the grouped holes linked to the selected solid">Ungroup</button>
             </div>
             {selectedObject && (
               <ObjectInspector

@@ -10,6 +10,7 @@ type BaseObject = {
   rotation: Vector3
   scale: Vector3
   cutTargetId?: string
+  groupedWithTarget?: boolean
   joinGroupId?: string
 }
 

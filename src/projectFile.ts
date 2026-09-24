@@ -1,7 +1,7 @@
 import { isHoleObject, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 7
+const PROJECT_VERSION = 8
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -46,9 +46,13 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
     (typeof data.name !== 'string' || !data.name.trim() || data.name.length > 80)) {
     throw new Error(`${field}.name must be 1 to 80 characters.`)
   }
+  if (version >= 8 && data.groupedWithTarget !== undefined && typeof data.groupedWithTarget !== 'boolean') {
+    throw new Error(`${field}.groupedWithTarget must be a boolean.`)
+  }
   const base = {
     id: data.id,
     ...(version >= 7 && data.name ? { name: (data.name as string).trim() } : {}),
+    ...(version >= 8 && data.groupedWithTarget ? { groupedWithTarget: true } : {}),
     position: vector(data.position, `${field}.position`),
     rotation: vector(data.rotation, `${field}.rotation`),
     scale: vector(data.scale, `${field}.scale`),
@@ -107,7 +111,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
@@ -117,6 +121,9 @@ export function parseProject(text: string): CadObject[] {
   const ids = new Set(objects.map((object) => object.id))
   if (ids.size !== objects.length) throw new Error('The project contains duplicate object IDs.')
   for (const object of objects) {
+    if (object.groupedWithTarget && !isHoleObject(object)) {
+      throw new Error(`Only a linked hole can be grouped with its target.`)
+    }
     if (isHoleObject(object) &&
       !objects.some((target) => target.id === object.cutTargetId &&
         (project.version === 2 ? target.type === 'box' : !isHoleObject(target)))) {

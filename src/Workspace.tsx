@@ -9,7 +9,7 @@ function CadObjectMesh({
   object,
   isSelected,
   isActive,
-  hiddenInJoin,
+  hiddenInGroup,
   onSelect,
   selectedMeshRef,
   cutGeometry,
@@ -17,20 +17,20 @@ function CadObjectMesh({
   object: CadObject
   isSelected: boolean
   isActive: boolean
-  hiddenInJoin: boolean
+  hiddenInGroup: boolean
   onSelect: (id: string, additive: boolean) => void
   selectedMeshRef: RefObject<Mesh | null>
   cutGeometry?: BufferGeometry
 }) {
   const { position, rotation, scale } = object
   const isCutter = isHoleObject(object)
-  const sourceOverlay = hiddenInJoin && isSelected
+  const sourceOverlay = hiddenInGroup && isSelected
   const wireframe = isCutter || sourceOverlay
 
   return (
     <mesh
       ref={isActive ? selectedMeshRef : undefined}
-      visible={!hiddenInJoin || isSelected}
+      visible={!hiddenInGroup || isSelected}
       position={[position.x, position.y, position.z]}
       rotation={[rotation.x, rotation.y, rotation.z]}
       scale={[scale.x, scale.y, scale.z]}
@@ -82,10 +82,13 @@ function CadScene({
   booleanGeometries,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean> }) {
   const selectedMeshRef = useRef<Mesh | null>(null)
-  const hiddenJoinedIds = new Set(getSolidBodies(objects).flatMap((body) => body.members.length > 1 &&
-    booleanGeometries.has(body.anchor.id)
-    ? body.members.slice(1).map((member) => member.id)
-    : []))
+  const hiddenGroupedIds = new Set(getSolidBodies(objects).flatMap((body) => {
+    if (!booleanGeometries.has(body.anchor.id)) return []
+    return [
+      ...(body.members.length > 1 ? body.members.slice(1).map((member) => member.id) : []),
+      ...body.holes.filter((hole) => hole.groupedWithTarget).map((hole) => hole.id),
+    ]
+  }))
 
   return (
     <>
@@ -99,7 +102,7 @@ function CadScene({
           object={object}
           isSelected={selectedObjectIds.includes(object.id)}
           isActive={object.id === selectedObjectId}
-          hiddenInJoin={hiddenJoinedIds.has(object.id)}
+          hiddenInGroup={hiddenGroupedIds.has(object.id)}
           onSelect={(id, additive) => { if (!gizmoInteractionRef.current) onSelectObject(id, additive) }}
           selectedMeshRef={selectedMeshRef}
           cutGeometry={booleanGeometries.get(object.id)}
