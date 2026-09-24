@@ -25,10 +25,11 @@ export type CadObject = BaseObject & (
   | { type: 'cylinder'; dimensions: { diameter: number; height: number } }
   | { type: 'sphere'; dimensions: { diameter: number } }
   | { type: 'svg'; dimensions: Vector3; contours: SvgContours }
+  | { type: 'stl'; dimensions: Vector3; meshData: string }
 )
 
 export type CadObjectType = CadObject['type']
-export type PrimitiveType = Exclude<CadObjectType, 'svg'>
+export type PrimitiveType = Exclude<CadObjectType, 'svg' | 'stl'>
 
 export type HoleObject = CadObject & { cutTargetId: string }
 
@@ -88,6 +89,7 @@ function baseDimensions(object: CadObject): Vector3 {
     case 'sphere':
       return { x: object.dimensions.diameter, y: object.dimensions.diameter, z: object.dimensions.diameter }
     case 'svg':
+    case 'stl':
       return object.dimensions
   }
 }

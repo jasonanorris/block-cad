@@ -15,12 +15,14 @@ import MeasurementPanel from './MeasurementPanel'
 import ViewCube from './ViewCube'
 import { getObjectTopHeight } from './workplane'
 import { importSvg } from './svgImport'
+import { importStl } from './stlImport'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
   cylinder: 'Cylinder',
   sphere: 'Sphere',
   svg: 'SVG',
+  stl: 'STL',
 }
 
 function objectLabel(object: CadObject, objects: CadObject[]) {
@@ -55,9 +57,12 @@ export default function App() {
   const [projectError, setProjectError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [svgError, setSvgError] = useState<string | null>(null)
+  const [stlError, setStlError] = useState<string | null>(null)
+  const [importingStl, setImportingStl] = useState(false)
   const [hasCopiedObjects, setHasCopiedObjects] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const svgInput = useRef<HTMLInputElement>(null)
+  const stlInput = useRef<HTMLInputElement>(null)
   const copiedObjects = useRef<{ sources: CadObject[]; activeId: string | null; pasteCount: number } | null>(null)
   const nudgeKeys = useRef(new Set<string>())
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
@@ -105,6 +110,7 @@ export default function App() {
     setProjectError(null)
     setExportError(null)
     setSvgError(null)
+    setStlError(null)
   }
 
   function setWorkplane(height: number) {
@@ -140,7 +146,6 @@ export default function App() {
     try {
       download(new Blob([await exportStl(objects)], { type: 'model/stl' }), 'block-cad-model.stl')
       setExportError(null)
-      setSvgError(null)
     } catch (error) {
       setExportError(error instanceof Error ? error.message : 'Could not export the model.')
     }
@@ -165,6 +170,28 @@ export default function App() {
     }
   }
 
+  async function importStlFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setImportingStl(true)
+    try {
+      const index = objects.length
+      const imported = await importStl(await file.arrayBuffer(), file.name, workplaneHeight,
+        (index % 3) * 30, Math.floor(index / 3) * 30)
+      commit((current) => ({ ...current,
+        objects: [...current.objects, imported],
+        selectedObjectIds: [imported.id],
+        selectedObjectId: imported.id,
+      }))
+      setStlError(null)
+    } catch (error) {
+      setStlError(error instanceof Error ? error.message : 'Could not import this STL file.')
+    } finally {
+      setImportingStl(false)
+    }
+  }
+
   async function loadProject(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -176,6 +203,8 @@ export default function App() {
       setWorkplane(0)
       setProjectError(null)
       setExportError(null)
+      setSvgError(null)
+      setStlError(null)
     } catch (error) {
       setProjectError(error instanceof Error ? error.message : 'Could not load this project file.')
     }
@@ -480,6 +509,7 @@ export default function App() {
       {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
       {exportError && <div className="project-error" role="alert">Could not export STL: {exportError}</div>}
       {svgError && <div className="project-error" role="alert">Could not import SVG: {svgError}</div>}
+      {stlError && <div className="project-error" role="alert">Could not import STL: {stlError}</div>}
       <main className="app-main">
         <section className="workspace-panel" aria-labelledby="workspace-title">
           <div className="workspace-heading">
@@ -573,6 +603,9 @@ export default function App() {
             <button className="cut-example-button" type="button" onClick={() => svgInput.current?.click()}>Import SVG</button>
             <input ref={svgInput} type="file" accept=".svg,image/svg+xml" onChange={importSvgFile} hidden aria-label="Choose an SVG file" />
             <p className="cut-example-hint">Filled SVG shapes import as 5 mm tall solids.</p>
+            <button className="cut-example-button" type="button" disabled={importingStl} onClick={() => stlInput.current?.click()}>{importingStl ? 'Importing STL…' : 'Import STL'}</button>
+            <input ref={stlInput} type="file" accept=".stl,model/stl" onChange={importStlFile} hidden aria-label="Choose an STL file" />
+            <p className="cut-example-hint">Imports a watertight STL at its original millimeter size.</p>
             {derivedBodies.length > 0 && !booleanError && (
               <p className="cut-status" role="status">
                 {booleanGeometries.size === derivedBodies.length

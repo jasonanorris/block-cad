@@ -5,6 +5,7 @@ import type { TransformControlsMode } from 'three/addons/controls/TransformContr
 import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
 import { svgGeometry } from './svgGeometry'
+import { stlMeshGeometry } from './stlMesh'
 
 function CadObjectMesh({
   object,
@@ -24,7 +25,8 @@ function CadObjectMesh({
   cutGeometry?: BufferGeometry
 }) {
   const importedGeometry = useMemo(() => object.type === 'svg'
-    ? svgGeometry(object.contours, object.dimensions) : null, [object])
+    ? svgGeometry(object.contours, object.dimensions)
+    : object.type === 'stl' ? stlMeshGeometry(object.meshData) : null, [object])
   useEffect(() => () => importedGeometry?.dispose(), [importedGeometry])
   if (object.hidden) return null
   const { position, rotation, scale } = object

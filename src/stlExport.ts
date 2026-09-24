@@ -4,6 +4,7 @@ import { getSolidBodies, type CadObject } from './cadModel'
 import { buildSolidGeometry } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
 import { svgGeometry } from './svgGeometry'
+import { stlMeshGeometry } from './stlMesh'
 
 function geometryFor(object: CadObject): BufferGeometry {
   switch (object.type) {
@@ -15,6 +16,8 @@ function geometryFor(object: CadObject): BufferGeometry {
       return new SphereGeometry(object.dimensions.diameter / 2, 32, 16)
     case 'svg':
       return svgGeometry(object.contours, object.dimensions)
+    case 'stl':
+      return stlMeshGeometry(object.meshData)
   }
 }
 

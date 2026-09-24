@@ -1,7 +1,8 @@
 import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours, type Vector3 } from './cadModel.ts'
+import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 10
+const PROJECT_VERSION = 11
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -136,6 +137,24 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
       }, contours: svgContours(data.contours, `${field}.contours`),
       ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
     }
+    case 'stl': {
+      if (version < 11) throw new Error(`${field} has an unsupported shape type.`)
+      if (data.cutTargetId !== undefined && (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
+        throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      }
+      if (typeof data.meshData !== 'string') throw new Error(`${field}.meshData must contain STL triangles.`)
+      try {
+        decodeStlMesh(data.meshData)
+      } catch (error) {
+        throw new Error(`${field}.meshData: ${error instanceof Error ? error.message : 'Invalid STL data.'}`)
+      }
+      return { ...base, type: 'stl', dimensions: {
+        x: positiveNumber(dimensions.x, `${field}.dimensions.x`),
+        y: positiveNumber(dimensions.y, `${field}.dimensions.y`),
+        z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
+      }, meshData: data.meshData,
+      ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+    }
     default:
       throw new Error(`${field} has an unsupported shape type.`)
   }
@@ -155,7 +174,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== 8 && project.version !== 9 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== 8 && project.version !== 9 && project.version !== 10 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)

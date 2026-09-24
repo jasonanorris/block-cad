@@ -1,6 +1,7 @@
 import { BufferGeometry, Euler, Float32BufferAttribute, Matrix4, Quaternion, Uint32BufferAttribute, Vector3 } from 'three'
 import type { Manifold, ManifoldToplevel, Mat4 } from 'manifold-3d'
 import type { CadObject, SolidBody } from './cadModel'
+import { stlMeshManifold } from './stlMesh'
 
 function objectMatrix(object: CadObject): Matrix4 {
   const { position, rotation, scale } = object
@@ -46,6 +47,8 @@ export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): 
           section.delete()
         }
       }
+      case 'stl':
+        return track(stlMeshManifold(object.meshData, runtime))
     }
   }
 
