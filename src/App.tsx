@@ -10,6 +10,9 @@ import type { CameraView } from './SceneControls'
 import { useBooleanPreview } from './useBooleanPreview'
 import { updateObjectWithGroups } from './groupTransforms'
 import { alignSelectedObjects, alignmentCandidates, copyCadObjects, expandAssemblyIds } from './selectionOperations'
+import { nudgeSelectedObjects } from './selectionOperations'
+import MeasurementPanel from './MeasurementPanel'
+import ViewCube from './ViewCube'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -29,19 +32,27 @@ const cameraViews: { view: CameraView; label: string }[] = [
   { view: 'top', label: 'Top' },
   { view: 'front', label: 'Front' },
   { view: 'right', label: 'Right' },
+  { view: 'bottom', label: 'Bottom' },
+  { view: 'back', label: 'Back' },
+  { view: 'left', label: 'Left' },
 ]
+
+const gridSizes = [1, 5, 10, 20]
 
 export default function App() {
   const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => [createCadObject('box')])
   const { objects, selectedObjectId, selectedObjectIds } = scene
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [snapEnabled, setSnapEnabled] = useState(false)
+  const [gridSize, setGridSize] = useState(5)
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
+  const [cameraOrientation, setCameraOrientation] = useState('rotateX(-25deg) rotateY(-35deg)')
   const [projectError, setProjectError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [hasCopiedObjects, setHasCopiedObjects] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const copiedObjects = useRef<{ sources: CadObject[]; activeId: string | null; pasteCount: number } | null>(null)
+  const nudgeKeys = useRef(new Set<string>())
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
   const selectedIds = new Set(selectedObjectIds)
   const selectedObjects = objects.filter((object) => selectedIds.has(object.id))
@@ -52,6 +63,8 @@ export default function App() {
   const canEditActive = !!selectedObject &&
     objects.every((object) => !activeAssemblyIds.has(object.id) || !object.locked)
   const canTransformSelected = canEditActive && !selectedObject?.hidden
+  const nudgeIds = expandAssemblyIds(objects, selectedIds, true)
+  const canNudge = selectedIds.size > 0 && objects.every((object) => !nudgeIds.has(object.id) || (!object.locked && !object.hidden))
   const alignCandidates = alignmentCandidates(objects, selectedIds, selectedObjectId)
   const alignmentIds = expandAssemblyIds(objects, selectedIds, true)
   const canAlign = alignCandidates.length > 0 &&
@@ -261,6 +274,15 @@ export default function App() {
     })
   }
 
+  const nudgeSelection = useCallback((axis: keyof Vector3, amount: number) => {
+    editObjects((current) => {
+      const ids = new Set(selectedObjectIds)
+      const affected = expandAssemblyIds(current, ids, true)
+      if (current.some((object) => affected.has(object.id) && (object.locked || object.hidden))) return current
+      return nudgeSelectedObjects(current, ids, axis, amount)
+    })
+  }, [editObjects, selectedObjectIds])
+
   function joinSelected() {
     const groupId = crypto.randomUUID()
     commit((current) => {
@@ -343,6 +365,11 @@ export default function App() {
 
       const modifier = event.metaKey || event.ctrlKey
       const key = event.key.toLowerCase()
+      const nudge: Record<string, [keyof Vector3, number]> = {
+        arrowleft: ['x', -1], arrowright: ['x', 1],
+        arrowup: ['z', -1], arrowdown: ['z', 1],
+        pageup: ['y', 1], pagedown: ['y', -1],
+      }
       if (modifier && key === 'z') {
         event.preventDefault()
         if (!event.repeat) (event.shiftKey ? redo : undo)()
@@ -363,12 +390,35 @@ export default function App() {
       } else if (canEditSelection && !modifier && (event.key === 'Delete' || event.key === 'Backspace')) {
         event.preventDefault()
         deleteSelected()
+      } else if (canNudge && !modifier && nudge[key]) {
+        event.preventDefault()
+        if (nudgeKeys.current.size === 0) begin()
+        nudgeKeys.current.add(key)
+        const [axis, direction] = nudge[key]
+        nudgeSelection(axis, direction * (event.shiftKey ? gridSize * 10 : snapEnabled ? gridSize : 1))
+      }
+    }
+
+    function onKeyUp(event: KeyboardEvent) {
+      if (nudgeKeys.current.delete(event.key.toLowerCase()) && nudgeKeys.current.size === 0) end()
+    }
+
+    function onBlur() {
+      if (nudgeKeys.current.size > 0) {
+        nudgeKeys.current.clear()
+        end()
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedObjectIds.length, canEditSelection, hasCopiedObjects, copySelected, pasteCopied, duplicateSelected, deleteSelected, select, undo, redo])
+    window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [selectedObjectIds.length, canEditSelection, canNudge, gridSize, snapEnabled, hasCopiedObjects, copySelected, pasteCopied, duplicateSelected, deleteSelected, nudgeSelection, begin, end, select, undo, redo])
 
   return (
     <div className="app-shell">
@@ -391,7 +441,7 @@ export default function App() {
           <div className="workspace-heading">
             <div><p className="eyebrow">Workspace</p><h1 id="workspace-title">Your canvas</h1></div>
             <div className="view-presets" role="group" aria-label="Camera views">
-              {cameraViews.map(({ view, label }) => (
+              {cameraViews.slice(0, 4).map(({ view, label }) => (
                 <button key={view} type="button" aria-pressed={cameraView === view} onClick={() => setCameraView(view)}>{label}</button>
               ))}
             </div>
@@ -417,11 +467,16 @@ export default function App() {
               type="button"
               className={`tool-button snap-button${snapEnabled ? ' is-active' : ''}`}
               aria-pressed={snapEnabled}
-              title="Snap moves to a 5 mm grid and rotations to 15° steps"
+              title={`Snap moves to a ${gridSize} mm grid and rotations to 15° steps`}
               onClick={() => setSnapEnabled((enabled) => !enabled)}
             >
-              Snap <span>5 mm · 15°</span>
+              Snap <span>{gridSize} mm · 15°</span>
             </button>
+            <label className="grid-size-control">Grid
+              <select aria-label="Grid spacing" value={gridSize} onChange={(event) => setGridSize(Number(event.target.value))}>
+                {gridSizes.map((size) => <option key={size} value={size}>{size} mm</option>)}
+              </select>
+            </label>
             {!selectedObject && <span className="toolbar-hint">Select a shape to use these tools</span>}
             <div className="history-actions">
               <button type="button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl/Cmd+Z)">Undo</button>
@@ -435,13 +490,16 @@ export default function App() {
               selectedObjectIds={selectedObjectIds}
               toolMode={toolMode}
               snapEnabled={snapEnabled}
+              gridSize={gridSize}
               cameraView={cameraView}
+              onCameraOrientation={setCameraOrientation}
               booleanGeometries={booleanGeometries}
               onSelectObject={select}
               onTransformObject={updateObjectTransform}
               onTransformStart={begin}
               onTransformEnd={end}
             />
+            <ViewCube cameraView={cameraView} orientation={cameraOrientation} onChange={setCameraView} />
             <div className="workspace-hint">{cameraView === 'perspective' && 'Drag to orbit · '}Scroll to zoom · Right drag to pan</div>
             <div className="axis-label">X / Y / Z <span>·</span> {MODEL_UNIT}</div>
           </div>
@@ -536,10 +594,16 @@ export default function App() {
             )}
           </div>
           <div className="panel-section controls-section">
+            <MeasurementPanel objects={objects} selectedObjectIds={selectedObjectIds} activeObjectId={selectedObjectId} />
+          </div>
+          <div className="panel-section controls-section">
             <h3>Camera controls</h3>
             <div className="control-row"><span>Orbit</span><kbd>Drag</kbd></div>
             <div className="control-row"><span>Zoom</span><kbd>Scroll</kbd></div>
             <div className="control-row"><span>Pan</span><kbd>Right drag</kbd></div>
+            <div className="control-row"><span>Nudge X / Z</span><kbd>Arrow keys</kbd></div>
+            <div className="control-row"><span>Nudge Y</span><kbd>Page Up / Down</kbd></div>
+            <p className="selection-hint">Shift moves 10 grid spaces. Snap uses the selected grid size; free movement uses 1 mm.</p>
           </div>
           <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Ctrl/Cmd+Z undoes · Ctrl/Cmd+Shift+Z redoes</p></div>
         </aside>

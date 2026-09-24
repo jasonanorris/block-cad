@@ -21,6 +21,10 @@ To join shapes, Shift+click at least two separate solids and choose **Join**. Yo
 
 **Copy** or Ctrl/Cmd+C stores the selected shapes in the current browser tab. Copying a solid also includes its joined members and linked holes. **Paste** or Ctrl/Cmd+V inserts editable copies, offset 25 mm farther on X and Z each time; new projects can receive pasted shapes. Pasted and duplicated objects have new IDs and start visible and unlocked. **Hide** removes selected shapes or assemblies from the workspace but keeps them in project files and STL export. **Lock** prevents geometry and property edits and deletion until **Unlock**; visibility can still be changed, and locked shapes can still be selected from the Objects list and copied. Select two or more shapes and use **Align X/Y/Z** to align their center positions on that axis to the active shape. Joined assemblies and their grouped holes move together. These edits support Undo.
 
+With shapes selected, use the arrow keys to nudge X or Z and Page Up/Down to nudge Y. Each key hold is one Undo step. Movement is 1 mm with Snap off, or one grid space with Snap on; hold Shift for ten grid spaces. Joined members and grouped holes move together. Choose 1, 5, 10, or 20 mm from **Grid** to change the visible grid and movement snap. Rotation snap remains 15°. Grid and Snap are editing preferences and are not saved in project files.
+
+The **Measurements** section shows the active shape's local size and center height. When several shapes are selected, it also shows the distance from the active shape's center to the first other selected center and the span of all selected centers on X/Y/Z. These values update as shapes move. The view cube tracks the camera orientation; click a visible face or use the small face buttons below it for Top, Bottom, Front, Back, Left, Right, or Perspective views.
+
 ```bash
 npm run build
 npm run preview
@@ -42,6 +46,6 @@ React holds CAD objects as application data in `src/cadModel.ts`. React Three Fi
 
 `src/selectionOperations.ts` expands selected solids into their assemblies for copying and bulk visibility controls, remaps IDs and links for copies, and aligns independent selected assemblies to the active object. The clipboard is held for the open browser tab and is not part of a project file.
 
-The Snap toggle controls Three.js `TransformControls` during drag operations and shows a 5 mm grid while enabled. It is an editing preference, not part of the project file; it does not change existing object coordinates when toggled.
+The Snap toggle controls Three.js `TransformControls` during drag operations. The Grid selector sets the grid spacing and translation snap interval. These are editing preferences, not part of the project file; changing them does not move existing objects.
 
-`src/SceneControls.tsx` switches the active camera between perspective and orthographic views. The orthographic camera adjusts its aspect ratio with the workspace size. Camera view is an editing preference, not part of the project file or undo history.
+`src/SceneControls.tsx` switches the active camera between perspective and six orthographic views. The orthographic camera adjusts its aspect ratio with the workspace size. `src/ViewCube.tsx` displays the camera orientation and selects views. `src/MeasurementPanel.tsx` derives its readouts from CAD object data. Camera view is an editing preference, not part of the project file or undo history.

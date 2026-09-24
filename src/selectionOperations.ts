@@ -100,3 +100,21 @@ export function alignSelectedObjects(objects: CadObject[], ids: Set<string>, act
   }
   return aligned
 }
+
+// Move each selected assembly once, even when several of its members are selected.
+export function nudgeSelectedObjects(objects: CadObject[], ids: Set<string>, axis: Axis, amount: number): CadObject[] {
+  let moved = objects
+  const visited = new Set<string>()
+  for (const object of objects) {
+    if (!ids.has(object.id)) continue
+    const key = assemblyKey(object, objects)
+    if (visited.has(key)) continue
+    visited.add(key)
+    const id = isHoleObject(object) && object.groupedWithTarget ? object.cutTargetId : object.id
+    moved = updateObjectWithGroups(moved, id, (current) => ({
+      ...current,
+      position: { ...current.position, [axis]: current.position[axis] + amount },
+    }))
+  }
+  return moved
+}
