@@ -32,11 +32,11 @@ export default function App() {
   const [exportError, setExportError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
-  const boxTargets = objects.flatMap((object, index) => object.type === 'box'
-    ? [{ id: object.id, label: `Box #${index + 1}` }]
+  const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isCylinderCutter(object)
+    ? [{ id: object.id, label: `${shapeLabels[object.type]} #${index + 1}` }]
     : [])
   const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
-  const cutBoxCount = new Set(objects.filter(isCylinderCutter).map((object) => object.cutTargetId)).size
+  const cutTargetCount = new Set(objects.filter(isCylinderCutter).map((object) => object.cutTargetId)).size
 
   function newProject() {
     reset([])
@@ -94,12 +94,23 @@ export default function App() {
   }, [updateObject])
 
   function setCutTarget(id: string, targetId: string | null) {
-    commit((current) => ({
-      ...current,
-      objects: current.objects.map((object) => object.id === id && object.type === 'cylinder'
-        ? { ...object, cutTargetId: targetId ?? undefined }
-        : object),
-    }))
+    commit((current) => {
+      if (targetId && !current.objects.some((object) => object.id === targetId &&
+        object.id !== id && !isCylinderCutter(object))) return current
+      return {
+        ...current,
+        objects: current.objects.map((object) => {
+          if (object.id === id && object.type === 'cylinder') {
+            return { ...object, cutTargetId: targetId ?? undefined }
+          }
+          // A hole cannot also be the target of another hole.
+          if (targetId && object.type === 'cylinder' && object.cutTargetId === id) {
+            return { ...object, cutTargetId: undefined }
+          }
+          return object
+        }),
+      }
+    })
   }
 
   function addObject(type: CadObjectType) {
@@ -260,9 +271,9 @@ export default function App() {
             </div>
             <button className="cut-example-button" type="button" onClick={addCutExample}>Add cutout example</button>
             <p className="cut-example-hint">Adds an editable box and cylinder cutter.</p>
-            {cutBoxCount > 0 && !booleanError && (
+            {cutTargetCount > 0 && !booleanError && (
               <p className="cut-status" role="status">
-                {booleanGeometries.size === cutBoxCount ? 'Cut preview ready' : 'Calculating cut…'}
+                {booleanGeometries.size === cutTargetCount ? 'Cut preview ready' : 'Calculating cut…'}
               </p>
             )}
           </div>
@@ -290,7 +301,7 @@ export default function App() {
               <ObjectInspector
                 key={selectedObject.id}
                 object={selectedObject}
-                boxTargets={boxTargets}
+                solidTargets={solidTargets}
                 onUpdate={updateObject}
                 onSetCutTarget={setCutTarget}
                 onEditStart={begin}

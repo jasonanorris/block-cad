@@ -67,14 +67,14 @@ function NumericField({
 
 export default function ObjectInspector({
   object,
-  boxTargets,
+  solidTargets,
   onUpdate,
   onSetCutTarget,
   onEditStart,
   onEditEnd,
 }: {
   object: CadObject
-  boxTargets: { id: string; label: string }[]
+  solidTargets: { id: string; label: string }[]
   onUpdate: (id: string, update: (current: CadObject) => CadObject) => void
   onSetCutTarget: (id: string, targetId: string | null) => void
   onEditStart: () => void
@@ -92,25 +92,25 @@ export default function ObjectInspector({
             <button
               type="button"
               aria-pressed={!!object.cutTargetId}
-              disabled={boxTargets.length === 0}
-              onClick={() => onSetCutTarget(object.id, object.cutTargetId ?? boxTargets[0].id)}
+              disabled={solidTargets.length === 0}
+              onClick={() => onSetCutTarget(object.id, object.cutTargetId ?? solidTargets[0].id)}
             >Hole</button>
           </div>
           {object.cutTargetId ? (
             <label className="cut-target-field">
-              <span>Cut box</span>
+              <span>Cut solid</span>
               <select
-                aria-label="Box to cut"
+                aria-label="Solid to cut"
                 value={object.cutTargetId}
                 onChange={(event) => onSetCutTarget(object.id, event.target.value)}
               >
-                {boxTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
+                {solidTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
               </select>
             </label>
-          ) : boxTargets.length === 0 ? (
-            <p className="shape-mode-hint">Add a box to use this cylinder as a hole.</p>
+          ) : solidTargets.length === 0 ? (
+            <p className="shape-mode-hint">Add a solid shape to use this cylinder as a hole.</p>
           ) : null}
-          {object.cutTargetId && <p className="shape-mode-hint">Move this cylinder into the box to cut it.</p>}
+          {object.cutTargetId && <p className="shape-mode-hint">Move this cylinder into the solid to cut it.</p>}
         </div>
       )}
       <div className="inspector-group">

@@ -23,9 +23,9 @@ export function useBooleanPreview(objects: CadObject[]): Preview {
       const geometries = new Map<string, BufferGeometry>()
       try {
         for (const object of objects) {
-          if (object.type !== 'box') continue
-          const boxCutters = cutters.filter((cutter) => cutter.cutTargetId === object.id)
-          if (boxCutters.length) geometries.set(object.id, subtractCylinders(object, boxCutters, runtime))
+          if (isCylinderCutter(object)) continue
+          const targetCutters = cutters.filter((cutter) => cutter.cutTargetId === object.id)
+          if (targetCutters.length) geometries.set(object.id, subtractCylinders(object, targetCutters, runtime))
         }
         if (cancelled) {
           for (const geometry of geometries.values()) geometry.dispose()

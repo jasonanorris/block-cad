@@ -45,10 +45,8 @@ export async function exportStl(objects: CadObject[]): Promise<ArrayBuffer> {
   try {
     for (const object of objects) {
       if (isCylinderCutter(object)) continue
-      const cutters = object.type === 'box'
-        ? objects.filter(isCylinderCutter).filter((candidate) => candidate.cutTargetId === object.id)
-        : []
-      const geometry = object.type === 'box' && cutters.length && runtime
+      const cutters = objects.filter(isCylinderCutter).filter((candidate) => candidate.cutTargetId === object.id)
+      const geometry = cutters.length && runtime
         ? subtractCylinders(object, cutters, runtime)
         : geometryFor(object)
       geometries.push(geometry)

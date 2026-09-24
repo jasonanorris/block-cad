@@ -2,7 +2,6 @@ import { BufferGeometry, Euler, Float32BufferAttribute, Matrix4, Quaternion, Uin
 import type { Manifold, ManifoldToplevel, Mat4 } from 'manifold-3d'
 import type { CadObject } from './cadModel'
 
-type BoxObject = Extract<CadObject, { type: 'box' }>
 type CylinderObject = Extract<CadObject, { type: 'cylinder' }>
 
 function objectMatrix(object: CadObject): Matrix4 {
@@ -18,16 +17,35 @@ function objectMatrix(object: CadObject): Matrix4 {
 // Manifold cylinders point along Z. The workspace's cylinder axis is Y.
 const CYLINDER_TO_Y = new Matrix4().makeRotationX(-Math.PI / 2)
 
-export function subtractCylinders(box: BoxObject, cutters: CylinderObject[], runtime: ManifoldToplevel): BufferGeometry {
+export function subtractCylinders(target: CadObject, cutters: CylinderObject[], runtime: ManifoldToplevel): BufferGeometry {
   const allocated: Manifold[] = []
   const track = (solid: Manifold) => { allocated.push(solid); return solid }
 
   try {
-    if ([box.scale.x, box.scale.y, box.scale.z].some((value) => Math.abs(value) < 1e-6)) {
-      throw new Error('A cut box must have nonzero scale on every axis.')
+    if ([target.scale.x, target.scale.y, target.scale.z].some((value) => Math.abs(value) < 1e-6)) {
+      throw new Error('A cut target must have nonzero scale on every axis.')
     }
-    let result = track(runtime.Manifold.cube([box.dimensions.x, box.dimensions.y, box.dimensions.z], true))
-    const worldToBox = objectMatrix(box).invert()
+    let result: Manifold
+    switch (target.type) {
+      case 'box':
+        result = track(runtime.Manifold.cube([target.dimensions.x, target.dimensions.y, target.dimensions.z], true))
+        break
+      case 'cylinder': {
+        const cylinder = track(runtime.Manifold.cylinder(
+          target.dimensions.height,
+          target.dimensions.diameter / 2,
+          target.dimensions.diameter / 2,
+          32,
+          true,
+        ))
+        result = track(cylinder.transform(CYLINDER_TO_Y.elements as Mat4))
+        break
+      }
+      case 'sphere':
+        result = track(runtime.Manifold.sphere(target.dimensions.diameter / 2, 32))
+        break
+    }
+    const worldToTarget = objectMatrix(target).invert()
 
     for (const cutter of cutters) {
       const cylinder = track(runtime.Manifold.cylinder(
@@ -37,7 +55,7 @@ export function subtractCylinders(box: BoxObject, cutters: CylinderObject[], run
         32,
         true,
       ))
-      const relativeMatrix = worldToBox.clone().multiply(objectMatrix(cutter)).multiply(CYLINDER_TO_Y)
+      const relativeMatrix = worldToTarget.clone().multiply(objectMatrix(cutter)).multiply(CYLINDER_TO_Y)
       const transformed = track(cylinder.transform(relativeMatrix.elements as Mat4))
       result = track(result.subtract(transformed))
     }

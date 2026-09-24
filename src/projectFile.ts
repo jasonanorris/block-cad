@@ -1,7 +1,7 @@
-import { MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
+import { isCylinderCutter, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 2
+const PROJECT_VERSION = 3
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -55,14 +55,14 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
         z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
       } }
     case 'cylinder': {
-      if (version === 2 && data.cutTargetId !== undefined &&
+      if (version >= 2 && data.cutTargetId !== undefined &&
         (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
         throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
       }
       return { ...base, type: 'cylinder', dimensions: {
         diameter: positiveNumber(dimensions.diameter, `${field}.dimensions.diameter`),
         height: positiveNumber(dimensions.height, `${field}.dimensions.height`),
-      }, ...(version === 2 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+      }, ...(version >= 2 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
     }
     case 'sphere':
       return { ...base, type: 'sphere', dimensions: {
@@ -87,7 +87,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
@@ -98,8 +98,9 @@ export function parseProject(text: string): CadObject[] {
   if (ids.size !== objects.length) throw new Error('The project contains duplicate object IDs.')
   for (const object of objects) {
     if (object.type === 'cylinder' && object.cutTargetId &&
-      !objects.some((target) => target.id === object.cutTargetId && target.type === 'box')) {
-      throw new Error(`Cylinder ${object.id} must cut an existing box.`)
+      !objects.some((target) => target.id === object.cutTargetId &&
+        (project.version === 2 ? target.type === 'box' : !isCylinderCutter(target)))) {
+      throw new Error(`Cylinder ${object.id} must cut an existing solid target.`)
     }
   }
   return objects

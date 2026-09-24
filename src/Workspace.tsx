@@ -38,10 +38,10 @@ function CadObjectMesh({
       ) : object.type === 'box' && (
         <boxGeometry args={[object.dimensions.x, object.dimensions.y, object.dimensions.z]} />
       )}
-      {object.type === 'cylinder' && (
+      {!cutGeometry && object.type === 'cylinder' && (
         <cylinderGeometry args={[object.dimensions.diameter / 2, object.dimensions.diameter / 2, object.dimensions.height, 32]} />
       )}
-      {object.type === 'sphere' && (
+      {!cutGeometry && object.type === 'sphere' && (
         <sphereGeometry args={[object.dimensions.diameter / 2, 32, 16]} />
       )}
       <meshStandardMaterial
