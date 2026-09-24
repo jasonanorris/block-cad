@@ -72,6 +72,7 @@ export default function ObjectInspector({
   onSetCutTarget,
   onEditStart,
   onEditEnd,
+  disabled = false,
 }: {
   object: CadObject
   solidTargets: { id: string; label: string }[]
@@ -79,12 +80,13 @@ export default function ObjectInspector({
   onSetCutTarget: (id: string, targetId: string | null) => void
   onEditStart: () => void
   onEditEnd: () => void
+  disabled?: boolean
 }) {
   const dimensions = getObjectDimensions(object)
   const shapeName = object.type[0].toUpperCase() + object.type.slice(1)
 
   return (
-    <div className="object-inspector">
+    <fieldset className="object-inspector" disabled={disabled}>
       <div className="inspector-group">
         <label className="name-field">
           <span>Name</span>
@@ -189,6 +191,6 @@ export default function ObjectInspector({
           ))}
         </div>
       </div>
-    </div>
+    </fieldset>
   )
 }

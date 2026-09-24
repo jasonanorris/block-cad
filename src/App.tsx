@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
-import { createCadObject, createCutExample, duplicateCadObject, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
+import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type CadObjectType, type ObjectTransform, type Vector3 } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
 import type { CameraView } from './SceneControls'
 import { useBooleanPreview } from './useBooleanPreview'
 import { updateObjectWithGroups } from './groupTransforms'
+import { alignSelectedObjects, alignmentCandidates, copyCadObjects, expandAssemblyIds } from './selectionOperations'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -20,7 +21,7 @@ function objectLabel(object: CadObject, objects: CadObject[]) {
   const shape = `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}`
   const grouped = isHoleObject(object) ? object.groupedWithTarget :
     objects.some((hole) => isHoleObject(hole) && hole.groupedWithTarget && hole.cutTargetId === object.id)
-  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? ' · Joined' : ''}${grouped ? ' · Grouped' : ''}`
+  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? ' · Joined' : ''}${grouped ? ' · Grouped' : ''}${object.hidden ? ' · Hidden' : ''}${object.locked ? ' · Locked' : ''}`
 }
 
 const cameraViews: { view: CameraView; label: string }[] = [
@@ -38,25 +39,39 @@ export default function App() {
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
   const [projectError, setProjectError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [hasCopiedObjects, setHasCopiedObjects] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+  const copiedObjects = useRef<{ sources: CadObject[]; activeId: string | null; pasteCount: number } | null>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
   const selectedIds = new Set(selectedObjectIds)
   const selectedObjects = objects.filter((object) => selectedIds.has(object.id))
+  const selectedAssemblyIds = expandAssemblyIds(objects, selectedIds)
+  const selectedAssembly = objects.filter((object) => selectedAssemblyIds.has(object.id))
+  const canEditSelection = selectedObjects.length > 0 && selectedAssembly.every((object) => !object.locked)
+  const activeAssemblyIds = selectedObject ? expandAssemblyIds(objects, new Set([selectedObject.id]), true) : new Set<string>()
+  const canEditActive = !!selectedObject &&
+    objects.every((object) => !activeAssemblyIds.has(object.id) || !object.locked)
+  const canTransformSelected = canEditActive && !selectedObject?.hidden
+  const alignCandidates = alignmentCandidates(objects, selectedIds, selectedObjectId)
+  const alignmentIds = expandAssemblyIds(objects, selectedIds, true)
+  const canAlign = alignCandidates.length > 0 &&
+    objects.every((object) => !alignmentIds.has(object.id) || (!object.locked && !object.hidden))
   const selectedSolids = selectedObjects.filter((object) => !isHoleObject(object))
   const selectedHoles = selectedObjects.filter(isHoleObject)
   const selectedSolidIds = new Set(selectedSolids.map((object) => object.id))
-  const canJoin = selectedSolids.length >= 2 && selectedSolids.every((object) => !object.joinGroupId) &&
+  const canJoin = canEditSelection && selectedSolids.length >= 2 && selectedSolids.every((object) => !object.joinGroupId) &&
     selectedObjects.every((object) => !isHoleObject(object) || selectedSolidIds.has(object.cutTargetId))
-  const canSeparate = selectedObjects.some((object) => !!object.joinGroupId)
-  const canGroupCut = selectedSolids.length === 1 && selectedHoles.length > 0 &&
+  const canSeparate = canEditSelection && selectedObjects.some((object) => !!object.joinGroupId)
+  const canGroupCut = canEditSelection && selectedSolids.length === 1 && selectedHoles.length > 0 &&
     selectedHoles.every((hole) => hole.cutTargetId === selectedSolids[0].id) &&
     selectedHoles.some((hole) => !hole.groupedWithTarget)
   const groupedCutTargets = new Set(objects.filter(isHoleObject).filter((hole) => hole.groupedWithTarget)
     .map((hole) => hole.cutTargetId))
-  const canUngroupCut = selectedObjects.some((object) => isHoleObject(object)
+  const canUngroupCut = canEditSelection && selectedObjects.some((object) => isHoleObject(object)
     ? !!object.groupedWithTarget
     : groupedCutTargets.has(object.id))
-  const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isHoleObject(object)
+  const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isHoleObject(object) &&
+    (!object.locked || selectedObject?.cutTargetId === object.id)
     ? [{ id: object.id, label: `${object.name ? `${object.name} · ` : ''}${shapeLabels[object.type]} #${index + 1}` }]
     : [])
   const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
@@ -111,7 +126,10 @@ export default function App() {
   }
 
   const updateObject = useCallback((id: string, update: (current: CadObject) => CadObject) => {
-    editObjects((current) => updateObjectWithGroups(current, id, update))
+    editObjects((current) => {
+      const changed = updateObjectWithGroups(current, id, update)
+      return current.some((object, index) => object.locked && changed[index] !== object) ? current : changed
+    })
   }, [editObjects])
 
   const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
@@ -121,9 +139,10 @@ export default function App() {
   function setCutTarget(id: string, targetId: string | null) {
     commit((current) => {
       const source = current.objects.find((object) => object.id === id)
-      if (!source) return current
+      if (!source || source.locked) return current
+      if (source.cutTargetId && current.objects.some((object) => object.id === source.cutTargetId && object.locked)) return current
       if (targetId && !current.objects.some((object) => object.id === targetId &&
-        object.id !== id && !isHoleObject(object))) return current
+        object.id !== id && !isHoleObject(object) && !object.locked)) return current
       return {
         ...current,
         objects: normalizeJoinGroups(current.objects.map((object) => {
@@ -160,31 +179,37 @@ export default function App() {
       const selectedIds = new Set(current.selectedObjectIds)
       const sources = current.objects.filter((object) => selectedIds.has(object.id))
       if (sources.length === 0) return current
-      const duplicates = sources.map(duplicateCadObject)
-      const copiedIds = new Map(sources.map((source, index) => [source.id, duplicates[index].id]))
-      const groupCounts = new Map<string, number>()
-      for (const source of sources) {
-        if (source.joinGroupId) groupCounts.set(source.joinGroupId, (groupCounts.get(source.joinGroupId) ?? 0) + 1)
-      }
-      const copiedGroupIds = new Map<string, string>()
-      const linkedDuplicates = duplicates.map((object) => {
-        const groupId = object.joinGroupId
-        if (groupId && (groupCounts.get(groupId) ?? 0) >= 2 && !copiedGroupIds.has(groupId)) {
-          copiedGroupIds.set(groupId, crypto.randomUUID())
-        }
-        return {
-          ...object,
-          cutTargetId: object.cutTargetId ? copiedIds.get(object.cutTargetId) ?? object.cutTargetId : undefined,
-          groupedWithTarget: object.groupedWithTarget && object.cutTargetId && copiedIds.has(object.cutTargetId) ? true : undefined,
-          joinGroupId: groupId ? copiedGroupIds.get(groupId) : undefined,
-        }
-      })
+      const { copies, copiedIds } = copyCadObjects(sources, 25, current.objects)
       return {
-        objects: [...current.objects, ...linkedDuplicates],
-        selectedObjectIds: linkedDuplicates.map((object) => object.id),
+        objects: [...current.objects, ...copies],
+        selectedObjectIds: copies.map((object) => object.id),
         selectedObjectId: current.selectedObjectId
           ? copiedIds.get(current.selectedObjectId) ?? null
-          : linkedDuplicates.at(-1)?.id ?? null,
+          : copies.at(-1)?.id ?? null,
+      }
+    })
+  }, [commit])
+
+  const copySelected = useCallback(() => {
+    const ids = expandAssemblyIds(objects, new Set(selectedObjectIds), true)
+    const sources = objects.filter((object) => ids.has(object.id))
+    if (sources.length === 0) return
+    copiedObjects.current = { sources: structuredClone(sources), activeId: selectedObjectId, pasteCount: 0 }
+    setHasCopiedObjects(true)
+  }, [objects, selectedObjectId, selectedObjectIds])
+
+  const pasteCopied = useCallback(() => {
+    const copied = copiedObjects.current
+    if (!copied) return
+    const offset = 25 * ++copied.pasteCount
+    commit((current) => {
+      const { copies, copiedIds } = copyCadObjects(copied.sources, offset, current.objects)
+      return {
+        objects: [...current.objects, ...copies],
+        selectedObjectIds: copies.map((object) => object.id),
+        selectedObjectId: copied.activeId
+          ? copiedIds.get(copied.activeId) ?? copies[0]?.id ?? null
+          : copies[0]?.id ?? null,
       }
     })
   }, [commit])
@@ -193,6 +218,8 @@ export default function App() {
     commit((current) => {
       const selectedIds = new Set(current.selectedObjectIds)
       if (selectedIds.size === 0) return current
+      const affected = expandAssemblyIds(current.objects, selectedIds)
+      if (current.objects.some((object) => affected.has(object.id) && object.locked)) return current
       return {
         objects: normalizeJoinGroups(current.objects
           .filter((object) => !selectedIds.has(object.id))
@@ -205,11 +232,42 @@ export default function App() {
     })
   }, [commit])
 
+  function setHidden(hidden: boolean) {
+    commit((current) => {
+      const ids = expandAssemblyIds(current.objects, new Set(current.selectedObjectIds))
+      if (ids.size === 0) return current
+      return { ...current, objects: current.objects.map((object) => ids.has(object.id)
+        ? { ...object, hidden: hidden || undefined }
+        : object) }
+    })
+  }
+
+  function setLocked(locked: boolean) {
+    commit((current) => {
+      const ids = expandAssemblyIds(current.objects, new Set(current.selectedObjectIds))
+      if (ids.size === 0) return current
+      return { ...current, objects: current.objects.map((object) => ids.has(object.id)
+        ? { ...object, locked: locked || undefined }
+        : object) }
+    })
+  }
+
+  function alignSelected(axis: keyof Vector3) {
+    commit((current) => {
+      const ids = new Set(current.selectedObjectIds)
+      const affected = expandAssemblyIds(current.objects, ids, true)
+      if (current.objects.some((object) => affected.has(object.id) && (object.locked || object.hidden))) return current
+      return { ...current, objects: alignSelectedObjects(current.objects, ids, current.selectedObjectId, axis) }
+    })
+  }
+
   function joinSelected() {
     const groupId = crypto.randomUUID()
     commit((current) => {
       const ids = new Set(current.selectedObjectIds)
       const selected = current.objects.filter((object) => ids.has(object.id))
+      const affected = expandAssemblyIds(current.objects, ids)
+      if (current.objects.some((object) => affected.has(object.id) && object.locked)) return current
       const members = selected.filter((object) => !isHoleObject(object))
       const memberIds = new Set(members.map((object) => object.id))
       if (members.length < 2 || members.some((object) => object.joinGroupId) ||
@@ -227,6 +285,8 @@ export default function App() {
       const ids = new Set(current.selectedObjectIds)
       const groups = new Set(current.objects.filter((object) => ids.has(object.id) && object.joinGroupId)
         .map((object) => object.joinGroupId))
+      const affected = expandAssemblyIds(current.objects, ids)
+      if (current.objects.some((object) => affected.has(object.id) && object.locked)) return current
       if (groups.size === 0) return current
       return {
         ...current,
@@ -241,6 +301,8 @@ export default function App() {
     commit((current) => {
       const ids = new Set(current.selectedObjectIds)
       const selected = current.objects.filter((object) => ids.has(object.id))
+      const affected = expandAssemblyIds(current.objects, ids)
+      if (current.objects.some((object) => affected.has(object.id) && object.locked)) return current
       const solids = selected.filter((object) => !isHoleObject(object))
       const holes = selected.filter(isHoleObject)
       if (solids.length !== 1 || holes.length === 0 ||
@@ -261,6 +323,8 @@ export default function App() {
       const ids = new Set(current.selectedObjectIds)
       const targets = new Set(current.objects.filter((object) => ids.has(object.id))
         .map((object) => isHoleObject(object) ? object.cutTargetId : object.id))
+      if (current.objects.some((object) => object.locked &&
+        (ids.has(object.id) || isHoleObject(object) && targets.has(object.cutTargetId)))) return current
       if (!current.objects.some((object) => isHoleObject(object) && object.groupedWithTarget && targets.has(object.cutTargetId))) return current
       return {
         ...current,
@@ -287,10 +351,16 @@ export default function App() {
         if (!event.repeat) redo()
       } else if (event.key === 'Escape') {
         select(null)
+      } else if (selectedObjectIds.length > 0 && modifier && key === 'c') {
+        event.preventDefault()
+        if (!event.repeat) copySelected()
+      } else if (modifier && key === 'v' && hasCopiedObjects) {
+        event.preventDefault()
+        if (!event.repeat) pasteCopied()
       } else if (selectedObjectIds.length > 0 && modifier && key === 'd') {
         event.preventDefault()
         if (!event.repeat) duplicateSelected()
-      } else if (selectedObjectIds.length > 0 && !modifier && (event.key === 'Delete' || event.key === 'Backspace')) {
+      } else if (canEditSelection && !modifier && (event.key === 'Delete' || event.key === 'Backspace')) {
         event.preventDefault()
         deleteSelected()
       }
@@ -298,7 +368,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedObjectIds.length, duplicateSelected, deleteSelected, select, undo, redo])
+  }, [selectedObjectIds.length, canEditSelection, hasCopiedObjects, copySelected, pasteCopied, duplicateSelected, deleteSelected, select, undo, redo])
 
   return (
     <div className="app-shell">
@@ -337,7 +407,7 @@ export default function App() {
                 type="button"
                 className={`tool-button${toolMode === mode ? ' is-active' : ''}`}
                 aria-pressed={toolMode === mode}
-                disabled={!selectedObject}
+                disabled={!canTransformSelected}
                 onClick={() => setToolMode(mode)}
               >
                 {label}
@@ -361,7 +431,7 @@ export default function App() {
           <div className="workspace-frame">
             <Workspace
               objects={objects}
-              selectedObjectId={selectedObjectId}
+              selectedObjectId={canTransformSelected ? selectedObjectId : null}
               selectedObjectIds={selectedObjectIds}
               toolMode={toolMode}
               snapEnabled={snapEnabled}
@@ -417,7 +487,7 @@ export default function App() {
             {objects.length > 0 && (
               <div className="object-list" role="group" aria-label="Objects">
                 {objects.map((object, index) => (
-                  <button key={object.id} type="button" aria-pressed={selectedObjectIds.includes(object.id)} onClick={(event) => select(object.id, event.shiftKey)}>
+                  <button key={object.id} type="button" className={object.hidden ? 'is-hidden' : undefined} aria-pressed={selectedObjectIds.includes(object.id)} onClick={(event) => select(object.id, event.shiftKey)}>
                     <span>{objectLabel(object, objects)}</span>
                     <span>#{index + 1}</span>
                   </button>
@@ -426,7 +496,17 @@ export default function App() {
             )}
             <div className="selection-actions">
               <button type="button" disabled={selectedObjectIds.length === 0} onClick={duplicateSelected} title="Duplicate selected objects (Ctrl/Cmd+D)">Duplicate</button>
-              <button type="button" disabled={selectedObjectIds.length === 0} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>
+              <button type="button" disabled={!canEditSelection} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>
+            </div>
+            <div className="clipboard-actions" role="group" aria-label="Copy and paste">
+              <button type="button" disabled={selectedObjectIds.length === 0} onClick={copySelected} title="Copy selected shapes and assemblies (Ctrl/Cmd+C)">Copy</button>
+              <button type="button" disabled={!hasCopiedObjects} onClick={pasteCopied} title="Paste copies with a 25 mm offset (Ctrl/Cmd+V)">Paste</button>
+            </div>
+            <div className="visibility-actions" role="group" aria-label="Visibility and locking">
+              <button type="button" disabled={!selectedAssembly.some((object) => !object.hidden)} onClick={() => setHidden(true)}>Hide</button>
+              <button type="button" disabled={!selectedAssembly.some((object) => object.hidden)} onClick={() => setHidden(false)}>Show</button>
+              <button type="button" disabled={!selectedAssembly.some((object) => !object.locked)} onClick={() => setLocked(true)}>Lock</button>
+              <button type="button" disabled={!selectedAssembly.some((object) => object.locked)} onClick={() => setLocked(false)}>Unlock</button>
             </div>
             <div className="join-actions">
               <button type="button" disabled={!canJoin} onClick={joinSelected} title="Join two or more selected solids, including their selected holes">Join</button>
@@ -436,6 +516,12 @@ export default function App() {
               <button type="button" disabled={!canGroupCut} onClick={groupCutSelected} title="Group one selected solid with its selected holes">Group</button>
               <button type="button" disabled={!canUngroupCut} onClick={ungroupCutSelected} title="Reveal the grouped holes linked to the selected solid">Ungroup</button>
             </div>
+            <div className="align-actions" role="group" aria-label="Align selected centers to active shape">
+              {(['x', 'y', 'z'] as const).map((axis) => (
+                <button key={axis} type="button" disabled={!canAlign} onClick={() => alignSelected(axis)} title={`Align selected centers on ${axis.toUpperCase()} to the active shape`}>Align {axis.toUpperCase()}</button>
+              ))}
+            </div>
+            {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}
             {selectedObject && (
               <ObjectInspector
                 key={selectedObject.id}
@@ -445,6 +531,7 @@ export default function App() {
                 onSetCutTarget={setCutTarget}
                 onEditStart={begin}
                 onEditEnd={end}
+                disabled={!canEditActive}
               />
             )}
           </div>

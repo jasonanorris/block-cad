@@ -6,6 +6,8 @@ export const MODEL_UNIT = 'mm' as const
 type BaseObject = {
   id: string
   name?: string
+  hidden?: boolean
+  locked?: boolean
   position: Vector3
   rotation: Vector3
   scale: Vector3
@@ -100,11 +102,11 @@ export function setObjectDimension(object: CadObject, axis: keyof Vector3, value
   return { ...object, scale: { ...object.scale, [axis]: direction * value / base } }
 }
 
-export function duplicateCadObject(object: CadObject): CadObject {
+export function duplicateCadObject(object: CadObject, offset = 25): CadObject {
   const duplicate = structuredClone(object)
   duplicate.id = crypto.randomUUID()
-  duplicate.position.x += 25
-  duplicate.position.z += 25
+  duplicate.position.x += offset
+  duplicate.position.z += offset
   return duplicate
 }
 

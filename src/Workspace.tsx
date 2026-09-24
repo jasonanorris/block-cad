@@ -22,6 +22,7 @@ function CadObjectMesh({
   selectedMeshRef: RefObject<Mesh | null>
   cutGeometry?: BufferGeometry
 }) {
+  if (object.hidden) return null
   const { position, rotation, scale } = object
   const isCutter = isHoleObject(object)
   const sourceOverlay = hiddenInGroup && isSelected
