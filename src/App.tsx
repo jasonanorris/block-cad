@@ -13,6 +13,7 @@ import { alignSelectedObjects, alignmentCandidates, copyCadObjects, expandAssemb
 import { nudgeSelectedObjects } from './selectionOperations'
 import MeasurementPanel from './MeasurementPanel'
 import ViewCube from './ViewCube'
+import { getObjectTopHeight } from './workplane'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -45,6 +46,8 @@ export default function App() {
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [snapEnabled, setSnapEnabled] = useState(false)
   const [gridSize, setGridSize] = useState(5)
+  const [workplaneHeight, setWorkplaneHeight] = useState(0)
+  const [workplaneDraft, setWorkplaneDraft] = useState('0')
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
   const [cameraOrientation, setCameraOrientation] = useState('rotateX(-25deg) rotateY(-35deg)')
   const [projectError, setProjectError] = useState<string | null>(null)
@@ -94,8 +97,22 @@ export default function App() {
   function newProject() {
     reset([])
     setToolMode('translate')
+    setWorkplane(0)
     setProjectError(null)
     setExportError(null)
+  }
+
+  function setWorkplane(height: number) {
+    if (!Number.isFinite(height)) return
+    const rounded = Number(height.toFixed(3))
+    setWorkplaneHeight(rounded)
+    setWorkplaneDraft(String(rounded))
+  }
+
+  function applyWorkplaneDraft(rawValue: string) {
+    const value = Number(rawValue)
+    if (rawValue.trim() && Number.isFinite(value)) setWorkplane(value)
+    else setWorkplaneDraft(String(workplaneHeight))
   }
 
   function saveProject() {
@@ -131,6 +148,7 @@ export default function App() {
       const loadedObjects = parseProject(await file.text())
       reset(loadedObjects)
       setToolMode('translate')
+      setWorkplane(0)
       setProjectError(null)
       setExportError(null)
     } catch (error) {
@@ -176,14 +194,14 @@ export default function App() {
   function addObject(type: CadObjectType) {
     // Keep new shapes apart so each one can be seen and selected immediately.
     const index = objects.length
-    const object = createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30)
+    const object = createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30, workplaneHeight)
     commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id, selectedObjectIds: [object.id] }))
   }
 
   function addCutExample() {
     const x = (objects.length % 3) * 40
     const z = Math.floor(objects.length / 3) * 40
-    const [box, cutter] = createCutExample(x, z)
+    const [box, cutter] = createCutExample(x, z, workplaneHeight)
     commit((current) => ({ objects: [...current.objects, box, cutter], selectedObjectId: cutter.id, selectedObjectIds: [cutter.id] }))
   }
 
@@ -491,6 +509,7 @@ export default function App() {
               toolMode={toolMode}
               snapEnabled={snapEnabled}
               gridSize={gridSize}
+              workplaneHeight={workplaneHeight}
               cameraView={cameraView}
               onCameraOrientation={setCameraOrientation}
               booleanGeometries={booleanGeometries}
@@ -501,7 +520,7 @@ export default function App() {
             />
             <ViewCube cameraView={cameraView} orientation={cameraOrientation} onChange={setCameraView} />
             <div className="workspace-hint">{cameraView === 'perspective' && 'Drag to orbit · '}Scroll to zoom · Right drag to pan</div>
-            <div className="axis-label">X / Y / Z <span>·</span> {MODEL_UNIT}</div>
+            <div className="axis-label">Workplane Y {workplaneHeight} {MODEL_UNIT} <span>·</span> X / Y / Z</div>
           </div>
         </section>
         <aside className="info-panel" aria-label="Workspace information">
@@ -532,6 +551,20 @@ export default function App() {
                   : 'Calculating model…'}
               </p>
             )}
+          </div>
+          <div className="panel-section workplane-section">
+            <h3>Workplane</h3>
+            <label className="workplane-height-field">Height (mm)
+              <input type="number" step="any" value={workplaneDraft}
+                onChange={(event) => setWorkplaneDraft(event.target.value)}
+                onBlur={(event) => applyWorkplaneDraft(event.currentTarget.value)}
+                onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
+            </label>
+            <div className="workplane-actions">
+              <button type="button" disabled={!selectedObject} onClick={() => selectedObject && setWorkplane(getObjectTopHeight(selectedObject))}>Use selected top</button>
+              <button type="button" disabled={workplaneHeight === 0} onClick={() => setWorkplane(0)}>Reset to 0</button>
+            </div>
+            <p className="selection-hint">New shapes rest on this horizontal plane. Existing shapes stay where they are.</p>
           </div>
           <div className="panel-section selection-section">
             <h3>Selection</h3>

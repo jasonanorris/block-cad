@@ -110,10 +110,10 @@ export function duplicateCadObject(object: CadObject, offset = 25): CadObject {
   return duplicate
 }
 
-export function createCadObject(type: CadObjectType, x = 0, z = 0): CadObject {
+export function createCadObject(type: CadObjectType, x = 0, z = 0, workplaneHeight = 0): CadObject {
   const base = {
     id: crypto.randomUUID(),
-    position: { x, y: 10, z },
+    position: { x, y: workplaneHeight + 10, z },
     rotation: { x: 0, y: 0, z: 0 },
     scale: { x: 1, y: 1, z: 1 },
   }
@@ -129,11 +129,11 @@ export function createCadObject(type: CadObjectType, x = 0, z = 0): CadObject {
 }
 
 // A small, editable subtraction example for the first Boolean milestone.
-export function createCutExample(x = 0, z = 0): [CadObject, CadObject] {
-  const box = createCadObject('box', x, z) as Extract<CadObject, { type: 'box' }>
+export function createCutExample(x = 0, z = 0, workplaneHeight = 0): [CadObject, CadObject] {
+  const box = createCadObject('box', x, z, workplaneHeight) as Extract<CadObject, { type: 'box' }>
   box.dimensions = { x: 30, y: 20, z: 30 }
 
-  const cutter = createCadObject('cylinder', x, z) as Extract<CadObject, { type: 'cylinder' }>
+  const cutter = createCadObject('cylinder', x, z, workplaneHeight) as Extract<CadObject, { type: 'cylinder' }>
   cutter.dimensions = { diameter: 12, height: 30 }
   cutter.cutTargetId = box.id
   return [box, cutter]

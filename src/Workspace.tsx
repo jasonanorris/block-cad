@@ -76,6 +76,7 @@ function CadScene({
   toolMode,
   snapEnabled,
   gridSize,
+  workplaneHeight,
   cameraView,
   onCameraOrientation,
   onTransformObject,
@@ -98,7 +99,7 @@ function CadScene({
       <color attach="background" args={['#f8faff']} />
       <ambientLight intensity={1.6} />
       <directionalLight position={[50, 90, 40]} intensity={2.4} />
-      <gridHelper args={[200, 200 / gridSize, '#a9b8cf', '#dce3ef']} position={[0, -0.01, 0]} />
+      <gridHelper args={[200, 200 / gridSize, '#a9b8cf', '#dce3ef']} position={[0, workplaneHeight - 0.01, 0]} />
       {objects.map((object) => (
         <CadObjectMesh
           key={object.id}
@@ -135,6 +136,7 @@ type WorkspaceProps = {
   toolMode: TransformControlsMode
   snapEnabled: boolean
   gridSize: number
+  workplaneHeight: number
   cameraView: CameraView
   onCameraOrientation: (transform: string) => void
   booleanGeometries: Map<string, BufferGeometry>
