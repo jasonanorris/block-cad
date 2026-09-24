@@ -8,6 +8,7 @@ import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
 import type { CameraView } from './SceneControls'
 import { useBooleanPreview } from './useBooleanPreview'
+import { updateObjectWithGroups } from './groupTransforms'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -110,27 +111,7 @@ export default function App() {
   }
 
   const updateObject = useCallback((id: string, update: (current: CadObject) => CadObject) => {
-    editObjects((current) => {
-      const source = current.find((object) => object.id === id)
-      if (!source) return current
-      const changed = update(source)
-      const offset = {
-        x: changed.position.x - source.position.x,
-        y: changed.position.y - source.position.y,
-        z: changed.position.z - source.position.z,
-      }
-      const moved = offset.x !== 0 || offset.y !== 0 || offset.z !== 0
-      return current.map((object) => {
-        if (object.id === id) return changed
-        if (!moved || isHoleObject(source) || !isHoleObject(object) ||
-          !object.groupedWithTarget || object.cutTargetId !== id) return object
-        return { ...object, position: {
-          x: object.position.x + offset.x,
-          y: object.position.y + offset.y,
-          z: object.position.z + offset.z,
-        } }
-      })
-    })
+    editObjects((current) => updateObjectWithGroups(current, id, update))
   }, [editObjects])
 
   const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
