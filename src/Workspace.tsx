@@ -2,13 +2,14 @@ import { useRef, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import type { BufferGeometry, Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
-import { isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
+import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
 
 function CadObjectMesh({
   object,
   isSelected,
   isActive,
+  hiddenInJoin,
   onSelect,
   selectedMeshRef,
   cutGeometry,
@@ -16,20 +17,24 @@ function CadObjectMesh({
   object: CadObject
   isSelected: boolean
   isActive: boolean
+  hiddenInJoin: boolean
   onSelect: (id: string, additive: boolean) => void
   selectedMeshRef: RefObject<Mesh | null>
   cutGeometry?: BufferGeometry
 }) {
   const { position, rotation, scale } = object
   const isCutter = isHoleObject(object)
+  const sourceOverlay = hiddenInJoin && isSelected
+  const wireframe = isCutter || sourceOverlay
 
   return (
     <mesh
       ref={isActive ? selectedMeshRef : undefined}
+      visible={!hiddenInJoin || isSelected}
       position={[position.x, position.y, position.z]}
       rotation={[rotation.x, rotation.y, rotation.z]}
       scale={[scale.x, scale.y, scale.z]}
-      renderOrder={isCutter ? 1 : 0}
+      renderOrder={wireframe ? 1 : 0}
       onClick={(event) => {
         event.stopPropagation()
         onSelect(object.id, event.nativeEvent.shiftKey)
@@ -52,11 +57,11 @@ function CadObjectMesh({
         emissiveIntensity={isSelected ? 0.18 : 0}
         roughness={0.75}
         flatShading={!!cutGeometry}
-        wireframe={isCutter}
-        transparent={isCutter}
-        opacity={isCutter ? 0.55 : 1}
-        depthTest={!isCutter}
-        depthWrite={!isCutter}
+        wireframe={wireframe}
+        transparent={wireframe}
+        opacity={wireframe ? 0.55 : 1}
+        depthTest={!wireframe}
+        depthWrite={!wireframe}
       />
     </mesh>
   )
@@ -77,6 +82,10 @@ function CadScene({
   booleanGeometries,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean> }) {
   const selectedMeshRef = useRef<Mesh | null>(null)
+  const hiddenJoinedIds = new Set(getSolidBodies(objects).flatMap((body) => body.members.length > 1 &&
+    booleanGeometries.has(body.anchor.id)
+    ? body.members.slice(1).map((member) => member.id)
+    : []))
 
   return (
     <>
@@ -90,6 +99,7 @@ function CadScene({
           object={object}
           isSelected={selectedObjectIds.includes(object.id)}
           isActive={object.id === selectedObjectId}
+          hiddenInJoin={hiddenJoinedIds.has(object.id)}
           onSelect={(id, additive) => { if (!gizmoInteractionRef.current) onSelectObject(id, additive) }}
           selectedMeshRef={selectedMeshRef}
           cutGeometry={booleanGeometries.get(object.id)}

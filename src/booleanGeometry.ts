@@ -1,6 +1,6 @@
 import { BufferGeometry, Euler, Float32BufferAttribute, Matrix4, Quaternion, Uint32BufferAttribute, Vector3 } from 'three'
 import type { Manifold, ManifoldToplevel, Mat4 } from 'manifold-3d'
-import type { CadObject, HoleObject } from './cadModel'
+import type { CadObject, SolidBody } from './cadModel'
 
 function objectMatrix(object: CadObject): Matrix4 {
   const { position, rotation, scale } = object
@@ -15,7 +15,7 @@ function objectMatrix(object: CadObject): Matrix4 {
 // Manifold cylinders point along Z. The workspace's cylinder axis is Y.
 const CYLINDER_TO_Y = new Matrix4().makeRotationX(-Math.PI / 2)
 
-export function subtractHoles(target: CadObject, holes: HoleObject[], runtime: ManifoldToplevel): BufferGeometry {
+export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): BufferGeometry {
   const allocated: Manifold[] = []
   const track = (solid: Manifold) => { allocated.push(solid); return solid }
 
@@ -39,15 +39,23 @@ export function subtractHoles(target: CadObject, holes: HoleObject[], runtime: M
   }
 
   try {
-    if ([target.scale.x, target.scale.y, target.scale.z].some((value) => Math.abs(value) < 1e-6)) {
-      throw new Error('A cut target must have nonzero scale on every axis.')
+    if (body.members.some((member) => [member.scale.x, member.scale.y, member.scale.z]
+      .some((value) => Math.abs(value) < 1e-6))) {
+      throw new Error('A joined or cut solid must have nonzero scale on every axis.')
     }
-    let result = primitive(target)
-    const worldToTarget = objectMatrix(target).invert()
+    let result = primitive(body.anchor)
+    const worldToAnchor = objectMatrix(body.anchor).invert()
 
-    for (const hole of holes) {
+    for (const member of body.members.slice(1)) {
+      const shape = primitive(member)
+      const relativeMatrix = worldToAnchor.clone().multiply(objectMatrix(member))
+      const transformed = track(shape.transform(relativeMatrix.elements as Mat4))
+      result = track(result.add(transformed))
+    }
+
+    for (const hole of body.holes) {
       const shape = primitive(hole)
-      const relativeMatrix = worldToTarget.clone().multiply(objectMatrix(hole))
+      const relativeMatrix = worldToAnchor.clone().multiply(objectMatrix(hole))
       const transformed = track(shape.transform(relativeMatrix.elements as Mat4))
       result = track(result.subtract(transformed))
     }

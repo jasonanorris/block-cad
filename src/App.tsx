@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectInspector from './ObjectInspector'
-import { createCadObject, createCutExample, duplicateCadObject, isHoleObject, MODEL_UNIT, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
+import { createCadObject, createCutExample, duplicateCadObject, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type CadObjectType, type ObjectTransform } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
@@ -16,7 +16,7 @@ const shapeLabels: Record<CadObjectType, string> = {
 }
 
 function objectLabel(object: CadObject) {
-  return `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}`
+  return `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}${object.joinGroupId ? ' · Joined' : ''}`
 }
 
 const cameraViews: { view: CameraView; label: string }[] = [
@@ -36,11 +36,16 @@ export default function App() {
   const [exportError, setExportError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
+  const selectedIds = new Set(selectedObjectIds)
+  const selectedObjects = objects.filter((object) => selectedIds.has(object.id))
+  const canJoin = selectedObjects.length >= 2 && selectedObjects.every((object) => !isHoleObject(object) && !object.joinGroupId)
+  const canSeparate = selectedObjects.some((object) => !!object.joinGroupId)
   const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isHoleObject(object)
     ? [{ id: object.id, label: `${shapeLabels[object.type]} #${index + 1}` }]
     : [])
   const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
-  const cutTargetCount = new Set(objects.filter(isHoleObject).map((object) => object.cutTargetId)).size
+  const derivedBodies = getSolidBodies(objects).filter((body) => body.members.length > 1 || body.holes.length > 0)
+  const hasJoinedBodies = derivedBodies.some((body) => body.members.length > 1)
 
   function newProject() {
     reset([])
@@ -105,7 +110,7 @@ export default function App() {
         object.id !== id && !isHoleObject(object))) return current
       return {
         ...current,
-        objects: current.objects.map((object) => {
+        objects: normalizeJoinGroups(current.objects.map((object) => {
           if (object.id === id) {
             return { ...object, cutTargetId: targetId ?? undefined }
           }
@@ -114,7 +119,7 @@ export default function App() {
             return { ...object, cutTargetId: undefined }
           }
           return object
-        }),
+        })),
       }
     })
   }
@@ -140,9 +145,22 @@ export default function App() {
       if (sources.length === 0) return current
       const duplicates = sources.map(duplicateCadObject)
       const copiedIds = new Map(sources.map((source, index) => [source.id, duplicates[index].id]))
-      const linkedDuplicates = duplicates.map((object) => object.cutTargetId && copiedIds.has(object.cutTargetId)
-        ? { ...object, cutTargetId: copiedIds.get(object.cutTargetId) }
-        : object)
+      const groupCounts = new Map<string, number>()
+      for (const source of sources) {
+        if (source.joinGroupId) groupCounts.set(source.joinGroupId, (groupCounts.get(source.joinGroupId) ?? 0) + 1)
+      }
+      const copiedGroupIds = new Map<string, string>()
+      const linkedDuplicates = duplicates.map((object) => {
+        const groupId = object.joinGroupId
+        if (groupId && (groupCounts.get(groupId) ?? 0) >= 2 && !copiedGroupIds.has(groupId)) {
+          copiedGroupIds.set(groupId, crypto.randomUUID())
+        }
+        return {
+          ...object,
+          cutTargetId: object.cutTargetId ? copiedIds.get(object.cutTargetId) ?? object.cutTargetId : undefined,
+          joinGroupId: groupId ? copiedGroupIds.get(groupId) : undefined,
+        }
+      })
       return {
         objects: [...current.objects, ...linkedDuplicates],
         selectedObjectIds: linkedDuplicates.map((object) => object.id),
@@ -158,16 +176,45 @@ export default function App() {
       const selectedIds = new Set(current.selectedObjectIds)
       if (selectedIds.size === 0) return current
       return {
-        objects: current.objects
+        objects: normalizeJoinGroups(current.objects
           .filter((object) => !selectedIds.has(object.id))
           .map((object) => isHoleObject(object) && selectedIds.has(object.cutTargetId)
             ? { ...object, cutTargetId: undefined }
-            : object),
+            : object)),
         selectedObjectId: null,
         selectedObjectIds: [],
       }
     })
   }, [commit])
+
+  function joinSelected() {
+    const groupId = crypto.randomUUID()
+    commit((current) => {
+      const ids = new Set(current.selectedObjectIds)
+      const members = current.objects.filter((object) => ids.has(object.id))
+      if (members.length < 2 || members.some((object) => isHoleObject(object) || object.joinGroupId)) return current
+      return {
+        objects: current.objects.map((object) => ids.has(object.id) ? { ...object, joinGroupId: groupId } : object),
+        selectedObjectId: members[0].id,
+        selectedObjectIds: [members[0].id],
+      }
+    })
+  }
+
+  function separateSelected() {
+    commit((current) => {
+      const ids = new Set(current.selectedObjectIds)
+      const groups = new Set(current.objects.filter((object) => ids.has(object.id) && object.joinGroupId)
+        .map((object) => object.joinGroupId))
+      if (groups.size === 0) return current
+      return {
+        ...current,
+        objects: current.objects.map((object) => object.joinGroupId && groups.has(object.joinGroupId)
+          ? { ...object, joinGroupId: undefined }
+          : object),
+      }
+    })
+  }
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -212,7 +259,7 @@ export default function App() {
         </div>
       </header>
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
-      {booleanError && <div className="project-error" role="alert">Could not calculate cut: {booleanError}</div>}
+      {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
       {exportError && <div className="project-error" role="alert">Could not export STL: {exportError}</div>}
       <main className="app-main">
         <section className="workspace-panel" aria-labelledby="workspace-title">
@@ -295,9 +342,11 @@ export default function App() {
             </div>
             <button className="cut-example-button" type="button" onClick={addCutExample}>Add cutout example</button>
             <p className="cut-example-hint">Adds an editable box and cylinder cutter.</p>
-            {cutTargetCount > 0 && !booleanError && (
+            {derivedBodies.length > 0 && !booleanError && (
               <p className="cut-status" role="status">
-                {booleanGeometries.size === cutTargetCount ? 'Cut preview ready' : 'Calculating cut…'}
+                {booleanGeometries.size === derivedBodies.length
+                  ? hasJoinedBodies ? 'Join preview ready' : 'Cut preview ready'
+                  : 'Calculating model…'}
               </p>
             )}
           </div>
@@ -323,6 +372,10 @@ export default function App() {
             <div className="selection-actions">
               <button type="button" disabled={selectedObjectIds.length === 0} onClick={duplicateSelected} title="Duplicate selected objects (Ctrl/Cmd+D)">Duplicate</button>
               <button type="button" disabled={selectedObjectIds.length === 0} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>
+            </div>
+            <div className="join-actions">
+              <button type="button" disabled={!canJoin} onClick={joinSelected} title="Join two or more selected, separate solid shapes">Join</button>
+              <button type="button" disabled={!canSeparate} onClick={separateSelected} title="Separate the selected joined shapes">Separate</button>
             </div>
             {selectedObject && (
               <ObjectInspector

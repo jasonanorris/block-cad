@@ -9,6 +9,7 @@ type BaseObject = {
   rotation: Vector3
   scale: Vector3
   cutTargetId?: string
+  joinGroupId?: string
 }
 
 export type ObjectTransform = Pick<BaseObject, 'position' | 'rotation' | 'scale'>
@@ -25,6 +26,49 @@ export type HoleObject = CadObject & { cutTargetId: string }
 
 export function isHoleObject(object: CadObject): object is HoleObject {
   return !!object.cutTargetId
+}
+
+export type SolidBody = {
+  anchor: CadObject
+  members: CadObject[]
+  holes: HoleObject[]
+}
+
+// Joined solids form one derived body. A hole linked to any member cuts the whole body.
+export function getSolidBodies(objects: CadObject[]): SolidBody[] {
+  const bodies: SolidBody[] = []
+  const joined = new Map<string, SolidBody>()
+  const bodyByMemberId = new Map<string, SolidBody>()
+
+  for (const object of objects) {
+    if (isHoleObject(object)) continue
+    let body = object.joinGroupId ? joined.get(object.joinGroupId) : undefined
+    if (!body) {
+      body = { anchor: object, members: [], holes: [] }
+      bodies.push(body)
+      if (object.joinGroupId) joined.set(object.joinGroupId, body)
+    }
+    body.members.push(object)
+    bodyByMemberId.set(object.id, body)
+  }
+
+  for (const hole of objects.filter(isHoleObject)) {
+    bodyByMemberId.get(hole.cutTargetId)?.holes.push(hole)
+  }
+  return bodies
+}
+
+export function normalizeJoinGroups(objects: CadObject[]): CadObject[] {
+  const counts = new Map<string, number>()
+  for (const object of objects) {
+    if (object.joinGroupId && !isHoleObject(object)) {
+      counts.set(object.joinGroupId, (counts.get(object.joinGroupId) ?? 0) + 1)
+    }
+  }
+  return objects.map((object) => object.joinGroupId &&
+    (isHoleObject(object) || (counts.get(object.joinGroupId) ?? 0) < 2)
+    ? { ...object, joinGroupId: undefined }
+    : object)
 }
 
 function baseDimensions(object: CadObject): Vector3 {

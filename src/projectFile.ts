@@ -1,7 +1,7 @@
 import { isHoleObject, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 5
+const PROJECT_VERSION = 6
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -38,11 +38,16 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
   if (!data || typeof data.id !== 'string' || !data.id.trim()) {
     throw new Error(`${field} must have a nonempty ID.`)
   }
+  if (version >= 6 && data.joinGroupId !== undefined &&
+    (typeof data.joinGroupId !== 'string' || !data.joinGroupId.trim())) {
+    throw new Error(`${field}.joinGroupId must be a nonempty ID.`)
+  }
   const base = {
     id: data.id,
     position: vector(data.position, `${field}.position`),
     rotation: vector(data.rotation, `${field}.rotation`),
     scale: vector(data.scale, `${field}.scale`),
+    ...(version >= 6 && data.joinGroupId ? { joinGroupId: data.joinGroupId as string } : {}),
   }
   const dimensions = record(data.dimensions)
   if (!dimensions) throw new Error(`${field}.dimensions is missing.`)
@@ -97,7 +102,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
@@ -112,6 +117,15 @@ export function parseProject(text: string): CadObject[] {
         (project.version === 2 ? target.type === 'box' : !isHoleObject(target)))) {
       throw new Error(`Hole ${object.id} must cut an existing solid target.`)
     }
+  }
+  const joinCounts = new Map<string, number>()
+  for (const object of objects) {
+    if (!object.joinGroupId) continue
+    if (isHoleObject(object)) throw new Error(`Hole ${object.id} cannot be joined as a solid.`)
+    joinCounts.set(object.joinGroupId, (joinCounts.get(object.joinGroupId) ?? 0) + 1)
+  }
+  for (const [groupId, count] of joinCounts) {
+    if (count < 2) throw new Error(`Join ${groupId} must contain at least two solids.`)
   }
   return objects
 }
