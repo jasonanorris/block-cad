@@ -8,13 +8,15 @@ import SceneControls, { type CameraView } from './SceneControls'
 function CadObjectMesh({
   object,
   isSelected,
+  isActive,
   onSelect,
   selectedMeshRef,
   cutGeometry,
 }: {
   object: CadObject
   isSelected: boolean
-  onSelect: (id: string) => void
+  isActive: boolean
+  onSelect: (id: string, additive: boolean) => void
   selectedMeshRef: RefObject<Mesh | null>
   cutGeometry?: BufferGeometry
 }) {
@@ -23,14 +25,14 @@ function CadObjectMesh({
 
   return (
     <mesh
-      ref={isSelected ? selectedMeshRef : undefined}
+      ref={isActive ? selectedMeshRef : undefined}
       position={[position.x, position.y, position.z]}
       rotation={[rotation.x, rotation.y, rotation.z]}
       scale={[scale.x, scale.y, scale.z]}
       renderOrder={isCutter ? 1 : 0}
       onClick={(event) => {
         event.stopPropagation()
-        onSelect(object.id)
+        onSelect(object.id, event.nativeEvent.shiftKey)
       }}
     >
       {cutGeometry ? (
@@ -63,6 +65,7 @@ function CadObjectMesh({
 function CadScene({
   objects,
   selectedObjectId,
+  selectedObjectIds,
   onSelectObject,
   toolMode,
   snapEnabled,
@@ -85,8 +88,9 @@ function CadScene({
         <CadObjectMesh
           key={object.id}
           object={object}
-          isSelected={object.id === selectedObjectId}
-          onSelect={(id) => { if (!gizmoInteractionRef.current) onSelectObject(id) }}
+          isSelected={selectedObjectIds.includes(object.id)}
+          isActive={object.id === selectedObjectId}
+          onSelect={(id, additive) => { if (!gizmoInteractionRef.current) onSelectObject(id, additive) }}
           selectedMeshRef={selectedMeshRef}
           cutGeometry={booleanGeometries.get(object.id)}
         />
@@ -109,11 +113,12 @@ function CadScene({
 type WorkspaceProps = {
   objects: CadObject[]
   selectedObjectId: string | null
+  selectedObjectIds: string[]
   toolMode: TransformControlsMode
   snapEnabled: boolean
   cameraView: CameraView
   booleanGeometries: Map<string, BufferGeometry>
-  onSelectObject: (id: string | null) => void
+  onSelectObject: (id: string | null, additive?: boolean) => void
   onTransformObject: (id: string, transform: ObjectTransform) => void
   onTransformStart: () => void
   onTransformEnd: () => void
@@ -126,7 +131,7 @@ export default function Workspace(props: WorkspaceProps) {
     <div className="workspace-canvas" aria-label={`3D workspace with ${props.objects.length} ${props.objects.length === 1 ? 'object' : 'objects'} and grid`}>
       <Canvas
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
-        onPointerMissed={() => { if (!gizmoInteractionRef.current) props.onSelectObject(null) }}
+        onPointerMissed={(event) => { if (!gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
       >
         <CadScene {...props} gizmoInteractionRef={gizmoInteractionRef} />
       </Canvas>

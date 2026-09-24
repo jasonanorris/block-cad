@@ -28,7 +28,7 @@ const cameraViews: { view: CameraView; label: string }[] = [
 
 export default function App() {
   const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => [createCadObject('box')])
-  const { objects, selectedObjectId } = scene
+  const { objects, selectedObjectId, selectedObjectIds } = scene
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [snapEnabled, setSnapEnabled] = useState(false)
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
@@ -123,34 +123,51 @@ export default function App() {
     // Keep new shapes apart so each one can be seen and selected immediately.
     const index = objects.length
     const object = createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30)
-    commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id }))
+    commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id, selectedObjectIds: [object.id] }))
   }
 
   function addCutExample() {
     const x = (objects.length % 3) * 40
     const z = Math.floor(objects.length / 3) * 40
     const [box, cutter] = createCutExample(x, z)
-    commit((current) => ({ objects: [...current.objects, box, cutter], selectedObjectId: cutter.id }))
+    commit((current) => ({ objects: [...current.objects, box, cutter], selectedObjectId: cutter.id, selectedObjectIds: [cutter.id] }))
   }
 
   const duplicateSelected = useCallback(() => {
-    const source = objects.find((object) => object.id === selectedObjectId)
-    if (!source) return
-    const duplicate = duplicateCadObject(source)
-    commit((current) => ({ objects: [...current.objects, duplicate], selectedObjectId: duplicate.id }))
-  }, [objects, selectedObjectId, commit])
+    commit((current) => {
+      const selectedIds = new Set(current.selectedObjectIds)
+      const sources = current.objects.filter((object) => selectedIds.has(object.id))
+      if (sources.length === 0) return current
+      const duplicates = sources.map(duplicateCadObject)
+      const copiedIds = new Map(sources.map((source, index) => [source.id, duplicates[index].id]))
+      const linkedDuplicates = duplicates.map((object) => object.cutTargetId && copiedIds.has(object.cutTargetId)
+        ? { ...object, cutTargetId: copiedIds.get(object.cutTargetId) }
+        : object)
+      return {
+        objects: [...current.objects, ...linkedDuplicates],
+        selectedObjectIds: linkedDuplicates.map((object) => object.id),
+        selectedObjectId: current.selectedObjectId
+          ? copiedIds.get(current.selectedObjectId) ?? null
+          : linkedDuplicates.at(-1)?.id ?? null,
+      }
+    })
+  }, [commit])
 
   const deleteSelected = useCallback(() => {
-    if (!selectedObjectId) return
-    commit((current) => ({
-      objects: current.objects
-        .filter((object) => object.id !== selectedObjectId)
-        .map((object) => isHoleObject(object) && object.cutTargetId === selectedObjectId
-          ? { ...object, cutTargetId: undefined }
-          : object),
-      selectedObjectId: null,
-    }))
-  }, [selectedObjectId, commit])
+    commit((current) => {
+      const selectedIds = new Set(current.selectedObjectIds)
+      if (selectedIds.size === 0) return current
+      return {
+        objects: current.objects
+          .filter((object) => !selectedIds.has(object.id))
+          .map((object) => isHoleObject(object) && selectedIds.has(object.cutTargetId)
+            ? { ...object, cutTargetId: undefined }
+            : object),
+        selectedObjectId: null,
+        selectedObjectIds: [],
+      }
+    })
+  }, [commit])
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -168,10 +185,10 @@ export default function App() {
         if (!event.repeat) redo()
       } else if (event.key === 'Escape') {
         select(null)
-      } else if (selectedObjectId && modifier && key === 'd') {
+      } else if (selectedObjectIds.length > 0 && modifier && key === 'd') {
         event.preventDefault()
         if (!event.repeat) duplicateSelected()
-      } else if (selectedObjectId && !modifier && (event.key === 'Delete' || event.key === 'Backspace')) {
+      } else if (selectedObjectIds.length > 0 && !modifier && (event.key === 'Delete' || event.key === 'Backspace')) {
         event.preventDefault()
         deleteSelected()
       }
@@ -179,7 +196,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [selectedObjectId, duplicateSelected, deleteSelected, select, undo, redo])
+  }, [selectedObjectIds.length, duplicateSelected, deleteSelected, select, undo, redo])
 
   return (
     <div className="app-shell">
@@ -243,6 +260,7 @@ export default function App() {
             <Workspace
               objects={objects}
               selectedObjectId={selectedObjectId}
+              selectedObjectIds={selectedObjectIds}
               toolMode={toolMode}
               snapEnabled={snapEnabled}
               cameraView={cameraView}
@@ -287,12 +305,15 @@ export default function App() {
             <h3>Selection</h3>
             <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
               <span className="selection-indicator" aria-hidden="true" />
-              <span>{selectedObject ? `${objectLabel(selectedObject)} selected` : 'Nothing selected'}</span>
+              <span>{selectedObjectIds.length > 1
+                ? `${selectedObjectIds.length} objects selected · ${selectedObject ? objectLabel(selectedObject) : 'Shape'} active`
+                : selectedObject ? `${objectLabel(selectedObject)} selected` : 'Nothing selected'}</span>
             </div>
+            <p className="selection-hint">Shift+click shapes or the list to select more than one.</p>
             {objects.length > 0 && (
               <div className="object-list" role="group" aria-label="Objects">
                 {objects.map((object, index) => (
-                  <button key={object.id} type="button" aria-pressed={object.id === selectedObjectId} onClick={() => select(object.id)}>
+                  <button key={object.id} type="button" aria-pressed={selectedObjectIds.includes(object.id)} onClick={(event) => select(object.id, event.shiftKey)}>
                     <span>{objectLabel(object)}</span>
                     <span>#{index + 1}</span>
                   </button>
@@ -300,8 +321,8 @@ export default function App() {
               </div>
             )}
             <div className="selection-actions">
-              <button type="button" disabled={!selectedObject} onClick={duplicateSelected} title="Duplicate (Ctrl/Cmd+D)">Duplicate</button>
-              <button type="button" disabled={!selectedObject} onClick={deleteSelected} title="Delete (Delete or Backspace)">Delete</button>
+              <button type="button" disabled={selectedObjectIds.length === 0} onClick={duplicateSelected} title="Duplicate selected objects (Ctrl/Cmd+D)">Duplicate</button>
+              <button type="button" disabled={selectedObjectIds.length === 0} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>
             </div>
             {selectedObject && (
               <ObjectInspector

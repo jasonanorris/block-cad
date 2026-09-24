@@ -4,6 +4,7 @@ import type { CadObject } from './cadModel'
 type SceneSnapshot = {
   objects: CadObject[]
   selectedObjectId: string | null
+  selectedObjectIds: string[]
 }
 
 type SceneChange = (scene: SceneSnapshot) => SceneSnapshot
@@ -17,7 +18,7 @@ export type CadHistoryState = {
 
 export type CadHistoryAction =
   | { type: 'commit' | 'edit'; change: SceneChange }
-  | { type: 'select'; id: string | null }
+  | { type: 'select'; id: string | null; additive: boolean }
   | { type: 'reset'; objects: CadObject[] }
   | { type: 'begin' | 'end' | 'undo' | 'redo' }
 
@@ -26,7 +27,7 @@ const HISTORY_LIMIT = 100
 export function createInitialHistory(objects: CadObject[]): CadHistoryState {
   return {
     past: [],
-    present: { objects, selectedObjectId: null },
+    present: { objects, selectedObjectId: null, selectedObjectIds: [] },
     future: [],
     transactionStart: null,
   }
@@ -51,8 +52,24 @@ export function cadHistoryReducer(state: CadHistoryState, action: CadHistoryActi
   switch (action.type) {
     case 'reset':
       return createInitialHistory(action.objects)
-    case 'select':
-      return { ...state, present: { ...state.present, selectedObjectId: action.id } }
+    case 'select': {
+      if (!action.id) {
+        return { ...state, present: { ...state.present, selectedObjectId: null, selectedObjectIds: [] } }
+      }
+      if (!action.additive) {
+        return { ...state, present: { ...state.present, selectedObjectId: action.id, selectedObjectIds: [action.id] } }
+      }
+      const selectedObjectIds = state.present.selectedObjectIds.includes(action.id)
+        ? state.present.selectedObjectIds.filter((id) => id !== action.id)
+        : [...state.present.selectedObjectIds, action.id]
+      return { ...state, present: {
+        ...state.present,
+        selectedObjectIds,
+        selectedObjectId: selectedObjectIds.includes(action.id)
+          ? action.id
+          : selectedObjectIds.at(-1) ?? null,
+      } }
+    }
     case 'begin':
       return state.transactionStart ? state : { ...state, transactionStart: state.present }
     case 'edit': {
@@ -108,7 +125,7 @@ export function useCadHistory(createObjects: () => CadObject[]) {
   const editObjects = useCallback((update: (objects: CadObject[]) => CadObject[]) => {
     dispatch({ type: 'edit', change: (scene) => ({ ...scene, objects: update(scene.objects) }) })
   }, [])
-  const select = useCallback((id: string | null) => dispatch({ type: 'select', id }), [])
+  const select = useCallback((id: string | null, additive = false) => dispatch({ type: 'select', id, additive }), [])
   const begin = useCallback(() => dispatch({ type: 'begin' }), [])
   const end = useCallback(() => dispatch({ type: 'end' }), [])
   const undo = useCallback(() => dispatch({ type: 'undo' }), [])

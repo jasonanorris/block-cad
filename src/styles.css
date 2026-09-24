@@ -82,6 +82,7 @@ h1 { margin-bottom: 0; font-size: 23px; letter-spacing: -.035em; line-height: 1.
 .selection-card.is-selected { border-color: #f1cc99; background: #fff8ee; color: #79501e; font-weight: 700; }
 .selection-indicator { width: 9px; height: 9px; flex: none; border-radius: 3px; background: #cbd5e2; }
 .is-selected .selection-indicator { background: #ed9d39; }
+.panel-section p.selection-hint { margin: 8px 1px 0; color: #8a98ac; font-size: 11px; }
 .object-list { display: grid; gap: 5px; max-height: 150px; margin-top: 10px; overflow-y: auto; }
 .object-list button { display: flex; justify-content: space-between; padding: 7px 9px; border: 1px solid #e5eaf1; border-radius: 7px; background: #fff; color: #52657e; cursor: pointer; font: inherit; font-size: 11px; text-align: left; }
 .object-list button[aria-pressed="true"] { border-color: #f1cc99; background: #fff8ee; color: #79501e; font-weight: 700; }
