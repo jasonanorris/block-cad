@@ -1,7 +1,7 @@
 import { isHoleObject, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 6
+const PROJECT_VERSION = 7
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -42,8 +42,13 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
     (typeof data.joinGroupId !== 'string' || !data.joinGroupId.trim())) {
     throw new Error(`${field}.joinGroupId must be a nonempty ID.`)
   }
+  if (version >= 7 && data.name !== undefined &&
+    (typeof data.name !== 'string' || !data.name.trim() || data.name.length > 80)) {
+    throw new Error(`${field}.name must be 1 to 80 characters.`)
+  }
   const base = {
     id: data.id,
+    ...(version >= 7 && data.name ? { name: (data.name as string).trim() } : {}),
     position: vector(data.position, `${field}.position`),
     rotation: vector(data.rotation, `${field}.rotation`),
     scale: vector(data.scale, `${field}.scale`),
@@ -102,7 +107,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)

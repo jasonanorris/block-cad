@@ -5,6 +5,7 @@ export const MODEL_UNIT = 'mm' as const
 
 type BaseObject = {
   id: string
+  name?: string
   position: Vector3
   rotation: Vector3
   scale: Vector3

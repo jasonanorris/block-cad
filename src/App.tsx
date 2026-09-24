@@ -16,7 +16,8 @@ const shapeLabels: Record<CadObjectType, string> = {
 }
 
 function objectLabel(object: CadObject) {
-  return `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}${object.joinGroupId ? ' · Joined' : ''}`
+  const shape = `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}`
+  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? ' · Joined' : ''}`
 }
 
 const cameraViews: { view: CameraView; label: string }[] = [
@@ -41,7 +42,7 @@ export default function App() {
   const canJoin = selectedObjects.length >= 2 && selectedObjects.every((object) => !isHoleObject(object) && !object.joinGroupId)
   const canSeparate = selectedObjects.some((object) => !!object.joinGroupId)
   const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isHoleObject(object)
-    ? [{ id: object.id, label: `${shapeLabels[object.type]} #${index + 1}` }]
+    ? [{ id: object.id, label: `${object.name ? `${object.name} · ` : ''}${shapeLabels[object.type]} #${index + 1}` }]
     : [])
   const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
   const derivedBodies = getSolidBodies(objects).filter((body) => body.members.length > 1 || body.holes.length > 0)

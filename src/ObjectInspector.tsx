@@ -86,6 +86,28 @@ export default function ObjectInspector({
   return (
     <div className="object-inspector">
       <div className="inspector-group">
+        <label className="name-field">
+          <span>Name</span>
+          <input
+            aria-label="Object name"
+            type="text"
+            maxLength={80}
+            placeholder={shapeName}
+            value={object.name ?? ''}
+            onFocus={onEditStart}
+            onChange={(event) => {
+              const name = event.target.value
+              onUpdate(object.id, (current) => ({ ...current, name }))
+            }}
+            onBlur={(event) => {
+              const name = event.target.value.trim() || undefined
+              if (name !== object.name) onUpdate(object.id, (current) => ({ ...current, name }))
+              onEditEnd()
+            }}
+          />
+        </label>
+      </div>
+      <div className="inspector-group">
         <h4>Shape mode</h4>
         <div className="shape-mode" role="group" aria-label={`${shapeName} shape mode`}>
           <button type="button" aria-pressed={!object.cutTargetId} onClick={() => onSetCutTarget(object.id, null)}>Solid</button>
