@@ -32,6 +32,9 @@ export default function App() {
   const [exportError, setExportError] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
+  const boxTargets = objects.flatMap((object, index) => object.type === 'box'
+    ? [{ id: object.id, label: `Box #${index + 1}` }]
+    : [])
   const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
   const cutBoxCount = new Set(objects.filter(isCylinderCutter).map((object) => object.cutTargetId)).size
 
@@ -89,6 +92,15 @@ export default function App() {
   const updateObjectTransform = useCallback((id: string, transform: ObjectTransform) => {
     updateObject(id, (object) => ({ ...object, ...transform }))
   }, [updateObject])
+
+  function setCutTarget(id: string, targetId: string | null) {
+    commit((current) => ({
+      ...current,
+      objects: current.objects.map((object) => object.id === id && object.type === 'cylinder'
+        ? { ...object, cutTargetId: targetId ?? undefined }
+        : object),
+    }))
+  }
 
   function addObject(type: CadObjectType) {
     // Keep new shapes apart so each one can be seen and selected immediately.
@@ -278,7 +290,9 @@ export default function App() {
               <ObjectInspector
                 key={selectedObject.id}
                 object={selectedObject}
+                boxTargets={boxTargets}
                 onUpdate={updateObject}
+                onSetCutTarget={setCutTarget}
                 onEditStart={begin}
                 onEditEnd={end}
               />

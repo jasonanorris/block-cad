@@ -1,6 +1,6 @@
 # Block CAD
 
-A simple browser-based 3D modeling project. You can add, select, move, rotate, size, duplicate, delete, undo, and redo changes to boxes, cylinders, and spheres on a gridded 3D workplane. Projects can be saved to and loaded from JSON files, or exported as STL for 3D printing. A first Boolean prototype cuts a cylinder through a box.
+A simple browser-based 3D modeling project. You can add, select, move, rotate, size, duplicate, delete, undo, and redo changes to boxes, cylinders, and spheres on a gridded 3D workplane. Projects can be saved to and loaded from JSON files, or exported as STL for 3D printing. Cylinders can cut holes in boxes.
 
 ## Local development
 
@@ -13,7 +13,7 @@ npm run dev
 
 Open the local URL printed by Vite. Use New to start with an empty workplane, Save to download a project JSON file, Load to open one, and Export STL to download all shapes for a slicer. New and Load clear selection and undo history. An invalid file leaves the current project intact and displays an error. Use the Shapes buttons to add a box, cylinder, or sphere. New shapes appear on the workplane and are selected automatically. Choose Move, Rotate, or Scale above the workspace and drag the colored handles on the selected shape. Turn on Snap to move in 5 mm grid steps and rotate in 15° steps; turn it off for freeform dragging. Snap does not affect scaling or numeric inspector edits. The selected object's inspector also lets you enter position, rotation, and dimensions numerically. Use the Perspective, Top, Front, and Right buttons to switch camera views. Top, Front, and Right use orthographic projection; scroll to zoom and right-drag to pan. Perspective also supports drag to orbit. Changing views resets the camera angle and framing without changing the model. Use Duplicate or Delete in the sidebar, Ctrl/Cmd+D to duplicate, Delete or Backspace to remove, and Escape to clear selection. Undo and Redo are above the workspace; Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes. App shortcuts do not run while editing an inspector field.
 
-Click **Add cutout example** to add an editable box and cylinder cutter. The cutter starts selected. Select either source in the Objects list or on the canvas, then move or resize it to update the cut. Deleting the cutter restores the box; deleting the box turns its cutter into a normal cylinder. Undo and Redo cover these changes. This milestone is a focused box-minus-cylinder prototype; the general Hole tool is a later step.
+To cut a hole, add a box and a cylinder, select the cylinder, and choose **Hole** under Shape mode. Use **Cut box** to choose the target when the project has multiple boxes. Move or resize the cylinder to shape the cut. Choose **Solid** to restore it as a separate shape. **Add cutout example** provides a ready-made box and cylinder hole. Deleting the cutter restores the box; deleting the target box turns its cutter into a normal cylinder. Undo and Redo cover these changes.
 
 ```bash
 npm run build

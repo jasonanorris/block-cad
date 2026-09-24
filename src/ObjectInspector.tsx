@@ -67,12 +67,16 @@ function NumericField({
 
 export default function ObjectInspector({
   object,
+  boxTargets,
   onUpdate,
+  onSetCutTarget,
   onEditStart,
   onEditEnd,
 }: {
   object: CadObject
+  boxTargets: { id: string; label: string }[]
   onUpdate: (id: string, update: (current: CadObject) => CadObject) => void
+  onSetCutTarget: (id: string, targetId: string | null) => void
   onEditStart: () => void
   onEditEnd: () => void
 }) {
@@ -80,6 +84,35 @@ export default function ObjectInspector({
 
   return (
     <div className="object-inspector">
+      {object.type === 'cylinder' && (
+        <div className="inspector-group">
+          <h4>Shape mode</h4>
+          <div className="shape-mode" role="group" aria-label="Cylinder shape mode">
+            <button type="button" aria-pressed={!object.cutTargetId} onClick={() => onSetCutTarget(object.id, null)}>Solid</button>
+            <button
+              type="button"
+              aria-pressed={!!object.cutTargetId}
+              disabled={boxTargets.length === 0}
+              onClick={() => onSetCutTarget(object.id, object.cutTargetId ?? boxTargets[0].id)}
+            >Hole</button>
+          </div>
+          {object.cutTargetId ? (
+            <label className="cut-target-field">
+              <span>Cut box</span>
+              <select
+                aria-label="Box to cut"
+                value={object.cutTargetId}
+                onChange={(event) => onSetCutTarget(object.id, event.target.value)}
+              >
+                {boxTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
+              </select>
+            </label>
+          ) : boxTargets.length === 0 ? (
+            <p className="shape-mode-hint">Add a box to use this cylinder as a hole.</p>
+          ) : null}
+          {object.cutTargetId && <p className="shape-mode-hint">Move this cylinder into the box to cut it.</p>}
+        </div>
+      )}
       <div className="inspector-group">
         <h4>Position <span>mm</span></h4>
         <div className="numeric-grid">
