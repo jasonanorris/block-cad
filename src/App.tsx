@@ -39,7 +39,10 @@ export default function App() {
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
   const selectedIds = new Set(selectedObjectIds)
   const selectedObjects = objects.filter((object) => selectedIds.has(object.id))
-  const canJoin = selectedObjects.length >= 2 && selectedObjects.every((object) => !isHoleObject(object) && !object.joinGroupId)
+  const selectedSolids = selectedObjects.filter((object) => !isHoleObject(object))
+  const selectedSolidIds = new Set(selectedSolids.map((object) => object.id))
+  const canJoin = selectedSolids.length >= 2 && selectedSolids.every((object) => !object.joinGroupId) &&
+    selectedObjects.every((object) => !isHoleObject(object) || selectedSolidIds.has(object.cutTargetId))
   const canSeparate = selectedObjects.some((object) => !!object.joinGroupId)
   const solidTargets = objects.flatMap((object, index) => object.id !== selectedObjectId && !isHoleObject(object)
     ? [{ id: object.id, label: `${object.name ? `${object.name} · ` : ''}${shapeLabels[object.type]} #${index + 1}` }]
@@ -192,10 +195,13 @@ export default function App() {
     const groupId = crypto.randomUUID()
     commit((current) => {
       const ids = new Set(current.selectedObjectIds)
-      const members = current.objects.filter((object) => ids.has(object.id))
-      if (members.length < 2 || members.some((object) => isHoleObject(object) || object.joinGroupId)) return current
+      const selected = current.objects.filter((object) => ids.has(object.id))
+      const members = selected.filter((object) => !isHoleObject(object))
+      const memberIds = new Set(members.map((object) => object.id))
+      if (members.length < 2 || members.some((object) => object.joinGroupId) ||
+        selected.some((object) => isHoleObject(object) && !memberIds.has(object.cutTargetId))) return current
       return {
-        objects: current.objects.map((object) => ids.has(object.id) ? { ...object, joinGroupId: groupId } : object),
+        objects: current.objects.map((object) => memberIds.has(object.id) ? { ...object, joinGroupId: groupId } : object),
         selectedObjectId: members[0].id,
         selectedObjectIds: [members[0].id],
       }
@@ -375,7 +381,7 @@ export default function App() {
               <button type="button" disabled={selectedObjectIds.length === 0} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>
             </div>
             <div className="join-actions">
-              <button type="button" disabled={!canJoin} onClick={joinSelected} title="Join two or more selected, separate solid shapes">Join</button>
+              <button type="button" disabled={!canJoin} onClick={joinSelected} title="Join two or more selected solids, including their selected holes">Join</button>
               <button type="button" disabled={!canSeparate} onClick={separateSelected} title="Separate the selected joined shapes">Separate</button>
             </div>
             {selectedObject && (
