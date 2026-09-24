@@ -25,38 +25,38 @@ function shift(object: CadObject, offset: Vector3): CadObject {
   } }
 }
 
-function transformGroupedHole(hole: CadObject, before: CadObject, after: CadObject): CadObject {
+function transformRelative(object: CadObject, before: CadObject, after: CadObject): CadObject {
   const scaleChanged = before.scale.x !== after.scale.x || before.scale.y !== after.scale.y ||
     before.scale.z !== after.scale.z
   if (scaleChanged) {
     if ([before.scale.x, before.scale.y, before.scale.z].some((value) => Math.abs(value) < 1e-6)) {
-      return shift(hole, {
+      return shift(object, {
         x: after.position.x - before.position.x,
         y: after.position.y - before.position.y,
         z: after.position.z - before.position.z,
       })
     }
-    // Apply the solid's relative transform to the hole's world transform.
-    const transformed = matrix(after).multiply(matrix(before).invert()).multiply(matrix(hole))
+    // Apply the active solid's relative transform to another source shape.
+    const transformed = matrix(after).multiply(matrix(before).invert()).multiply(matrix(object))
     const position = new ThreeVector3()
     const rotation = new Quaternion()
     const scale = new ThreeVector3()
     transformed.decompose(position, rotation, scale)
     const euler = new Euler().setFromQuaternion(rotation)
-    return { ...hole, position: coordinates(position),
+    return { ...object, position: coordinates(position),
       rotation: { x: euler.x, y: euler.y, z: euler.z }, scale: coordinates(scale) }
   }
 
   const turn = orientation(after).multiply(orientation(before).invert())
-  const position = point(hole.position).sub(point(before.position)).applyQuaternion(turn).add(point(after.position))
-  const rotated = turn.multiply(orientation(hole))
+  const position = point(object.position).sub(point(before.position)).applyQuaternion(turn).add(point(after.position))
+  const rotated = turn.multiply(orientation(object))
   const euler = new Euler().setFromQuaternion(rotated)
-  return { ...hole, position: coordinates(position),
+  return { ...object, position: coordinates(position),
     rotation: { x: euler.x, y: euler.y, z: euler.z } }
 }
 
-// Source objects remain editable; a solid's transform carries its grouped holes.
-// Joined members translate together, while rotation and scale affect only the active member.
+// Source objects remain editable. The active solid's transform also affects its
+// joined members and any holes grouped with those members.
 export function updateObjectWithGroups(
   objects: CadObject[], id: string, update: (object: CadObject) => CadObject,
 ): CadObject[] {
@@ -75,18 +75,19 @@ export function updateObjectWithGroups(
     before.rotation.z !== after.rotation.z
   const scaled = before.scale.x !== after.scale.x || before.scale.y !== after.scale.y ||
     before.scale.z !== after.scale.z
+  if (!moved && !rotated && !scaled) {
+    return objects.map((object) => object.id === id ? after : object)
+  }
   const memberIds = new Set(objects.filter((object) => !isHoleObject(object) &&
-    (object.id === id || !!(moved && before.joinGroupId && object.joinGroupId === before.joinGroupId)))
+    (object.id === id || !!(before.joinGroupId && object.joinGroupId === before.joinGroupId)))
     .map((object) => object.id))
 
   return objects.map((object) => {
     if (object.id === id) return after
     if (isHoleObject(object) && object.groupedWithTarget && memberIds.has(object.cutTargetId)) {
-      if (object.cutTargetId !== id) return shift(object, offset)
-      if (scaled || rotated) return transformGroupedHole(object, before, after)
-      return moved ? shift(object, offset) : object
+      return scaled || rotated ? transformRelative(object, before, after) : shift(object, offset)
     }
-    if (moved && memberIds.has(object.id)) return shift(object, offset)
+    if (memberIds.has(object.id)) return scaled || rotated ? transformRelative(object, before, after) : shift(object, offset)
     return object
   })
 }
