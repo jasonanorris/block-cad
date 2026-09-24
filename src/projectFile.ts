@@ -1,7 +1,7 @@
 import { isHoleObject, MODEL_UNIT, type CadObject, type Vector3 } from './cadModel.ts'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 4
+const PROJECT_VERSION = 5
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -69,10 +69,15 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
         height: positiveNumber(dimensions.height, `${field}.dimensions.height`),
       }, ...(version >= 2 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
     }
-    case 'sphere':
+    case 'sphere': {
+      if (version >= 5 && data.cutTargetId !== undefined &&
+        (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
+        throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      }
       return { ...base, type: 'sphere', dimensions: {
         diameter: positiveNumber(dimensions.diameter, `${field}.dimensions.diameter`),
-      } }
+      }, ...(version >= 5 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+    }
     default:
       throw new Error(`${field} has an unsupported shape type.`)
   }
@@ -92,7 +97,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== PROJECT_VERSION) {
+  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)

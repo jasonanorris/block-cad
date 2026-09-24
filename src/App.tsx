@@ -100,13 +100,13 @@ export default function App() {
   function setCutTarget(id: string, targetId: string | null) {
     commit((current) => {
       const source = current.objects.find((object) => object.id === id)
-      if (!source || source.type === 'sphere') return current
+      if (!source) return current
       if (targetId && !current.objects.some((object) => object.id === targetId &&
         object.id !== id && !isHoleObject(object))) return current
       return {
         ...current,
         objects: current.objects.map((object) => {
-          if (object.id === id && object.type !== 'sphere') {
+          if (object.id === id) {
             return { ...object, cutTargetId: targetId ?? undefined }
           }
           // A hole cannot also be the target of another hole.

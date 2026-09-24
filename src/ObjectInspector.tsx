@@ -81,38 +81,37 @@ export default function ObjectInspector({
   onEditEnd: () => void
 }) {
   const dimensions = getObjectDimensions(object)
+  const shapeName = object.type[0].toUpperCase() + object.type.slice(1)
 
   return (
     <div className="object-inspector">
-      {object.type !== 'sphere' && (
-        <div className="inspector-group">
-          <h4>Shape mode</h4>
-          <div className="shape-mode" role="group" aria-label={`${object.type === 'box' ? 'Box' : 'Cylinder'} shape mode`}>
-            <button type="button" aria-pressed={!object.cutTargetId} onClick={() => onSetCutTarget(object.id, null)}>Solid</button>
-            <button
-              type="button"
-              aria-pressed={!!object.cutTargetId}
-              disabled={solidTargets.length === 0}
-              onClick={() => onSetCutTarget(object.id, object.cutTargetId ?? solidTargets[0].id)}
-            >Hole</button>
-          </div>
-          {object.cutTargetId ? (
-            <label className="cut-target-field">
-              <span>Cut solid</span>
-              <select
-                aria-label="Solid to cut"
-                value={object.cutTargetId}
-                onChange={(event) => onSetCutTarget(object.id, event.target.value)}
-              >
-                {solidTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
-              </select>
-            </label>
-          ) : solidTargets.length === 0 ? (
-            <p className="shape-mode-hint">Add a solid shape to use this {object.type} as a hole.</p>
-          ) : null}
-          {object.cutTargetId && <p className="shape-mode-hint">Move this {object.type} into the solid to cut it.</p>}
+      <div className="inspector-group">
+        <h4>Shape mode</h4>
+        <div className="shape-mode" role="group" aria-label={`${shapeName} shape mode`}>
+          <button type="button" aria-pressed={!object.cutTargetId} onClick={() => onSetCutTarget(object.id, null)}>Solid</button>
+          <button
+            type="button"
+            aria-pressed={!!object.cutTargetId}
+            disabled={solidTargets.length === 0}
+            onClick={() => onSetCutTarget(object.id, object.cutTargetId ?? solidTargets[0].id)}
+          >Hole</button>
         </div>
-      )}
+        {object.cutTargetId ? (
+          <label className="cut-target-field">
+            <span>Cut solid</span>
+            <select
+              aria-label="Solid to cut"
+              value={object.cutTargetId}
+              onChange={(event) => onSetCutTarget(object.id, event.target.value)}
+            >
+              {solidTargets.map((target) => <option key={target.id} value={target.id}>{target.label}</option>)}
+            </select>
+          </label>
+        ) : solidTargets.length === 0 ? (
+          <p className="shape-mode-hint">Add a solid shape to use this {object.type} as a hole.</p>
+        ) : null}
+        {object.cutTargetId && <p className="shape-mode-hint">Move this {object.type} into the solid to cut it.</p>}
+      </div>
       <div className="inspector-group">
         <h4>Position <span>mm</span></h4>
         <div className="numeric-grid">
