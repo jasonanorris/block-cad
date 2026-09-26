@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ObjectList from './ObjectList'
+import { colorObjects } from './objectColor'
 import { objectLabel, shapeLabels } from './objectLabels'
 import ObjectInspector from './ObjectInspector'
 import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type ObjectTransform, type PrimitiveType, type Vector3 } from './cadModel'
@@ -803,6 +804,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                 solidTargets={solidTargets}
                 onUpdate={updateObject}
                 onSetCutTarget={setCutTarget}
+                onSetColor={(id, color) => editObjects((current) => colorObjects(current, id, color))}
                 onEditStart={begin}
                 onEditEnd={end}
                 disabled={!canEditActive}

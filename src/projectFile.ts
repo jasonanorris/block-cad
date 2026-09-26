@@ -1,8 +1,9 @@
 import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours, type Vector3 } from './cadModel.ts'
+import { validObjectColor } from './objectColor'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 13
+const PROJECT_VERSION = 14
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -83,7 +84,11 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
   if (version >= 9 && data.locked !== undefined && typeof data.locked !== 'boolean') {
     throw new Error(`${field}.locked must be a boolean.`)
   }
+  if (version >= 14 && data.color !== undefined && !validObjectColor(data.color)) {
+    throw new Error(`${field}.color must be a six-digit hexadecimal color.`)
+  }
   const base = {
+    ...(version >= 14 && validObjectColor(data.color) ? { color: data.color.toLowerCase() } : {}),
     id: data.id,
     ...(version >= 7 && data.name ? { name: (data.name as string).trim() } : {}),
     ...(version >= 8 && data.groupedWithTarget ? { groupedWithTarget: true } : {}),

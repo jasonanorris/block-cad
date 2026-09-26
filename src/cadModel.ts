@@ -10,6 +10,7 @@ export const MODEL_UNIT = 'mm' as const
 type BaseObject = {
   id: string
   name?: string
+  color?: string
   hidden?: boolean
   locked?: boolean
   position: Vector3

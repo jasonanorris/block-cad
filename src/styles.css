@@ -237,3 +237,7 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 .object-children { border-left: 2px solid #dfe6f0; margin-left: 12px; padding-left: 8px; }
 .object-list .context-row { font-style: italic; }
 .object-select span:first-child { overflow-wrap: anywhere; }
+.object-children .object-select { width: 100%; margin-top: 4px; }
+.color-field { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.color-field input { width: 52px; height: 30px; padding: 2px; border: 1px solid #dfe6f0; background: white; border-radius: 6px; }
+.object-swatch { display: inline-block; width: 9px; height: 9px; border: 1px solid #0003; border-radius: 2px; margin-right: 5px; }

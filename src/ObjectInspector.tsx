@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { DEFAULT_OBJECT_COLOR } from './objectColor'
 import { getObjectDimensions, setObjectDimension, type CadObject, type Vector3 } from './cadModel'
 
 type Axis = keyof Vector3
@@ -78,6 +79,7 @@ export default function ObjectInspector({
   solidTargets,
   onUpdate,
   onSetCutTarget,
+  onSetColor,
   onEditStart,
   onEditEnd,
   disabled = false,
@@ -85,6 +87,7 @@ export default function ObjectInspector({
   object: CadObject
   solidTargets: { id: string; label: string }[]
   onUpdate: (id: string, update: (current: CadObject) => CadObject) => void
+  onSetColor: (id: string, color: string) => void
   onSetCutTarget: (id: string, targetId: string | null) => void
   onEditStart: () => void
   onEditEnd: () => void
@@ -119,6 +122,12 @@ export default function ObjectInspector({
         </label>
       </div>
       <div className="inspector-group">
+        <label className="color-field">Color
+          <input type="color" aria-label="Object color" value={object.color ?? DEFAULT_OBJECT_COLOR}
+            onFocus={onEditStart} onBlur={onEditEnd}
+            onChange={(event) => onSetColor(object.id, event.target.value)} />
+        </label>
+        <p className="selection-hint">Joined solids share a color. Selected shapes keep the orange highlight. Colors are saved in projects; STL/3MF exports contain geometry only.</p>
         <h4>Shape mode</h4>
         <div className="shape-mode" role="group" aria-label={`${shapeName} shape mode`}>
           <button type="button" aria-pressed={!object.cutTargetId} onClick={() => onSetCutTarget(object.id, null)}>Solid</button>

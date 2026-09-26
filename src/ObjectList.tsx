@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CadObject } from './cadModel'
+import { DEFAULT_OBJECT_COLOR } from './objectColor'
 import { objectLabel } from './objectLabels'
 import { objectListRows, type ObjectFilter } from './objectList'
 
@@ -17,7 +18,7 @@ export default function ObjectList({ objects, selectedIds, onSelect }: {
   const selectButton = (object: CadObject, context = false) => <button type="button" data-object-id={object.id}
     className={`object-select${object.hidden ? ' is-hidden' : ''}${context ? ' context-row' : ''}`}
     aria-pressed={selectedIds.includes(object.id)} onClick={(event) => onSelect(object.id, event.shiftKey)}>
-    <span>{objectLabel(object, objects)}{context ? ' · Assembly context' : ''}</span><span>#{objects.indexOf(object) + 1}</span>
+    <span><i className="object-swatch" aria-hidden="true" style={{ background: object.color ?? DEFAULT_OBJECT_COLOR }} />{objectLabel(object, objects)}{context ? ' · Assembly context' : ''}</span><span>#{objects.indexOf(object) + 1}</span>
   </button>
   return <div className="object-browser">
     <label className="object-search">Search objects<input type="search" aria-label="Search objects" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, shape, or number" /></label>

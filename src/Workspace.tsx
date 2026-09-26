@@ -4,6 +4,7 @@ import type { BufferGeometry, Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
+import { DEFAULT_OBJECT_COLOR } from './objectColor'
 import { createSourceGeometry } from './sourceGeometry'
 import type { FrameRequest } from './frameCamera'
 import { expandAssemblyIds } from './selectionOperations'
@@ -53,7 +54,7 @@ function CadObjectMesh({
     >
       <primitive object={cutGeometry ?? sourceGeometry} attach="geometry" />
       <meshStandardMaterial
-        color={isSelected ? '#f3a447' : '#6797ef'}
+        color={isSelected ? '#f3a447' : object.color ?? DEFAULT_OBJECT_COLOR}
         emissive={isSelected ? '#5c2d00' : '#000000'}
         emissiveIntensity={isSelected ? 0.18 : 0}
         roughness={0.75}
