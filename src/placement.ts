@@ -137,3 +137,14 @@ export async function distributeByBounds(objects: CadObject[], ids: Set<string>,
   }
   return translateUnits(objects, units, offsets, axis)
 }
+
+// Caller owns this geometry. Finished surfaces are returned in world coordinates.
+export async function placementGeometry(body: SolidBody) {
+  const geometry = body.members.length > 1 || body.holes.length > 0
+    ? buildSolidGeometry(body, await loadManifold()) : createSourceGeometry(body.anchor)
+  const { position, rotation, scale } = body.anchor
+  geometry.applyMatrix4(new Matrix4().compose(new ThreeVector3(position.x, position.y, position.z),
+    new Quaternion().setFromEuler(new Euler(rotation.x, rotation.y, rotation.z)),
+    new ThreeVector3(scale.x, scale.y, scale.z)))
+  return geometry
+}
