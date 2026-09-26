@@ -95,7 +95,8 @@ h1 { margin-bottom: 0; font-size: 23px; letter-spacing: -.035em; line-height: 1.
 .shape-glyph.sphere { border-radius: 50%; background: radial-gradient(circle at 30% 25%, #f7faff, #8eb4f3 70%); }
 .shape-add { margin-left: auto; color: #7198d6; font-size: 18px; font-weight: 400; line-height: 1; }
 .cut-example-button { width: 100%; margin-top: 12px; padding: 9px 11px; border: 1px solid #b7cdf0; border-radius: 8px; background: #eef5ff; color: #315fa8; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; text-align: left; }
-.cut-example-button:hover { background: #e1efff; }
+.cut-example-button:hover:not(:disabled) { background: #e1efff; }
+.cut-example-button:disabled { opacity: .5; cursor: default; }
 .cut-example-button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }
 .panel-section p.cut-example-hint { margin: 7px 2px 0; color: #8390a3; font-size: 11px; }
 .panel-section p.cut-status { margin: 8px 2px 0; color: #5276b2; font-size: 11px; font-weight: 700; }

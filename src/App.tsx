@@ -19,7 +19,7 @@ import { importSvg } from './svgImport'
 import { importStl } from './stlImport'
 import type { FrameRequest } from './frameCamera'
 import { useAutosave } from './useAutosave'
-import { alignByBounds, canPositionUnits, getPlacementUnits, type AlignmentEdge } from './placement'
+import { alignByBounds, canPositionUnits, dropToWorkplane, getPlacementUnits, type AlignmentEdge } from './placement'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -672,16 +672,20 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
           <div className="panel-section workplane-section">
             <h3>Workplane</h3>
             <label className="workplane-height-field">Height (mm)
-              <input type="number" step="any" value={workplaneDraft}
+              <input type="number" step="any" value={workplaneDraft} disabled={positioning}
                 onChange={(event) => setWorkplaneDraft(event.target.value)}
                 onBlur={(event) => applyWorkplaneDraft(event.currentTarget.value)}
                 onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
             </label>
             <div className="workplane-actions">
-              <button type="button" disabled={!selectedObject} onClick={() => selectedObject && setWorkplane(getObjectTopHeight(selectedObject))}>Use selected top</button>
-              <button type="button" disabled={workplaneHeight === 0} onClick={() => setWorkplane(0)}>Reset to 0</button>
+              <button type="button" disabled={!selectedObject || positioning} onClick={() => selectedObject && setWorkplane(getObjectTopHeight(selectedObject))}>Use selected top</button>
+              <button type="button" disabled={workplaneHeight === 0 || positioning} onClick={() => setWorkplane(0)}>Reset to 0</button>
             </div>
+            <button type="button" className="cut-example-button" disabled={!canPosition}
+              onClick={() => void positionSelection((current, ids) => dropToWorkplane(current, ids, workplaneHeight))}
+              title="Rest each selected body's finished bottom on the current workplane">Drop to workplane</button>
             <p className="selection-hint">New shapes rest on this horizontal plane. Existing shapes stay where they are.</p>
+            <p className="selection-hint">Drop moves each selected body to this plane, carrying its linked holes. It supports Undo.</p>
           </div>
           <div className="panel-section selection-section">
             <h3>Selection</h3>

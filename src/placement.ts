@@ -78,3 +78,12 @@ export async function alignByBounds(objects: CadObject[], ids: Set<string>, acti
   const target = coordinate(bounds[activeIndex])
   return translateUnits(objects, units, bounds.map((box) => target - coordinate(box)), axis)
 }
+
+export async function dropToWorkplane(objects: CadObject[], ids: Set<string>, height: number): Promise<CadObject[]> {
+  if (!Number.isFinite(height)) throw new Error('Workplane height must be a finite number.')
+  const units = getPlacementUnits(objects, ids)
+  if (units.length === 0) return objects
+  if (!canPositionUnits(objects, units)) throw new Error('Show and unlock the selected shapes and their linked holes before positioning.')
+  const bounds = await Promise.all(units.map(getPlacementBounds))
+  return translateUnits(objects, units, bounds.map((box) => height - box.min.y), 'y')
+}

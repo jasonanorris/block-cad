@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { alignByBounds, getPlacementBounds, getPlacementUnits } from '../src/placement.ts'
+import { alignByBounds, dropToWorkplane, getPlacementBounds, getPlacementUnits } from '../src/placement.ts'
 import { encodeStlMesh } from '../src/stlMesh.ts'
 import { box, assembly } from './fixtures.mjs'
 
@@ -63,4 +63,49 @@ test('imported mesh bounds use transformed vertices rather than transformed boun
   const bounds = await boundsFor([object], 'mesh')
   near(bounds.max.x, 30 / Math.sqrt(2))
   near(bounds.min.z, -10 / Math.sqrt(2))
+})
+
+test('drop places each rotated body on a raised or negative plane without changing X/Z', async () => {
+  const objects = [box('a', 50, 100, 60), { ...box('b', -30, -50, 80),
+    rotation: { x: Math.PI / 4, y: .3, z: .1 }, scale: { x: -2, y: 1, z: 1 } }]
+  for (const height of [25, -15]) {
+    const result = await dropToWorkplane(objects, new Set(['a', 'b']), height)
+    for (const [index, object] of result.entries()) {
+      near((await boundsFor(result, object.id)).min.y, height)
+      assert.equal(object.position.x, objects[index].position.x)
+      assert.equal(object.position.z, objects[index].position.z)
+      assert.deepEqual(object.rotation, objects[index].rotation)
+    }
+  }
+})
+
+test('drop uses the cut bottom and preserves ungrouped cutter offsets', async () => {
+  const objects = [box('solid'), { ...box('hole', 0, 0), dimensions: { x: 30, y: 20, z: 30 }, cutTargetId: 'solid' }]
+  near((await boundsFor(objects, 'solid')).min.y, 10)
+  const result = await dropToWorkplane(objects, new Set(['solid', 'hole']), 5)
+  near((await boundsFor(result, 'solid')).min.y, 5)
+  near(result[0].position.y, 5)
+  near(result[1].position.y, -5)
+  assert.deepEqual(objects.map((object) => object.position.y), [10, 0])
+})
+
+test('dropping a joined assembly moves it once and keeps member offsets', async () => {
+  const objects = assembly('intersection')
+  const result = await dropToWorkplane(objects, new Set(['a', 'b', 'hole']), 30)
+  near((await boundsFor(result, 'a')).min.y, 30)
+  assert.deepEqual(result.map((object) => object.position.y), [40, 40, 40])
+  const second = await dropToWorkplane(result, new Set(['a']), 30)
+  assert.ok(second.every((object, index) => object === result[index]))
+})
+
+test('drop fails atomically for hidden, locked, empty, or invalid selections', async () => {
+  for (const property of ['hidden', 'locked']) {
+    const objects = [box('a'), { ...box('b'), [property]: true }]
+    await assert.rejects(dropToWorkplane(objects, new Set(['a', 'b']), 30), /Show and unlock/)
+    near(objects[0].position.y, 10)
+  }
+  const empty = assembly('intersection')
+  empty[1].position.x = 100
+  await assert.rejects(dropToWorkplane(empty, new Set(['a']), 30), /empty/)
+  await assert.rejects(dropToWorkplane([box('a')], new Set(['a']), NaN), /finite/)
 })
