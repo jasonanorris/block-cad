@@ -29,11 +29,21 @@ Reference origins and workplanes are workspace aids: changing them does not move
 
 ## Make lettering
 
-Open **Text shape**, enter wording, font size and extrusion, then **Add text**. The lettering lies flat on the current workplane and is one object. To engrave, select Hole and its target, then lower the lettering into the surface. To emboss, overlap a small part of its depth with the base and Join. **Edit text → Apply text** updates the wording while retaining placement and links. Changing wording can change its footprint; recheck placement afterward. The bundled Helvetiker font supports a limited character set and reports unsupported characters.
+Open **Text shape**, enter wording, font size and extrusion, then **Add text**. The lettering lies flat on the current workplane and is one object. To engrave, select Hole and its target, then lower the lettering into the surface. To emboss, overlap a small part of its depth with the base and Join. **Edit text → Apply text** updates the wording while retaining placement and links. Changing wording can change its footprint; recheck placement afterward. Choose Helvetiker Regular, Helvetiker Bold, or Optimer Regular in the Font selector. Font changes preserve placement and links but can change the footprint. Fonts are bundled for offline use; unsupported characters are reported. Existing lettering from older projects uses Helvetiker Regular when edited.
 
 ## Inspect interiors
 
 Enable **Section view** and choose an axis and plane position. Flip side changes the visible half. It is an uncapped visual cutaway: measurements and exports still use the entire model. Disable it to see the whole model again. The section-demo example has an enclosed cavity visible around Y=15 mm.
+
+## Split a solid
+
+Select a solid or joined assembly and open **Section view**. Enable the section, choose X/Y/Z, and enter a position through the model. **Split selected at section** replaces each selected finished body with two closed mesh solids, keeping their world positions and display color. The section preview turns off so both halves are visible. Select a half and move it to inspect the capped surface.
+
+Split bakes the joins, holes, text, and primitive parameters into mesh geometry. The resulting pieces can be transformed, cut, joined, saved, and exported. **Undo** restores the original editable sources and selection in one step. All selected bodies must have material on both sides of the plane, and their linked shapes must be visible/unlocked; otherwise the whole action is rejected. Flip side only affects the preview, not which halves are kept.
+
+## Background previews
+
+Boolean previews calculate in a background worker. Unchanged bodies retain their meshes, while changed bodies show source geometry until the latest preview arrives. Progress appears under Shapes. Edits made during a calculation supersede its result; New/empty models cancel pending preview work. If a worker fails or a calculation exceeds 30 seconds, use **Retry previews** in the error message. Measurements, placement, splitting, imports, and exports still calculate on the main thread and can pause editing for complex models.
 
 ## Save your work
 
@@ -42,7 +52,9 @@ Enable **Section view** and choose an axis and plane position. Flip side changes
 - **Parts library** saves selected solid assemblies for reuse. Inserted copies get independent IDs and start at the current workplane origin.
 - **Project snapshots** stores named checkpoints of the full project. Restore is undoable.
 
-Local parts, snapshots, and autosave do not synchronize across browsers or addresses. Clearing browser storage removes them. Keep downloaded project files as backups.
+Open **Library backup / transfer → Export library backup** to download all saved parts and snapshots in one file. Import it on another browser/site with **Import library backup**. Import validates the whole file, then adds every entry in one transaction using fresh storage IDs. Existing entries and the open model stay unchanged; repeated imports create duplicates. Names, dates, fonts, colors, assemblies, and empty snapshots are preserved. Limits are 50 MB, 250 saved items, and 10,000 source shapes per file. Failed imports add nothing. Library import is separate from model Undo.
+
+Local parts, snapshots, and autosave do not synchronize automatically across browsers or addresses. Clearing browser storage removes them. Keep downloaded project files as backups.
 
 ## Export for printing
 

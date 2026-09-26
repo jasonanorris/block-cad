@@ -1,6 +1,7 @@
 import type { SectionView } from './sectionView'
 
-export default function SectionTools({ section, onChange, activePosition }: {
+export default function SectionTools({ section, onChange, activePosition, onSplit, canSplit, error, busy }: {
+  onSplit: () => void; canSplit: boolean; error: string | null; busy: boolean
   section: SectionView; onChange: (section: SectionView) => void; activePosition?: { x: number; y: number; z: number }
 }) {
   return <details className="repeat-tools section-tools">
@@ -15,5 +16,9 @@ export default function SectionTools({ section, onChange, activePosition }: {
     <label>Flip side<input aria-label="Flip section side" type="checkbox" checked={section.flipped} onChange={(event) => onChange({ ...section, flipped: event.target.checked })} /></label>
     <button type="button" className="cut-example-button" disabled={!activePosition} onClick={() => activePosition && onChange({ ...section, position: activePosition[section.axis] })}>Section through active center</button>
     <p className="selection-hint">Keeps the {section.flipped ? 'lower' : 'higher'} coordinate side. This is an open cutaway without a filled cut face. View only: models, measurements, and exports stay whole.</p>
+    <button type="button" className="cut-example-button" disabled={!canSplit || !section.enabled} onClick={onSplit}>Split selected at section</button>
+    <p className="selection-hint">Split makes two closed mesh solids per selected body at this plane. Joins and holes are baked into the pieces; Undo restores their editable sources. Both halves are kept. Flip side only changes the preview.</p>
+    {busy && <p role="status">Calculating placement…</p>}
+    {error && <p className="position-error" role="alert">{error}</p>}
   </details>
 }

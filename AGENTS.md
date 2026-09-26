@@ -45,6 +45,19 @@ npm run benchmark
 npm run samples
 ```
 
+## Geometry and browser checks
+
+Boolean previews use `src/booleanPreview.worker.ts`, scheduled by `BackgroundPreview.ts`. Keep one request in flight, discard obsolete results, and dispose replaced meshes. Other geometry operations still run on the main thread. Production smoke checks must load the worker JS and Manifold WASM through Vite preview.
+
+Browser-only storage regression helpers (run with Vite, from the browser console):
+
+```js
+(await import('/tests/browser-library.mjs')).runLibraryChecks()
+(await import('/tests/browser-library-transfer.mjs')).runTransferChecks()
+```
+
+Both helpers remove the temporary entries they create. Project format 16 adds text font IDs and reads earlier versions. Library backup format 1 embeds validated project files and imports additively in one IndexedDB transaction.
+
 ## Deployment
 
 Deployment target: TBD

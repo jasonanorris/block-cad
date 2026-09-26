@@ -14,7 +14,7 @@ npm run preview -- --host 127.0.0.1 --port 4175
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. Complex single-body Booleans still run on the main thread.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews use a worker with separate scheduling tests; measurements and export calculations still run on the main thread.
 
 `npm run samples` regenerates the three bundled examples from source; tests load them, validate their projects, and export STL/3MF.
 
@@ -33,6 +33,11 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Pick top, side, underside, and sloped faces. Add a primitive, text, SVG, STL, and library part; confirm they face outward and rest on the plane. Drop an existing body, Undo, reset, and cancel picking with Escape. Check face picking and Box select are mutually exclusive.
 - Drop onto a rotated body and into a cut pocket. A through hole without support must fail without moving the model. Check multiple selected bodies and a locked target; Undo must restore all moved shapes in one step.
 
+- Enable a section through a joined, cut body; split, move one half, and export both. Check that the cap is closed, holes remain cut, and Undo restores source objects and selection. An outside/tangent plane must fail atomically.
+- Create and edit lettering in all three fonts. Save/load and Undo/Redo must retain the font, contours, transform, and cutter links. Load a version-15 project and check the default font.
+- Check the production preview worker JS and WASM load successfully. Change one cutter rapidly; only its newest result may appear. Color/name edits should not trigger new work. New must cancel outstanding work, and a worker error must offer Retry previews.
+- Export/import a library backup, including an empty snapshot and joined part. Reimport adds fresh entries without overwrites. Malformed input and quota failures must add no partial entries. Run `(await import('/tests/browser-library-transfer.mjs')).runTransferChecks()` with Vite for automated IndexedDB checks; it deletes its own temporary entries.
+
 ## Known limits
 
 - Face workplanes use the picked mesh triangle plane, stay fixed, and extend beyond the picked face. World-axis snapping is not reoriented.
@@ -41,10 +46,12 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Gaps compare world bounding boxes, not exact surface distances.
 - Object snapping uses source bounds before cuts/joins.
 - Nonuniform scaling of rotated assemblies can approximate shear.
-- Text uses one bundled font; unsupported characters are rejected.
+- Text offers three bundled font choices; custom font uploads are not supported and unsupported characters are rejected.
 - STL has no unit metadata; this app treats coordinates as millimeters.
 - Geometry exports do not include display colors.
 - Local storage is specific to the browser and site address.
-- Main-thread geometry and large initial bundles remain performance limits.
+- Previews run in a worker, with a 30-second timeout per body; other geometry calculations and the large initial bundle remain performance limits.
+- Split results are baked meshes. Undo restores editable sources; each half has the existing 100,000-triangle limit.
+- Library backups are limited to 50 MB / 250 entries / 10,000 source shapes and exclude autosave and the currently open unsaved model.
 
-The font license is shipped in `public/licenses/helvetiker.txt` and copied into production output.
+The font licenses are shipped in `public/licenses/helvetiker.txt` and `public/licenses/bundled-fonts.txt` and copied into production output.

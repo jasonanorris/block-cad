@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { deleteLocalProject, listLocalProjects, savedName, type SavedKind, type SavedProject } from './localProjects'
 
-export default function SavedProjectsPanel({ kind, canSave, onSave, onUse }: {
+export default function SavedProjectsPanel({ kind, canSave, onSave, onUse, revision = 0 }: {
+  revision?: number
   kind: SavedKind
   canSave: boolean
   onSave: (name: string) => Promise<void>
@@ -19,7 +20,7 @@ export default function SavedProjectsPanel({ kind, canSave, onSave, onUse }: {
     listLocalProjects(kind).then((saved) => { if (!cancelled) setItems(saved) })
       .catch((error) => { if (!cancelled) setError(error instanceof Error ? error.message : 'Local storage is unavailable.') })
     return () => { cancelled = true }
-  }, [kind])
+  }, [kind, revision])
   async function run(action: () => Promise<void>, message: string) {
     if (busy) return
     setBusy(true); setError(null); setStatus('')

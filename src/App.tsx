@@ -7,8 +7,10 @@ import { positionFromReference } from './referenceOrigin'
 import ToolGroup, { jumpToTools } from './ToolGroup'
 import ExampleProjects from './ExampleProjects'
 import SectionTools from './SectionTools'
+import { splitSelection } from './splitSelection'
 import { defaultSection, type SectionView } from './sectionView'
 import TextTools from './TextTools'
+import type { TextFont } from './textFonts'
 import { createTextObject, changeText } from './textShapes'
 import ObjectList from './ObjectList'
 import { colorObjects } from './objectColor'
@@ -42,6 +44,7 @@ import { resizeSelection } from './resizeSelection'
 import { selectedExportObjects, type ExportScope } from './exportSelection'
 import ShortcutHelp from './ShortcutHelp'
 import SavedProjectsPanel from './SavedProjectsPanel'
+import LibraryTransfer from './LibraryTransfer'
 import { readLocalProject, saveLocalProject } from './localProjects'
 import { insertPart, preparePart } from './partsLibrary'
 import ExportReview, { type ExportFormat } from './ExportReview'
@@ -65,6 +68,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const { objects, selectedObjectId, selectedObjectIds } = scene
   const sceneRef = useRef(scene)
   sceneRef.current = scene
+  const [libraryRevision, setLibraryRevision] = useState(0)
   const [dropTarget, setDropTarget] = useState('')
   const [positioning, setPositioning] = useState(false)
   const [positionError, setPositionError] = useState<string | null>(null)
@@ -148,7 +152,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     (!object.locked || selectedObject?.cutTargetId === object.id)
     ? [{ id: object.id, label: `${object.name ? `${object.name} · ` : ''}${shapeLabels[object.type]} #${index + 1}` }]
     : [])
-  const { geometries: booleanGeometries, error: booleanError } = useBooleanPreview(objects)
+  const { geometries: booleanGeometries, error: booleanError, pending: previewPending, retry: retryPreviews } = useBooleanPreview(objects)
   const derivedBodies = getSolidBodies(objects).filter((body) => body.members.length > 1 || body.holes.length > 0)
   const hasJoinedBodies = derivedBodies.some((body) => body.members.length > 1)
   const hasIntersectedBodies = derivedBodies.some((body) => body.anchor.joinMode === 'intersection')
@@ -414,6 +418,20 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     }
   }
 
+  async function splitSelected() {
+    if (positioning) return
+    const snapshot = scene
+    setPositioning(true); setPositionError(null)
+    try {
+      const result = await splitSelection(snapshot.objects, new Set(snapshot.selectedObjectIds), section.axis, section.position)
+      if (sceneRef.current !== snapshot) throw new Error('The model or selection changed. Try splitting again.')
+      commit((current) => current === snapshot ? { objects: result.objects, selectedObjectIds: result.selectedIds,
+        selectedObjectId: result.selectedIds[0] ?? null } : current)
+      setSection((current) => ({ ...current, enabled: false }))
+    } catch (error) { setPositionError(error instanceof Error ? error.message : 'Could not split these bodies.') }
+    finally { setPositioning(false) }
+  }
+
   function alignSelected(axis: keyof Vector3) {
     void positionSelection((current, ids) => alignByBounds(current, ids, selectedObjectId, axis, alignmentEdge))
   }
@@ -449,8 +467,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     setExportRequest(null)
   }
 
-  function addText(text: string, size: number, height: number) {
-    const [object] = onFaceWorkplane([createTextObject(text, size, height, workplaneHeight)], facePlane)
+  function addText(text: string, size: number, height: number, fontId: TextFont) {
+    const [object] = onFaceWorkplane([createTextObject(text, size, height, workplaneHeight, fontId)], facePlane)
     commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id, selectedObjectIds: [object.id] }))
   }
 
@@ -642,7 +660,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
         <button type="button" onClick={() => setShowRecoveryNotice(false)}>Dismiss</button>
       </div>}
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
-      {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
+      {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError} <button type="button" onClick={retryPreviews}>Retry previews</button></div>}
       {showShortcuts && <ShortcutHelp onClose={() => setShowShortcuts(false)} />}
       {exportRequest && <ExportReview objects={exportRequest.exportObjects} stale={objects !== exportRequest.objects} scope={exportRequest.scope} format={exportRequest.format}
         onClose={() => setExportRequest(null)} onDownload={downloadReviewedExport} />}
@@ -784,17 +802,18 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                   ? hasEmptyIntersection ? 'Intersection is empty; select a member to Separate or move the shapes'
                     : hasIntersectedBodies ? 'Intersection preview ready'
                       : hasJoinedBodies ? 'Join preview ready' : 'Cut preview ready'
-                  : 'Calculating model…'}
+                  : `Calculating ${previewPending} preview${previewPending === 1 ? '' : 's'} in background…`}
               </p>
             )}
             </ToolGroup>
           </div>
           <div className="panel-section">
-            <SavedProjectsPanel kind="part" canSave={selectedObjects.some((object) => !isHoleObject(object))}
+            <SavedProjectsPanel revision={libraryRevision} kind="part" canSave={selectedObjects.some((object) => !isHoleObject(object))}
               onSave={savePart} onUse={useSavedPart} />
-            <SavedProjectsPanel kind="snapshot" canSave={true} onSave={saveSnapshot} onUse={restoreSnapshot} />
+            <SavedProjectsPanel revision={libraryRevision} kind="snapshot" canSave={true} onSave={saveSnapshot} onUse={restoreSnapshot} />
+            <LibraryTransfer onImported={() => setLibraryRevision((value) => value + 1)} />
           </div>
-          <div className="panel-section"><SectionTools section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
+          <div className="panel-section"><SectionTools error={positionError} busy={positioning} onSplit={() => void splitSelected()} canSplit={canPosition && placementUnits.every((unit) => !isHoleObject(unit.body.anchor))} section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
           <div className="panel-section workplane-section">
             <ToolGroup id="tools-place" title="Place">
             <ReferenceTools objects={objects} selectedIds={selectedObjectIds} origin={referenceOrigin} onOrigin={setReferenceOrigin}
@@ -912,10 +931,10 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             {positionError && <p className="position-error" role="alert">{positionError}</p>}
             {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}
             {selectedObject?.type === 'text' && <TextTools
-              key={`${selectedObject.id}:${selectedObject.text}:${selectedObject.fontSize}:${selectedObject.dimensions.y}`}
-              initialText={selectedObject.text} initialSize={selectedObject.fontSize} initialHeight={selectedObject.dimensions.y}
-              action="Apply text" disabled={!canEditActive} onApply={(text, size, height) => {
-                const updated = changeText(selectedObject, text, size, height)
+              key={`${selectedObject.id}:${selectedObject.text}:${selectedObject.fontSize}:${selectedObject.fontId}:${selectedObject.dimensions.y}`}
+              initialFont={selectedObject.fontId} initialText={selectedObject.text} initialSize={selectedObject.fontSize} initialHeight={selectedObject.dimensions.y}
+              action="Apply text" disabled={!canEditActive} onApply={(text, size, height, fontId) => {
+                const updated = changeText(selectedObject, text, size, height, fontId)
                 commit((current) => ({ ...current, objects: current.objects.map((object) => object.id === updated.id ? updated : object) }))
               }} />}
             {selectedObject && (
