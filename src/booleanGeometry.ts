@@ -1,6 +1,7 @@
 import { BufferGeometry, Euler, Float32BufferAttribute, Matrix4, Quaternion, Uint32BufferAttribute, Vector3 } from 'three'
 import type { Manifold, ManifoldToplevel, Mat4 } from 'manifold-3d'
 import type { CadObject, SolidBody } from './cadModel'
+import { customProfile } from './customShapes'
 import { stlMeshManifold } from './stlMesh'
 import { basicShapeGeometry } from './basicShapeGeometry'
 
@@ -24,6 +25,15 @@ export function readSolidManifold<T>(body: SolidBody, runtime: ManifoldToplevel,
 
   function primitive(object: CadObject): Manifold {
     switch (object.type) {
+      case 'custom': {
+        const { contours, depth, upright } = customProfile(object.parameters)
+        const polygons = [contours.outline, ...contours.holes].map((contour) => contour.map((p): [number, number] => [p.x, p.y]))
+        const section = new runtime.CrossSection(polygons, 'EvenOdd')
+        try {
+          const extruded = track(section.extrude(depth, 0, 0, [1, 1], true))
+          return upright ? extruded : track(extruded.transform(CYLINDER_TO_Y.elements as Mat4))
+        } finally { section.delete() }
+      }
       case 'box':
         return track(runtime.Manifold.cube([object.dimensions.x, object.dimensions.y, object.dimensions.z], true))
       case 'cylinder': {

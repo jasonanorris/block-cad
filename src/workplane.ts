@@ -12,7 +12,7 @@ export function getObjectTopHeight(object: CadObject): number {
     object.rotation.x, object.rotation.y, object.rotation.z,
   )).elements
   const [x, y, z] = [rotation[1], rotation[5], rotation[9]]
-  if (object.type === 'cone' || object.type === 'wedge' || object.type === 'prism' || object.type === 'text') {
+  if (object.type === 'custom' || object.type === 'cone' || object.type === 'wedge' || object.type === 'prism' || object.type === 'text') {
     const geometry = createSourceGeometry(object)
     try {
       const positions = geometry.getAttribute('position')

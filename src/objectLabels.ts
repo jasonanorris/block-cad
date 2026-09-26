@@ -1,6 +1,7 @@
 import { isHoleObject, type CadObject, type CadObjectType } from './cadModel'
 
 export const shapeLabels: Record<CadObjectType, string> = {
+  custom: 'Custom shape',
   box: 'Box',
   cylinder: 'Cylinder',
   sphere: 'Sphere',

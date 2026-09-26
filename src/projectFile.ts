@@ -1,10 +1,11 @@
 import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours, type Vector3 } from './cadModel.ts'
 import { validObjectColor } from './objectColor'
 import { isTextFont } from './textFonts'
+import { customProfile, validateCustomParameters } from './customShapes'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 16
+const PROJECT_VERSION = 17
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -105,6 +106,15 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
   if (!dimensions) throw new Error(`${field}.dimensions is missing.`)
 
   switch (data.type) {
+    case 'custom': {
+      if (version < 17) throw new Error(`${field} has an unsupported shape type.`)
+      const parameters = validateCustomParameters(data.parameters)
+      const expected = customProfile(parameters).dimensions
+      const actual = vector(dimensions, `${field}.dimensions`)
+      if ((['x', 'y', 'z'] as const).some((axis) => expected[axis] !== actual[axis])) throw new Error(`${field}.dimensions do not match its custom parameters.`)
+      if (data.cutTargetId !== undefined && (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      return { ...base, type: 'custom', parameters, dimensions: expected, ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+    }
     case 'cone':
     case 'wedge':
     case 'prism': {

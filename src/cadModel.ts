@@ -1,3 +1,4 @@
+import type { CustomParameters } from './customShapes'
 import type { TextFont } from './textFonts'
 import { regularPolygon } from './polygon'
 
@@ -26,6 +27,7 @@ type BaseObject = {
 export type ObjectTransform = Pick<BaseObject, 'position' | 'rotation' | 'scale'>
 
 export type CadObject = BaseObject & (
+  | { type: 'custom'; parameters: CustomParameters; dimensions: Vector3 }
   | { type: 'box'; dimensions: Vector3 }
   | { type: 'cylinder'; dimensions: { diameter: number; height: number } }
   | { type: 'sphere'; dimensions: { diameter: number } }
@@ -38,7 +40,7 @@ export type CadObject = BaseObject & (
 )
 
 export type CadObjectType = CadObject['type']
-export type PrimitiveType = Exclude<CadObjectType, 'svg' | 'stl' | 'text'>
+export type PrimitiveType = Exclude<CadObjectType, 'svg' | 'stl' | 'text' | 'custom'>
 
 export type HoleObject = CadObject & { cutTargetId: string }
 
@@ -105,6 +107,7 @@ function baseDimensions(object: CadObject): Vector3 {
     }
     case 'sphere':
       return { x: object.dimensions.diameter, y: object.dimensions.diameter, z: object.dimensions.diameter }
+    case 'custom':
     case 'svg':
     case 'text':
     case 'stl':

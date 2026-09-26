@@ -12,6 +12,7 @@ export function sameGeometryInput(a: CadObject, b: CadObject): boolean {
   // Compare named fields, not object insertion order from imported JSON.
   if (dimensionsA.length !== dimensionsB.length || Object.entries(a.dimensions).some(([key, value]) =>
     value !== (b.dimensions as Record<string, number>)[key])) return false
+  if (a.type === 'custom' && b.type === 'custom' && Object.entries(a.parameters).some(([key, value]) => value !== (b.parameters as unknown as Record<string, unknown>)[key])) return false
   if (a.type === 'prism' && b.type === 'prism' && a.sides !== b.sides) return false
   if ((a.type === 'svg' || a.type === 'text') && (b.type === 'svg' || b.type === 'text') && a.contours !== b.contours) return false
   if (a.type === 'stl' && b.type === 'stl' && a.meshData !== b.meshData) return false
