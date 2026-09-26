@@ -1,5 +1,6 @@
 import { Euler, Matrix4 } from 'three'
 import { getObjectDimensions, type CadObject } from './cadModel'
+import { createSourceGeometry } from './sourceGeometry'
 
 // Height of the source shape's top in world coordinates. The formulas use the
 // support radius along world Y, so rotated boxes, cylinders, and spheres work.
@@ -9,6 +10,16 @@ export function getObjectTopHeight(object: CadObject): number {
     object.rotation.x, object.rotation.y, object.rotation.z,
   )).elements
   const [x, y, z] = [rotation[1], rotation[5], rotation[9]]
+  if (object.type === 'cone' || object.type === 'wedge' || object.type === 'prism') {
+    const geometry = createSourceGeometry(object)
+    try {
+      const positions = geometry.getAttribute('position')
+      let top = -Infinity
+      for (let i = 0; i < positions.count; i++) top = Math.max(top,
+        positions.getX(i) * object.scale.x * x + positions.getY(i) * object.scale.y * y + positions.getZ(i) * object.scale.z * z)
+      return object.position.y + top
+    } finally { geometry.dispose() }
+  }
   let radius: number
 
   if (object.type === 'box' || object.type === 'svg' || object.type === 'stl') {

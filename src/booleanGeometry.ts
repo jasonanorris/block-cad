@@ -2,6 +2,7 @@ import { BufferGeometry, Euler, Float32BufferAttribute, Matrix4, Quaternion, Uin
 import type { Manifold, ManifoldToplevel, Mat4 } from 'manifold-3d'
 import type { CadObject, SolidBody } from './cadModel'
 import { stlMeshManifold } from './stlMesh'
+import { basicShapeGeometry } from './basicShapeGeometry'
 
 function objectMatrix(object: CadObject): Matrix4 {
   const { position, rotation, scale } = object
@@ -36,6 +37,17 @@ export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): 
       }
       case 'sphere':
         return track(runtime.Manifold.sphere(object.dimensions.diameter / 2, 32))
+      case 'cone':
+      case 'wedge':
+      case 'prism': {
+        const geometry = basicShapeGeometry(object)
+        try {
+          return track(runtime.Manifold.ofMesh(new runtime.Mesh({ numProp: 3,
+            vertProperties: new Float32Array(geometry.getAttribute('position').array),
+            triVerts: new Uint32Array(geometry.getIndex()!.array),
+          })))
+        } finally { geometry.dispose() }
+      }
       case 'svg': {
         const polygons = [object.contours.outline, ...object.contours.holes]
           .map((contour) => contour.map((point): [number, number] => [point.x, point.y]))

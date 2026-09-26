@@ -4,8 +4,7 @@ import type { BufferGeometry, Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
-import { svgGeometry } from './svgGeometry'
-import { stlMeshGeometry } from './stlMesh'
+import { createSourceGeometry } from './sourceGeometry'
 import type { FrameRequest } from './frameCamera'
 import { expandAssemblyIds } from './selectionOperations'
 
@@ -26,10 +25,10 @@ function CadObjectMesh({
   selectedMeshRef: RefObject<Mesh | null>
   cutGeometry?: BufferGeometry
 }) {
-  const importedGeometry = useMemo(() => object.type === 'svg'
-    ? svgGeometry(object.contours, object.dimensions)
-    : object.type === 'stl' ? stlMeshGeometry(object.meshData) : null, [object])
-  useEffect(() => () => importedGeometry?.dispose(), [importedGeometry])
+  const sourceGeometry = useMemo(() => createSourceGeometry(object), [object.type, object.dimensions,
+    object.type === 'svg' ? object.contours : null, object.type === 'stl' ? object.meshData : null,
+    object.type === 'prism' ? object.sides : null])
+  useEffect(() => () => sourceGeometry.dispose(), [sourceGeometry])
   if (object.hidden) return null
   const { position, rotation, scale } = object
   const isCutter = isHoleObject(object)
@@ -50,25 +49,13 @@ function CadObjectMesh({
         onSelect(object.id, event.nativeEvent.shiftKey)
       }}
     >
-      {cutGeometry ? (
-        <primitive object={cutGeometry} attach="geometry" />
-      ) : importedGeometry ? (
-        <primitive object={importedGeometry} attach="geometry" />
-      ) : object.type === 'box' && (
-        <boxGeometry args={[object.dimensions.x, object.dimensions.y, object.dimensions.z]} />
-      )}
-      {!cutGeometry && object.type === 'cylinder' && (
-        <cylinderGeometry args={[object.dimensions.diameter / 2, object.dimensions.diameter / 2, object.dimensions.height, 32]} />
-      )}
-      {!cutGeometry && object.type === 'sphere' && (
-        <sphereGeometry args={[object.dimensions.diameter / 2, 32, 16]} />
-      )}
+      <primitive object={cutGeometry ?? sourceGeometry} attach="geometry" />
       <meshStandardMaterial
         color={isSelected ? '#f3a447' : '#6797ef'}
         emissive={isSelected ? '#5c2d00' : '#000000'}
         emissiveIntensity={isSelected ? 0.18 : 0}
         roughness={0.75}
-        flatShading={!!cutGeometry}
+        flatShading={!!cutGeometry || ['cone', 'wedge', 'prism'].includes(object.type)}
         wireframe={wireframe}
         transparent={wireframe}
         opacity={wireframe ? 0.55 : 1}

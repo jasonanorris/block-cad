@@ -13,6 +13,9 @@ function NumericField({
   ariaLabel,
   value,
   positive = false,
+  integer = false,
+  minimum,
+  maximum,
   onChange,
   onEditStart,
   onEditEnd,
@@ -21,6 +24,9 @@ function NumericField({
   ariaLabel: string
   value: number
   positive?: boolean
+  integer?: boolean
+  minimum?: number
+  maximum?: number
   onChange: (value: number) => void
   onEditStart: () => void
   onEditEnd: () => void
@@ -34,7 +40,8 @@ function NumericField({
 
   function validNumber(text: string) {
     const number = Number(text)
-    return text.trim() !== '' && Number.isFinite(number) && (!positive || number > 0)
+    return text.trim() !== '' && Number.isFinite(number) && (!positive || number > 0) &&
+      (!integer || Number.isInteger(number)) && (minimum === undefined || number >= minimum) && (maximum === undefined || number <= maximum)
   }
 
   return (
@@ -43,8 +50,9 @@ function NumericField({
       <input
         aria-label={ariaLabel}
         type="number"
-        step="any"
-        min={positive ? '0.001' : undefined}
+        step={integer ? 1 : 'any'}
+        min={minimum ?? (positive ? 0.001 : undefined)}
+        max={maximum}
         value={draft}
         onFocus={() => {
           editing.current = true
@@ -192,6 +200,12 @@ export default function ObjectInspector({
           ))}
         </div>
       </div>
+      {object.type === 'prism' && <div className="inspector-group">
+        <h4>Polygon</h4>
+        <NumericField label="Sides (3–64)" ariaLabel="Prism sides" value={object.sides} integer minimum={3} maximum={64}
+          onEditStart={onEditStart} onEditEnd={onEditEnd}
+          onChange={(sides) => onUpdate(object.id, (current) => current.type === 'prism' ? { ...current, sides } : current)} />
+      </div>}
     </fieldset>
   )
 }

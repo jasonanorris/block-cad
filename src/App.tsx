@@ -28,6 +28,9 @@ const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
   cylinder: 'Cylinder',
   sphere: 'Sphere',
+  cone: 'Cone',
+  wedge: 'Wedge',
+  prism: 'Prism',
   svg: 'SVG',
   stl: 'STL',
 }
@@ -664,7 +667,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           <div className="panel-section shapes-section">
             <h3>Shapes</h3>
             <div className="shape-list">
-              {(['box', 'cylinder', 'sphere'] as const).map((type) => (
+              {(['box', 'cylinder', 'sphere', 'cone', 'wedge', 'prism'] as const).map((type) => (
                 <button className="shape-button" key={type} type="button" onClick={() => addObject(type)}>
                   <span className={`shape-glyph ${type}`} aria-hidden="true" />
                   <span>{shapeLabels[type]}</span>

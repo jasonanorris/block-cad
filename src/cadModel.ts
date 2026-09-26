@@ -1,3 +1,5 @@
+import { regularPolygon } from './polygon'
+
 export type Vector3 = { x: number; y: number; z: number }
 export type Point2 = { x: number; y: number }
 export type SvgContours = { outline: Point2[]; holes: Point2[][] }
@@ -25,6 +27,9 @@ export type CadObject = BaseObject & (
   | { type: 'box'; dimensions: Vector3 }
   | { type: 'cylinder'; dimensions: { diameter: number; height: number } }
   | { type: 'sphere'; dimensions: { diameter: number } }
+  | { type: 'cone'; dimensions: { diameter: number; height: number } }
+  | { type: 'wedge'; dimensions: Vector3 }
+  | { type: 'prism'; dimensions: { diameter: number; height: number }; sides: number }
   | { type: 'svg'; dimensions: Vector3; contours: SvgContours }
   | { type: 'stl'; dimensions: Vector3; meshData: string }
 )
@@ -84,9 +89,17 @@ export function normalizeJoinGroups(objects: CadObject[]): CadObject[] {
 function baseDimensions(object: CadObject): Vector3 {
   switch (object.type) {
     case 'box':
+    case 'wedge':
       return object.dimensions
     case 'cylinder':
+    case 'cone':
       return { x: object.dimensions.diameter, y: object.dimensions.height, z: object.dimensions.diameter }
+    case 'prism': {
+      const points = regularPolygon(object.sides, object.dimensions.diameter / 2)
+      return { x: Math.max(...points.map((p) => p.x)) - Math.min(...points.map((p) => p.x)),
+        y: object.dimensions.height,
+        z: Math.max(...points.map((p) => p.y)) - Math.min(...points.map((p) => p.y)) }
+    }
     case 'sphere':
       return { x: object.dimensions.diameter, y: object.dimensions.diameter, z: object.dimensions.diameter }
     case 'svg':
@@ -129,9 +142,13 @@ export function createCadObject(type: PrimitiveType, x = 0, z = 0, workplaneHeig
 
   switch (type) {
     case 'box':
+    case 'wedge':
       return { ...base, type, dimensions: { x: 20, y: 20, z: 20 } }
     case 'cylinder':
+    case 'cone':
       return { ...base, type, dimensions: { diameter: 20, height: 20 } }
+    case 'prism':
+      return { ...base, type, dimensions: { diameter: 20, height: 20 }, sides: 6 }
     case 'sphere':
       return { ...base, type, dimensions: { diameter: 20 } }
   }

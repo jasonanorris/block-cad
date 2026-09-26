@@ -146,6 +146,9 @@ h1 { margin-bottom: 0; font-size: 23px; letter-spacing: -.035em; line-height: 1.
 .position-error { color: #a43e3e; font-size: 12px; margin-top: 8px; }
 .repeat-tools { margin: 12px 0; font-size: 12px; }
 .repeat-tools summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.shape-glyph.cone { background: #6797ef; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.shape-glyph.wedge { background: #6797ef; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+.shape-glyph.prism { background: #6797ef; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
 .repeat-tools label { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
 .repeat-tools input, .repeat-tools select { width: 80px; padding: 6px; border: 1px solid #b7cdf0; border-radius: 6px; font: inherit; }
 .join-actions button { padding: 8px 10px; border: 1px solid #b7cdf0; border-radius: 7px; background: #eef5ff; color: #315fa8; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }

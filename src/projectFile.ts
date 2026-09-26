@@ -2,7 +2,7 @@ import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 12
+const PROJECT_VERSION = 13
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -99,6 +99,27 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
   if (!dimensions) throw new Error(`${field}.dimensions is missing.`)
 
   switch (data.type) {
+    case 'cone':
+    case 'wedge':
+    case 'prism': {
+      if (version < 13) throw new Error(`${field} has an unsupported shape type.`)
+      if (data.cutTargetId !== undefined && (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
+        throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      }
+      const linked = { ...base, ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+      if (data.type === 'wedge') return { ...linked, type: 'wedge', dimensions: {
+        x: positiveNumber(dimensions.x, `${field}.dimensions.x`),
+        y: positiveNumber(dimensions.y, `${field}.dimensions.y`),
+        z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
+      } }
+      const roundDimensions = { diameter: positiveNumber(dimensions.diameter, `${field}.dimensions.diameter`),
+        height: positiveNumber(dimensions.height, `${field}.dimensions.height`) }
+      if (data.type === 'cone') return { ...linked, type: 'cone', dimensions: roundDimensions }
+      if (typeof data.sides !== 'number' || !Number.isInteger(data.sides) || data.sides < 3 || data.sides > 64) {
+        throw new Error(`${field}.sides must be a whole number from 3 to 64.`)
+      }
+      return { ...linked, type: 'prism', dimensions: roundDimensions, sides: data.sides }
+    }
     case 'box': {
       if (version >= 4 && data.cutTargetId !== undefined &&
         (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) {
@@ -179,7 +200,7 @@ export function parseProject(text: string): CadObject[] {
 
   const project = record(value)
   if (!project || project.format !== PROJECT_FORMAT) throw new Error('This is not a Block CAD project file.')
-  if (project.version !== 1 && project.version !== 2 && project.version !== 3 && project.version !== 4 && project.version !== 5 && project.version !== 6 && project.version !== 7 && project.version !== 8 && project.version !== 9 && project.version !== 10 && project.version !== 11 && project.version !== PROJECT_VERSION) {
+  if (typeof project.version !== 'number' || !Number.isInteger(project.version) || project.version < 1 || project.version > PROJECT_VERSION) {
     throw new Error(`Unsupported project version: ${String(project.version)}.`)
   }
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
