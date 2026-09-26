@@ -154,6 +154,14 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
         })
         profile = [[0, 0], ...arc]
       }
+      // Extend the cutter outside both adjoining faces. Coincident cutter walls
+      // can leave thin remnants after Float32 mesh round trips on angled faces.
+      // Keep the chamfer segment / fillet arc unchanged inside the solid.
+      const outwardB: [number, number] = [Math.cos(angle), -Math.sin(angle)]
+      const outerCorner: [number, number] = [-pad, -pad * Math.sin(angle) / (1 - Math.cos(angle))]
+      profile = [outerCorner,
+        [tangentB[0] + pad * outwardB[0], tangentB[1] + pad * outwardB[1]],
+        ...profile.slice(1), [tangentA[0] - pad, tangentA[1]]]
       const section = new runtime.CrossSection([profile])
       let cutter: Manifold
       try { cutter = track(section.extrude(length + 2 * pad)) } finally { section.delete() }

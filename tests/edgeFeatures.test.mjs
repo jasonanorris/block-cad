@@ -228,3 +228,26 @@ test('meeting chamfers and corner feature edits stay closed, undoable data and t
  const removed=await editEdgeFeature([rounded.object],[rounded.object.id],id,null)
  assert.ok(Math.abs(readSolidManifold(getSolidBodies([removed.object])[0],runtime,s=>s.volume())-8000)<.01)
 })
+
+test('prism chamfers remove every vertex beyond the cut plane without face slivers',async()=>{
+ const {decodeStlMesh}=await import('../src/stlMesh.ts')
+ const runtime=await loadManifold()
+ for(const sides of [5,6,8,12]) {
+  const shape={...box(`prism-slivers-${sides}`),type:'prism',sides,dimensions:{diameter:40,height:20}}
+  const edges=await findFeatureEdges([shape],[shape.id])
+  for(const selected of [...edges.map(edge=>[edge]),edges]) {
+   const {object}=await previewEdgeFeature([shape],[shape.id],selected,'chamfer',2)
+   const positions=decodeStlMesh(object.meshData)
+   for(const edge of selected) {
+    const n={x:edge.normalA.x+edge.normalB.x,y:edge.normalA.y+edge.normalB.y,z:edge.normalA.z+edge.normalB.z}
+    for(let i=0;i<positions.length;i+=3) {
+     const excess=(positions[i]+object.position.x-edge.a.x)*n.x+
+      (positions[i+1]+object.position.y-edge.a.y)*n.y+
+      (positions[i+2]+object.position.z-edge.a.z)*n.z+2*Math.sin(edge.angle*Math.PI/180)
+     assert.ok(excess<1e-5,`${sides}-sided prism has a vertex ${excess} beyond its chamfer`)
+    }
+   }
+   assert.equal(readSolidManifold(getSolidBodies([object])[0],runtime,s=>s.status()),'NoError')
+  }
+ }
+})

@@ -15,7 +15,7 @@ npm run preview -- --host 127.0.0.1 --port 4175
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 124 tests.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 125 tests.
 
 `npm run benchmark:large` verifies shared-mesh storage for 200 repeated sphere meshes and bounded object rows for 5,000 objects. Timings are informational; storage deduplication and the 50-row page limit are assertions.
 
@@ -61,7 +61,7 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Copy/library-insert a featured body, transform it, and edit its history independently. Verify feature size remains in local pre-scale units and a failed earlier edit leaves dependent later features and the model unchanged. Test version-20 base mesh references and malformed feature histories.
 
 - Pick two meeting box edges: Fillet must reject atomically, while Chamfer succeeds. Use Select all edges to fillet all twelve box edges; verify Preview/Cancel, Apply, Undo/Redo, Save/Load editing, operation changes, feature removal, and STL/3MF exports. Geometry tests check spherical corner surfaces, analytic rounded-box volume, maximum radius, and reflected/rotated bodies.
-- Physically pick 45° wedge and 120° prism edges. Check angle readouts, different chamfer-distance/fillet-radius limits, invalid-radius rejection, preview/apply, Undo/Redo, Save/Load editing, and STL/3MF worker exports. Geometry regressions cover acute/obtuse angles, reflected nonuniform transforms, and angle exclusions.
+- Physically pick 45° wedge and 120° prism edges. Check angle readouts, different chamfer-distance/fillet-radius limits, invalid-radius rejection, preview/apply, Undo/Redo, Save/Load editing, and STL/3MF worker exports. Geometry regressions cover acute/obtuse angles, reflected nonuniform transforms, and angle exclusions. Prism chamfer regressions check every output vertex against the cut plane on every edge of 5-, 6-, 8-, and 12-sided prisms, individually and together, to catch thin face remnants that volume checks miss.
 
 ## Known limits
 
