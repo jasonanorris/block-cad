@@ -2,11 +2,12 @@ import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours
 import { validObjectColor } from './objectColor'
 import { isTextFont } from './textFonts'
 import { customProfile, validateCustomParameters } from './customShapes'
+import { validateAnalyticHistory } from './analyticData'
 import { validateEdgeHistory } from './edgeFeatureData'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 20
+const PROJECT_VERSION = 21
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -103,6 +104,7 @@ function objectFromFile(value: unknown, index: number, version: number, verified
     ...(version >= 6 && data.joinGroupId ? { joinGroupId: data.joinGroupId as string } : {}),
     ...(version >= 12 && data.joinMode === 'intersection' ? { joinMode: 'intersection' as const } : {}),
   }
+  if (data.analyticHistory !== undefined && (version < 21 || data.type !== 'stl' || data.edgeHistory !== undefined)) throw new Error(`${field}.analyticHistory requires a format-21 mesh with no legacy edge history.`)
   if (data.edgeHistory !== undefined && (version < 20 || data.type !== 'stl')) throw new Error(`${field}.edgeHistory requires a format-20 mesh object.`)
   const dimensions = record(data.dimensions)
   if (!dimensions) throw new Error(`${field}.dimensions is missing.`)
@@ -210,6 +212,7 @@ function objectFromFile(value: unknown, index: number, version: number, verified
         y: positiveNumber(dimensions.y, `${field}.dimensions.y`),
         z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
       }, meshData: data.meshData,
+      ...(data.analyticHistory !== undefined ? { analyticHistory: validateAnalyticHistory(data.analyticHistory) } : {}),
       ...(data.edgeHistory !== undefined ? { edgeHistory: validateEdgeHistory(data.edgeHistory, verifiedMeshes) } : {}),
       ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
     }

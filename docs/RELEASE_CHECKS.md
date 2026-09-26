@@ -15,7 +15,7 @@ npm run preview -- --host 127.0.0.1 --port 4175
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 127 tests.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 131 tests.
 
 `npm run benchmark:large` verifies shared-mesh storage for 200 repeated sphere meshes and bounded object rows for 5,000 objects. Timings are informational; storage deduplication and the 50-row page limit are assertions.
 
@@ -66,7 +66,7 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 
 ## Known limits
 
-- Selected-edge tools currently handle straight outside edges with 15°–165° interior angles and flat, square ends on convex bodies up to 5,000 triangles. Size limits are conservative. The starting mesh bakes original primitive parameters and linked shapes; new edge features retain editable history, with sharp meeting chamfers and tangent variable-radius blends for two perpendicular fillets and spherical blends for three, selected together. Remaining straight edges can be selected after spherical blends; curved boundaries and edges ending in blends remain unsupported. Older baked features and split/exported meshes do not gain editable history.
+- Mesh selected-edge tools currently handle straight outside edges with 15°–165° interior angles and flat, square ends on convex bodies up to 5,000 triangles. Size limits are conservative. The starting mesh bakes original primitive parameters and linked shapes; new edge features retain editable history, with sharp meeting chamfers and tangent variable-radius blends for two perpendicular fillets and spherical blends for three, selected together. Remaining straight edges can be selected after spherical blends; curved boundaries and edges ending in blends remain unsupported. Older baked features and split/exported meshes do not gain editable history.
 - Custom shapes are three built-in parameterized generators. Rounded boxes offer sides-only or all-edge rounding with a uniform source radius; this is not general edge filleting. Nonuniform scaling also scales the rounding.
 - Hole patterns generate separate cutters, with no persistent pattern constraint or automatic through-depth calculation.
 - Face alignment uses picked triangle normals and points, without collision checking or additional twist control.
@@ -87,3 +87,10 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Library backups are limited to 50 MB / 250 entries / 10,000 source shapes and exclude autosave and the currently open unsaved model.
 
 The font licenses are shipped in `public/licenses/helvetiker.txt` and `public/licenses/bundled-fonts.txt` and copied into production output.
+
+### Advanced CAD acceptance
+
+- Choose Advanced CAD and physically pick two meeting edges. Set different individual sizes, Preview/Apply, Undo/Redo, Save/Load, edit overrides, remove the feature, and export STL/3MF. No kernel asset should be required for ordinary mesh-tool use.
+- Build a hexagonal prism corner blend, an edge ending in an existing rounded surface, a rectangular pocket bottom fillet, and a circular blind-hole bottom fillet. Verify valid solids and expected radii/material changes, not only successful responses.
+- Check transformed native sources, joined solids, analytic library copies, dependent-history failures, invalid radii, and invalid saved analytic references. Format 21 must continue loading formats 1–20.
+- Advanced CAD currently starts from boxes, wedges, prisms, cylinders, and their analytic joins/cuts. Imported or baked meshes retain mesh-tool support. The on-demand WASM is about 48 MiB uncompressed / 14 MB gzip and starts with a 100 MiB heap. See ADVANCED_FILLETS.md for implementation and limits.

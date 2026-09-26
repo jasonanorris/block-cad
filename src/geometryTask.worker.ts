@@ -13,9 +13,9 @@ worker.onmessage = async ({ data }) => {
   try {
     let result: GeometryResponse['result']
     switch (data.kind) {
-      case 'edges': result = await findFeatureEdges(data.input.objects, data.input.ids); break
-      case 'edgePreview': result = await previewEdgeFeature(data.input.objects, data.input.ids, data.input.edges, data.input.operation, data.input.size); break
-      case 'edgeEdit': result = await editEdgeFeature(data.input.objects, data.input.ids, data.input.featureId, data.input.change); break
+      case 'edges': result = data.input.advanced ? await (await import('./analyticFeatures')).findAnalyticEdges(data.input.objects, data.input.ids) : await findFeatureEdges(data.input.objects, data.input.ids); break
+      case 'edgePreview': result = data.input.advanced ? await (await import('./analyticFeatures')).previewAnalyticFeature(data.input.objects, data.input.ids, data.input.edges, data.input.operation, data.input.size) : await previewEdgeFeature(data.input.objects, data.input.ids, data.input.edges, data.input.operation, data.input.size); break
+      case 'edgeEdit': result = data.input.advanced ? await (await import('./analyticFeatures')).editAnalyticFeature(data.input.objects, data.input.ids, data.input.featureId, data.input.change) : await editEdgeFeature(data.input.objects, data.input.ids, data.input.featureId, data.input.change); break
       case 'measure': result = await measureSelection(data.input.objects, data.input.ids, data.input.activeId); break
       case 'reference': result = await selectionReference(data.input.objects, new Set(data.input.ids), data.input.edge); break
       case 'inspect': result = await inspectExport(data.input.objects, data.input.settings); break

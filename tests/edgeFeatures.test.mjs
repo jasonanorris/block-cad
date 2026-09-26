@@ -130,7 +130,7 @@ test('format 20 validates edge history and shares both base and resulting meshes
  const [edge]=await findFeatureEdges([shape],[shape.id])
  const {object}=await previewEdgeFeature([shape],[shape.id],edge,'chamfer',2)
  const file=JSON.parse(serializeProject([object,{...object,id:'copy'}]))
- assert.equal(file.version,20);assert.equal(file.meshes.length,2)
+ assert.equal(file.version,21);assert.equal(file.meshes.length,2)
  assert.equal(file.objects[0].edgeHistory.baseMeshRef,file.objects[1].edgeHistory.baseMeshRef)
  assert.deepEqual(parseProject(JSON.stringify(file)),[object,{...object,id:'copy'}])
  for(const mutate of [f=>f.version=19,f=>f.objects[0].edgeHistory.baseMeshRef=999,

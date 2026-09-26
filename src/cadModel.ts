@@ -1,3 +1,4 @@
+import type { AnalyticHistory } from './analyticData'
 import type { EdgeHistory } from './edgeFeatureData'
 import type { CustomParameters } from './customShapes'
 import type { TextFont } from './textFonts'
@@ -37,7 +38,7 @@ export type CadObject = BaseObject & (
   | { type: 'prism'; dimensions: { diameter: number; height: number }; sides: number }
   | { type: 'text'; fontId?: TextFont; text: string; fontSize: number; contours: SvgContours[]; dimensions: Vector3 }
   | { type: 'svg'; dimensions: Vector3; contours: SvgContours }
-  | { type: 'stl'; dimensions: Vector3; meshData: string; edgeHistory?: EdgeHistory }
+  | { type: 'stl'; dimensions: Vector3; meshData: string; edgeHistory?: EdgeHistory; analyticHistory?: AnalyticHistory }
 )
 
 export type CadObjectType = CadObject['type']

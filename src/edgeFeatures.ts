@@ -6,7 +6,7 @@ import { objectMatrix, readSolidManifold } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
 import { encodeStlMesh, stlMeshManifold, MAX_STL_TRIANGLES } from './stlMesh'
 
-export type FeatureEdge = { a: Point; b: Point; normalA: Point; normalB: Point; angle: number; maxSize: number; maxRadius: number }
+export type FeatureEdge = { a: Point; b: Point; normalA: Point; normalB: Point; angle: number; maxSize: number; maxRadius: number; key?: string; path?: Point[]; size?: number }
 import { MAX_EDGE_FEATURES, MAX_FEATURE_EDGES, type EdgeHistory, type EdgeFeature, type StoredEdge, type EdgeOperation } from './edgeFeatureData'
 export type { EdgeOperation } from './edgeFeatureData'
 const v = (p: Point) => new Vector3(p.x, p.y, p.z)
@@ -81,6 +81,7 @@ function solidEdges(solid: Manifold, blended = false): FeatureEdge[] {
 
 function historyObject(objects: CadObject[], ids: string[]) {
   const unit = selectedUnit(objects, ids), object = unit.body.anchor
+  if ([...unit.body.members, ...unit.body.holes].some(member => member.type === 'stl' && member.analyticHistory)) throw new Error('Use Advanced CAD for bodies with analytic feature history.')
   if (unit.body.members.some((member) => member.type === 'stl' && member.edgeHistory) && (unit.body.members.length !== 1 || unit.body.holes.length)) throw new Error('Separate this body and remove its later linked cuts before editing or adding edge features. Its existing history is preserved.')
   if (object.type !== 'stl' || !object.edgeHistory) return null
   return object

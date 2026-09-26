@@ -1,0 +1,14 @@
+Block CAD includes OpenCascade.js 2.0.0-beta.b5ff984 (Sebastian Alff),
+licensed under LGPL-2.1-only according to its package metadata.
+Source and build instructions: https://github.com/donalffons/opencascade.js
+Exact package: https://www.npmjs.com/package/opencascade.js/v/2.0.0-beta.b5ff984
+
+The bundled WASM identifies its Open CASCADE Technology version as 7.6.
+Open CASCADE Technology source and licensing information:
+https://dev.opencascade.org/resources/licensing
+https://github.com/Open-Cascade-SAS/OCCT
+
+The package's license text is provided in opencascade-js-LGPL-2.1.txt.
+The library is loaded as a separate JavaScript/WASM asset. To replace or rebuild
+it, install a compatible package/build and rebuild this Vite application;
+see src/occtRuntime.ts and docs/ADVANCED_FILLETS.md.

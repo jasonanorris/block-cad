@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CadObject } from './cadModel'
 import { GeometryJobs } from './GeometryJobs'
 import { MAX_FEATURE_EDGES, type EdgeFeature } from './edgeFeatureData'
-import type { EdgeOperation, FeatureEdge, previewEdgeFeature } from './edgeFeatures'
+import type { EdgeOperation, FeatureEdge } from './edgeFeatures'
 
-type Preview = Awaited<ReturnType<typeof previewEdgeFeature>>
+import type { EdgePreview as Preview } from './geometryTasks'
 export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () => void, onApply: (preview: Preview) => void) {
   const jobs = useMemo(() => new GeometryJobs(), [])
   const generation = useRef(0)
@@ -13,23 +13,27 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
   const [editing, setEditing] = useState<string | null>(null), [removing, setRemoving] = useState(false)
   const [operation, setOperation] = useState<EdgeOperation>('fillet')
   const [size, setSize] = useState('2')
+  const [preferAdvanced, setPreferAdvanced] = useState(false)
+  const [edgeSizes, setEdgeSizes] = useState<Record<number, string>>({})
   const [previewState, setPreviewState] = useState<{ objects: CadObject[]; ids: string[]; result: Preview } | null>(null)
   const preview = previewState?.objects === objects && previewState.ids === ids ? previewState.result : null
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const target = ids.length === 1 ? objects.find((object) => object.id === ids[0]) : undefined
-  const features = target?.type === 'stl' ? target.edgeHistory?.features ?? [] : []
-  function cancel() { generation.current++; jobs.cancel(); setEdges([]); setSelected([]); setEditing(null); setRemoving(false); setPreviewState(null); setBusy(false); setError('') }
+  const advanced = target?.type === 'stl' && target.analyticHistory ? true : preferAdvanced
+  const analyticBody = target?.type === 'stl' && !!target.analyticHistory
+  const features = target?.type === 'stl' ? (advanced ? target.analyticHistory?.features : target.edgeHistory?.features) ?? [] : []
+  function cancel() { generation.current++; jobs.cancel(); setEdges([]); setSelected([]); setEditing(null); setRemoving(false); setPreviewState(null); setBusy(false); setError(''); setEdgeSizes({}) }
   useEffect(() => { cancel() }, [objects, ids])
   useEffect(() => () => { generation.current++; jobs.dispose() }, [jobs])
   function invalidate() { generation.current++; jobs.cancel(); setPreviewState(null); setBusy(false); setError('') }
   async function start() {
     cancel(); onBegin(); const current = ++generation.current; setBusy(true)
-    try { const result = await jobs.run('edges', { objects, ids }); if (current === generation.current) setEdges(result) }
+    try { const result = await jobs.run('edges', { objects, ids, advanced }); if (current === generation.current) setEdges(result) }
     catch (reason) { if (current === generation.current) setError(reason instanceof Error ? reason.message : 'Could not find edges.') }
     finally { if (current === generation.current) setBusy(false) }
   }
   function edit(feature: EdgeFeature, remove = false) {
-    cancel(); onBegin(); setEditing(feature.id); setOperation(feature.operation); setSize(String(feature.size)); setRemoving(remove)
+    cancel(); onBegin(); setEditing(feature.id); setOperation(feature.operation); setSize(String(feature.size)); setRemoving(remove); setEdgeSizes(Object.fromEntries(feature.edges.map((edge, index) => [index, edge.size === undefined ? '' : String(edge.size)])))
   }
   async function calculate() {
     if (!editing && !selected.length) return
@@ -37,13 +41,15 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
     const value = size.trim() ? Number(size) : NaN
     try {
       const result = editing
-        ? await jobs.run('edgeEdit', { objects, ids, featureId: editing, change: removing ? null : { operation, size: value } })
-        : await jobs.run('edgePreview', { objects, ids, edges: selected.map((index) => edges[index]), operation, size: value })
+        ? await jobs.run('edgeEdit', { objects, ids, advanced, featureId: editing, change: removing ? null : { operation, size: value, ...(advanced ? { sizes: features.find(f => f.id === editing)!.edges.map((_, i) => edgeSizes[i]?.trim() ? Number(edgeSizes[i]) : null) } : {}) } })
+        : await jobs.run('edgePreview', { objects, ids, edges: selected.map((index) => ({ ...edges[index], ...(advanced && edgeSizes[index]?.trim() ? { size: Number(edgeSizes[index]) } : {}) })), operation, size: value, advanced })
       if (current === generation.current) setPreviewState({ objects, ids, result })
     } catch (reason) { if (current === generation.current) setError(reason instanceof Error ? reason.message : 'Could not preview these edges.') }
     finally { if (current === generation.current) setBusy(false) }
   }
-  return { edges, selected, operation, size, preview, busy, error, features, editing, removing,
+  return { edges, selected, operation, size, advanced, analyticBody, edgeSizes,
+    setAdvanced: (value: boolean) => { cancel(); setPreferAdvanced(value) },
+    setEdgeSize: (index: number, value: string) => { invalidate(); setEdgeSizes(current => ({ ...current, [index]: value })) }, preview, busy, error, features, editing, removing,
     active: edges.length > 0 || !!editing || busy, start, cancel, calculate, edit,
     pick: (index: number) => { invalidate(); setSelected((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index]) },
     selectAll: () => { invalidate(); if (edges.length <= MAX_FEATURE_EDGES) setSelected(edges.map((_, index) => index)); else setError(`Select up to ${MAX_FEATURE_EDGES} edges per feature.`) },

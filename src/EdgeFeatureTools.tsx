@@ -4,7 +4,10 @@ import type { EdgeOperation } from './edgeFeatures'
 export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatureController; disabled: boolean }) {
   const picking = tools.edges.length > 0
   return <details className="repeat-tools edge-feature-tools"><summary>Fillet / chamfer edges</summary>
-    <p className="selection-hint">Select one solid, then click highlighted edges to toggle them on or off. Each feature applies one size to straight outside edges with 15°–165° interior angles and square ends. Chamfers may meet at corners. Select two or three perpendicular edges together to blend a fillet corner. Two-edge corners use a variable-radius transition and keep the third edge sharp; use Select all edges for a fully rounded box. After Apply, select edges again to work on remaining straight edges.</p>
+    <label>Edge tools<select aria-label="Edge tool engine" value={tools.advanced ? 'advanced' : 'mesh'} disabled={tools.busy || tools.analyticBody} onChange={e => tools.setAdvanced(e.target.value === 'advanced')}>
+      <option value="mesh">Mesh tools</option><option value="advanced">Advanced CAD</option>
+    </select></label>
+    {tools.advanced ? <p className="selection-hint">Advanced CAD supports prism corners, curved terminations, inside edges, and individual radii on native boxes, wedges, prisms, cylinders, and their joins/cuts. Select edges, preview, then apply. The first use loads the CAD engine. Invalid radii leave the model unchanged.</p> : <p className="selection-hint">Select one solid, then click highlighted edges to toggle them on or off. Each feature applies one size to straight outside edges with 15°–165° interior angles and square ends. Chamfers may meet at corners. Select two or three perpendicular edges together to blend a fillet corner. Two-edge corners use a variable-radius transition and keep the third edge sharp; use Select all edges for a fully rounded box. After Apply, select edges again to work on remaining straight edges.</p>}
     <button type="button" disabled={disabled || tools.busy} onClick={() => void tools.start()}>{picking ? 'Pick edges again' : 'Select edges'}</button>
     {tools.features.length > 0 && <ol className="edge-feature-list" aria-label="Edge feature history">
       {tools.features.map((feature, index) => <li key={feature.id}>
@@ -15,7 +18,7 @@ export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatu
     </ol>}
     {(picking || tools.editing) && <>
       {picking ? <>
-        <p role="status">{tools.selected.length ? `${tools.selected.length} edges selected (${[...new Set(tools.selected.map((index) => `${Number(tools.edges[index].angle.toFixed(1))}°`))].join(', ')}). Maximum ${tools.operation === 'fillet' ? 'radius' : 'distance'} ${Number(Math.min(...tools.selected.map((index) => tools.operation === 'fillet' ? tools.edges[index].maxRadius : tools.edges[index].maxSize)).toFixed(4))} mm.` : `${tools.edges.length} eligible edges. Hover to highlight, then click to select.`}</p>
+        <p role="status">{tools.selected.length ? tools.advanced ? `${tools.selected.length} edges selected. Preview checks radius compatibility.` : `${tools.selected.length} edges selected (${[...new Set(tools.selected.map((index) => `${Number(tools.edges[index].angle.toFixed(1))}°`))].join(', ')}). Maximum ${tools.operation === 'fillet' ? 'radius' : 'distance'} ${Number(Math.min(...tools.selected.map((index) => tools.operation === 'fillet' ? tools.edges[index].maxRadius : tools.edges[index].maxSize)).toFixed(4))} mm.` : `${tools.edges.length} eligible edges. Hover to highlight, then click to select.`}</p>
         <button type="button" onClick={tools.selectAll} disabled={tools.busy}>Select all edges</button>
         <button type="button" onClick={tools.clearSelection} disabled={!tools.selected.length || tools.busy}>Clear edges</button>
       </> : <p role="status">{tools.removing ? 'Remove' : 'Edit'} feature {tools.features.findIndex((feature) => feature.id === tools.editing) + 1}. Preview to rebuild the remaining feature history.</p>}
@@ -25,6 +28,10 @@ export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatu
         </select></label>
         <label>{tools.operation === 'fillet' ? 'Radius' : 'Distance along each face'} (mm)
           <input aria-label="Edge feature size" type="number" step="any" min="0.01" value={tools.size} onChange={(e) => tools.setSize(e.target.value)} /></label>
+        {tools.advanced && <details><summary>Individual edge sizes</summary>
+          <p className="selection-hint">Leave blank to use the common size. Sizes are measured before later object scaling.</p>
+          {(picking ? tools.selected : tools.features.find(f => f.id === tools.editing)?.edges.map((_, i) => i) ?? []).map(index => <label key={index}>Edge {index + 1}<input type="number" min="0.01" max="10000" step="any" aria-label={`Size for edge ${index + 1}`} placeholder="Common size" value={tools.edgeSizes[index] ?? ''} onChange={e => tools.setEdgeSize(index, e.target.value)} /></label>)}
+        </details>}
       </>}
       <button type="button" disabled={(!tools.editing && !tools.selected.length) || tools.busy} onClick={() => void tools.calculate()}>{tools.removing ? 'Preview removal' : 'Preview edges'}</button>
       <button type="button" disabled={!tools.preview || tools.busy} onClick={tools.apply}>{tools.removing ? 'Apply removal' : 'Apply edges'}</button>

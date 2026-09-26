@@ -33,3 +33,5 @@ import './largeProjects.test.mjs'
 import './printChecks.test.mjs'
 
 import './edgeFeatures.test.mjs'
+
+import './analyticFeatures.test.mjs'

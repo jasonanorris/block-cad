@@ -8,7 +8,7 @@ export default function EdgePicker({ enabled, edges, selected, previewing, onPic
 }) {
   const { camera, scene, gl, invalidate } = useThree()
   const [hover, setHover] = useState<number | null>(null)
-  const geometries = useMemo(() => edges.map((edge) => new BufferGeometry().setFromPoints([edge.a, edge.b].map((p) => new Vector3(p.x, p.y, p.z)))), [edges])
+  const geometries = useMemo(() => edges.map((edge) => new BufferGeometry().setFromPoints((edge.path ? edge.path.slice(0, -1).flatMap((p, i) => [p, edge.path![i + 1]]) : [edge.a, edge.b]).map((p) => new Vector3(p.x, p.y, p.z)))), [edges])
   useEffect(() => { setHover(null); return () => geometries.forEach((geometry) => geometry.dispose()) }, [geometries])
   useEffect(() => {
     if (!enabled) return
@@ -22,17 +22,20 @@ export default function EdgePicker({ enabled, edges, selected, previewing, onPic
       const meshes: Mesh[] = []; scene.traverse((o) => { if (o instanceof Mesh && o.visible && o.userData.cadSurface) meshes.push(o) })
       let best: number | null = null, distance = 12
       edges.forEach((edge, index) => {
-        const p = new Vector3()
-        ray.ray.distanceSqToSegment(new Vector3(edge.a.x, edge.a.y, edge.a.z), new Vector3(edge.b.x, edge.b.y, edge.b.z), undefined, p)
-        const screen = p.clone().project(camera)
-        if (screen.z < -1 || screen.z > 1) return
-        const pixels = Math.hypot((screen.x + 1) * rect.width / 2 + rect.left - event.clientX, (1 - screen.y) * rect.height / 2 + rect.top - event.clientY)
-        if (pixels >= distance) return
-        // Raycast toward the candidate, not the nearby cursor: hidden back edges cannot win.
-        const visibility = new Raycaster(); visibility.setFromCamera(new Vector2(screen.x, screen.y), camera)
-        const hit = visibility.intersectObjects(meshes, false)[0]
-        if (hit && hit.distance < visibility.ray.origin.distanceTo(p) - .02) return
-        best = index; distance = pixels
+        const path = edge.path ?? [edge.a, edge.b]
+        for (let segment = 0; segment < path.length - 1; segment++) {
+          const a = path[segment], b = path[segment + 1], p = new Vector3()
+          ray.ray.distanceSqToSegment(new Vector3(a.x, a.y, a.z), new Vector3(b.x, b.y, b.z), undefined, p)
+          const screen = p.clone().project(camera)
+          if (screen.z < -1 || screen.z > 1) continue
+          const pixels = Math.hypot((screen.x + 1) * rect.width / 2 + rect.left - event.clientX, (1 - screen.y) * rect.height / 2 + rect.top - event.clientY)
+          if (pixels >= distance) continue
+          // Raycast toward the candidate, not the nearby cursor: hidden back edges cannot win.
+          const visibility = new Raycaster(); visibility.setFromCamera(new Vector2(screen.x, screen.y), camera)
+          const hit = visibility.intersectObjects(meshes, false)[0]
+          if (hit && hit.distance < visibility.ray.origin.distanceTo(p) - .02) continue
+          best = index; distance = pixels
+        }
       })
       return best
     }

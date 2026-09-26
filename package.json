@@ -15,6 +15,7 @@
   "dependencies": {
     "@react-three/fiber": "^9.4.0",
     "manifold-3d": "^3.5.3",
+    "opencascade.js": "2.0.0-beta.b5ff984",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "three": "^0.180.0"

@@ -223,3 +223,9 @@ Export review checks disconnected regions, a configurable print volume, small so
 ### 80 — Publishing (deferred)
 
 Keep the application local for now, as requested. No hosting destination or public deployment is configured. Launch it with `npm run dev` and open the URL printed by Vite.
+
+### Advanced CAD edge tools
+
+Choose **Edit → Fillet / chamfer edges → Edge tools → Advanced CAD** for prism corner blends, edges ending in existing fillets, inside pocket/hole edges, and unequal radii at shared corners. Start from native boxes, wedges, prisms, cylinders, or their joined/cut bodies. Select highlighted straight or curved edges, set a common size, optionally expand **Individual edge sizes**, then Preview and Apply. Blank overrides use the common size. The first request loads the additional CAD engine (about 14 MB compressed).
+
+Format 21 preserves analytic geometry and editable features alongside display meshes and reads formats 1–20. Existing mesh histories remain available in Mesh tools; arbitrary imported/baked meshes cannot automatically become analytic bodies. Radius compatibility is checked during Preview. See [advanced CAD details and limits](docs/ADVANCED_FILLETS.md).
