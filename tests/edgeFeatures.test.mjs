@@ -140,3 +140,41 @@ test('format 20 validates edge history and shares both base and resulting meshes
   const malformed=structuredClone(file);mutate(malformed);assert.throws(()=>parseProject(JSON.stringify(malformed)))
  }
 })
+
+test('acute and obtuse edges produce dimensioned chamfers and tangent circular fillets',async()=>{
+ const runtime=await loadManifold()
+ const fixtures=[{angle:Math.atan(.5)*180/Math.PI,shape:{...box('transformed-wedge'),type:'wedge',dimensions:{x:20,y:20,z:20},rotation:{x:.3,y:.7,z:.2},scale:{x:-2,y:1,z:.5}}},...[15,30,45,60,75].map(angle=>({angle,shape:{...box(`wedge-${angle}`),type:'wedge',dimensions:{x:20,y:20*Math.tan(angle*Math.PI/180),z:20}}})),
+  ...[5,6,12,24].map(sides=>({angle:180-360/sides,shape:{...box(`prism-${sides}`),type:'prism',sides,dimensions:{diameter:40,height:20}}}))]
+ for(const {angle,shape} of fixtures) {
+  const edges=await findFeatureEdges([shape],[shape.id])
+  const edge=edges.find(e=>Math.abs(e.angle-angle)<.001);assert.ok(edge,`Missing ${angle}° edge`)
+  const radians=angle*Math.PI/180,length=Math.hypot(edge.b.x-edge.a.x,edge.b.y-edge.a.y,edge.b.z-edge.a.z)
+  assert.ok(Math.abs(edge.maxRadius-edge.maxSize*Math.tan(radians/2))<1e-4)
+  const before=readSolidManifold(getSolidBodies([shape])[0],runtime,s=>s.volume())
+  for(const operation of ['chamfer','fillet']) {
+   const size=.5,{object}=await previewEdgeFeature([shape],[shape.id],edge,operation,size)
+   const after=readSolidManifold(getSolidBodies([object])[0],runtime,s=>{assert.equal(s.status(),'NoError');return s.volume()})
+   const area=operation==='chamfer'?.5*size*size*Math.sin(radians):size*size*(1/Math.tan(radians/2)-(Math.PI-radians)/2)
+   assert.ok(Math.abs((before-after)-area*length)<Math.max(.002,area*length*.03),`${angle}° ${operation}: ${before-after} vs ${area*length}`)
+   assert.deepEqual(parseProject(serializeProject([object])),[object])
+  }
+ }
+})
+
+test('angled limits differ by operation and editable histories retain acute edge choices',async()=>{
+ const {editEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const shape={...box('acute'),type:'wedge',dimensions:{x:20,y:20,z:20}}
+ const edges=await findFeatureEdges([shape],[shape.id]),edge=edges.find(e=>Math.abs(e.angle-45)<.001)
+ assert.ok(edge.maxRadius<5 && edge.maxSize>5)
+ await assert.rejects(()=>previewEdgeFeature([shape],[shape.id],edge,'fillet',5),/radius no larger/)
+ const first=await previewEdgeFeature([shape],[shape.id],edge,'chamfer',5)
+ const stored=parseProject(serializeProject([first.object]))[0],id=stored.edgeHistory.features[0].id
+ const edited=await editEdgeFeature([stored],[stored.id],id,{operation:'fillet',size:2})
+ assert.equal(edited.object.edgeHistory.features[0].size,2)
+ const removed=await editEdgeFeature([edited.object],[edited.object.id],id,null)
+ const runtime=await loadManifold();assert.ok(Math.abs(readSolidManifold(getSolidBodies([removed.object])[0],runtime,s=>s.volume())-4000)<.001)
+ const shallow={...shape,id:'shallow',dimensions:{x:20,y:20*Math.tan(5*Math.PI/180),z:20}}
+ assert.ok((await findFeatureEdges([shallow],[shallow.id])).every(e=>e.angle>=15 && e.angle<=165))
+ const fine={...box('fine'),type:'prism',sides:32,dimensions:{diameter:40,height:20}}
+ await assert.rejects(()=>findFeatureEdges([fine],[fine.id]),/No supported edges/)
+})

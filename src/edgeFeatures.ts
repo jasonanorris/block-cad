@@ -6,7 +6,7 @@ import { objectMatrix, readSolidManifold } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
 import { encodeStlMesh, stlMeshManifold, MAX_STL_TRIANGLES } from './stlMesh'
 
-export type FeatureEdge = { a: Point; b: Point; normalA: Point; normalB: Point; maxSize: number }
+export type FeatureEdge = { a: Point; b: Point; normalA: Point; normalB: Point; angle: number; maxSize: number; maxRadius: number }
 import { MAX_EDGE_FEATURES, MAX_FEATURE_EDGES, type EdgeHistory, type EdgeFeature, type StoredEdge, type EdgeOperation } from './edgeFeatureData'
 export type { EdgeOperation } from './edgeFeatureData'
 const v = (p: Point) => new Vector3(p.x, p.y, p.z)
@@ -42,10 +42,13 @@ function solidEdges(solid: Manifold): FeatureEdge[] {
   const edges: FeatureEdge[] = []
   for (let i = 0; i < faces.length; i++) for (let j = i + 1; j < faces.length; j++) {
     const f = faces[i], g = faces[j]
-    if (Math.abs(f.normal.dot(g.normal)) > 1e-6) continue
+    // Interior dihedral angle. Exclude nearly flat facets and needle-like corners.
+    const angle = Math.acos(Math.max(-1, Math.min(1, -f.normal.dot(g.normal))))
+    const degrees = angle * 180 / Math.PI
+    if (degrees < 15 - 1e-4 || degrees > 165 + 1e-4) continue
     const shared = vertices.filter((p) => Math.abs(f.normal.dot(p) - f.offset) < tolerance && Math.abs(g.normal.dot(p) - g.offset) < tolerance)
     if (shared.length < 2) continue
-    const direction = f.normal.clone().cross(g.normal)
+    const direction = f.normal.clone().cross(g.normal).normalize()
     shared.sort((a, b) => direction.dot(a) - direction.dot(b))
     const a = shared[0], b = shared.at(-1)!
     if (a.distanceTo(b) < .01) continue
@@ -56,10 +59,11 @@ function solidEdges(solid: Manifold): FeatureEdge[] {
     // rounded surfaces must not shrink the limit to their tessellation size.
     const distances = [...f.vertices].map((id) => g.offset - g.normal.dot(vertices[id]))
       .concat([...g.vertices].map((id) => f.offset - f.normal.dot(vertices[id]))).filter((d) => d > tolerance)
-    const maxSize = Math.min(...distances) / 2
-    if (maxSize >= .01) edges.push({ a: point(a), b: point(b), normalA: point(f.normal), normalB: point(g.normal), maxSize })
+    const maxSize = Math.min(...distances) / (2 * Math.sin(angle))
+    const maxRadius = maxSize * Math.tan(angle / 2)
+    if (Math.max(maxSize, maxRadius) >= .01) edges.push({ a: point(a), b: point(b), normalA: point(f.normal), normalB: point(g.normal), angle: degrees, maxSize, maxRadius })
   }
-  if (!edges.length) throw new Error('No supported edges. Pick a simple convex solid with straight 90° outside edges and flat, square ends, such as a box.')
+  if (!edges.length) throw new Error('No supported edges. Pick a simple convex solid with straight outside edges between planar faces at 15°–165°, with flat, square ends, such as a wedge or prism.')
   return edges
 }
 
@@ -101,7 +105,8 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
   const edges = feature.edges.map((edge) => {
     const current = available.find((candidate) => sameEdge(candidate, edge))
     if (!current) throw new Error('An edge changed or is unavailable. Remove dependent later features first, or pick edges again.')
-    if (feature.size > current.maxSize + tolerance) throw new Error(`Use a size no larger than ${Number(current.maxSize.toFixed(4))} mm for these edges.`)
+    const limit = feature.operation === 'fillet' ? current.maxRadius : current.maxSize
+    if (feature.size > limit + tolerance) throw new Error(`Use a ${feature.operation === 'fillet' ? 'radius' : 'distance'} no larger than ${Number(limit.toFixed(4))} mm for these edges.`)
     return current
   })
   for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
@@ -118,18 +123,27 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
       const origin = v(current.a), u = v(current.normalA).negate(), w = v(current.b).sub(origin).normalize(), y = w.clone().cross(u)
       const length = v(current.b).distanceTo(origin), pad = Math.max(1, length * .01)
       const matrix = new Matrix4().makeBasis(u, y, w).setPosition(origin)
-      let cutter: Manifold
-      if (operation === 'chamfer') {
-        const section = new runtime.CrossSection([[[-pad, -pad], [size + pad, -pad], [-pad, size + pad]]])
-        try { cutter = track(section.extrude(length + 2 * pad)) } finally { section.delete() }
-        cutter = track(cutter.translate([0, 0, -pad]))
-      } else {
-        const block = track(runtime.Manifold.cube([size + pad, size + pad, length + 2 * pad]))
-        const shifted = track(block.translate([-pad, -pad, -pad]))
-        const cylinder = track(runtime.Manifold.cylinder(length + 2 * pad, size, size, 96))
-        const round = track(cylinder.translate([size, size, -pad]))
-        cutter = track(shifted.subtract(round))
+      const angle = current.angle * Math.PI / 180
+      // A radius r touches each adjoining face at r*cot(angle/2) from the edge.
+      // Chamfer distances are measured along the faces, not normal to them.
+      const distance = operation === 'fillet' ? size / Math.tan(angle / 2) : size
+      const tangentB: [number, number] = [distance * Math.sin(angle), distance * Math.cos(angle)]
+      const tangentA: [number, number] = [0, distance]
+      let profile: [number, number][] = [[0, 0], tangentB, tangentA]
+      if (operation === 'fillet') {
+        const sweep = Math.PI - angle, segments = Math.max(2, Math.ceil(sweep / (Math.PI / 48)))
+        const arc = Array.from({ length: segments + 1 }, (_, i): [number, number] => {
+          if (i === 0) return tangentB
+          if (i === segments) return tangentA
+          const t = 2 * Math.PI - angle - sweep * i / segments
+          return [size + size * Math.cos(t), distance + size * Math.sin(t)]
+        })
+        profile = [[0, 0], ...arc]
       }
+      const section = new runtime.CrossSection([profile])
+      let cutter: Manifold
+      try { cutter = track(section.extrude(length + 2 * pad)) } finally { section.delete() }
+      cutter = track(cutter.translate([0, 0, -pad]))
       const transformed = track(cutter.transform(matrix.elements as Mat4))
       const removal = track(solid.intersect(transformed))
       for (const previous of removals) {

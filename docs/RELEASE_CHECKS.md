@@ -15,7 +15,7 @@ npm run preview -- --host 127.0.0.1 --port 4175
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 120 tests.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 122 tests.
 
 `npm run benchmark:large` verifies shared-mesh storage for 200 repeated sphere meshes and bounded object rows for 5,000 objects. Timings are informational; storage deduplication and the 50-row page limit are assertions.
 
@@ -60,9 +60,11 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Toggle multiple separate edges, preview/apply together, and Undo/Redo. Meeting edges and overlapping cuts must fail atomically. Save/Load the result and edit its radius/operation; preview/cancel/remove a feature and Undo/Redo removal. Removing all features must recover the starting mesh.
 - Copy/library-insert a featured body, transform it, and edit its history independently. Verify feature size remains in local pre-scale units and a failed earlier edit leaves dependent later features and the model unchanged. Test version-20 base mesh references and malformed feature histories.
 
+- Physically pick 45° wedge and 120° prism edges. Check angle readouts, different chamfer-distance/fillet-radius limits, invalid-radius rejection, preview/apply, Undo/Redo, Save/Load editing, and STL/3MF worker exports. Geometry regressions cover acute/obtuse angles, reflected nonuniform transforms, and angle exclusions.
+
 ## Known limits
 
-- Selected-edge tools currently handle straight 90° outside edges with flat, square ends on convex bodies up to 5,000 triangles. Size limits are conservative. The starting mesh bakes original primitive parameters and linked shapes; new edge features retain editable history, but there is no intersecting-corner blend solver. Older baked features and split/exported meshes do not gain editable history.
+- Selected-edge tools currently handle straight outside edges with 15°–165° interior angles and flat, square ends on convex bodies up to 5,000 triangles. Size limits are conservative. The starting mesh bakes original primitive parameters and linked shapes; new edge features retain editable history, but there is no intersecting-corner blend solver. Older baked features and split/exported meshes do not gain editable history.
 - Custom shapes are three built-in parameterized generators. Rounded boxes offer sides-only or all-edge rounding with a uniform source radius; this is not general edge filleting. Nonuniform scaling also scales the rounding.
 - Hole patterns generate separate cutters, with no persistent pattern constraint or automatic through-depth calculation.
 - Face alignment uses picked triangle normals and points, without collision checking or additional twist control.
