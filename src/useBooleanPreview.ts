@@ -1,24 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
-import { getSolidBodies, type CadObject } from './cadModel'
-import { loadManifold } from './manifoldRuntime'
-import { BooleanPreviewCache, type Preview } from './BooleanPreviewCache'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CadObject } from './cadModel'
+import { BackgroundPreview, type BackgroundPreviewState } from './BackgroundPreview'
 
-export function useBooleanPreview(objects: CadObject[]): Preview {
-  const cache = useMemo(() => new BooleanPreviewCache(), [])
-  const [preview, setPreview] = useState<Preview>(() => ({ geometries: new Map(), error: null }))
+export function useBooleanPreview(objects: CadObject[]) {
+  const controller = useRef<BackgroundPreview | null>(null)
+  const [preview, setPreview] = useState<BackgroundPreviewState>(() => ({ geometries: new Map(), error: null, pending: 0 }))
   useEffect(() => {
-    let cancelled = false
-    if (!getSolidBodies(objects).some((body) => body.members.length > 1 || body.holes.length)) {
-      setPreview(cache.clear())
-      return
-    }
-    loadManifold().then((runtime) => {
-      if (!cancelled) setPreview(cache.update(objects, runtime))
-    }).catch((error: unknown) => {
-      if (!cancelled) setPreview({ ...cache.clear(), error: error instanceof Error ? error.message : 'Could not load Manifold.' })
-    })
-    return () => { cancelled = true }
-  }, [objects, cache])
-  useEffect(() => () => { cache.clear() }, [cache])
-  return preview
+    const current = new BackgroundPreview(setPreview)
+    controller.current = current
+    return () => { current.dispose(); controller.current = null }
+  }, [])
+  useEffect(() => { controller.current?.update(objects) }, [objects])
+  const retry = useCallback(() => controller.current?.retry(), [])
+  return { ...preview, retry }
 }

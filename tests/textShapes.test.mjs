@@ -53,3 +53,26 @@ test('selected-top workplane follows actual rotated text vertices', async () => 
   const bounds=await getPlacementBounds(getPlacementUnits([text],new Set([text.id]))[0])
   assert.ok(Math.abs(getObjectTopHeight(text)-bounds.max.y)<1e-5)
 })
+
+test('font choices produce distinct printable contours and persist through editing and projects', async () => {
+  const fonts=['helvetiker','helvetiker-bold','optimer'], runtime=await loadManifold(), outlines=[]
+  for (const font of fonts) {
+    const text=createTextObject('BO 8',10,3,12,font)
+    assert.equal(text.fontId,font)
+    assert.deepEqual(parseProject(serializeProject([text])),[text])
+    assert.ok(readSolidManifold(getSolidBodies([text])[0],runtime,s=>s.volume())>0)
+    assert.ok(text.contours.some(c=>c.holes.length>0))
+    outlines.push(JSON.stringify(text.contours))
+    const edited=changeText({...text,cutTargetId:'base',color:'#abcdef'},'AB',14,5,'helvetiker-bold')
+    assert.equal(edited.fontId,'helvetiker-bold');assert.equal(edited.id,text.id)
+    assert.equal(edited.cutTargetId,'base');assert.deepEqual(edited.position,text.position)
+  }
+  assert.equal(new Set(outlines).size,3)
+  const old=JSON.parse(serializeProject([createTextObject('CAD',10,3)]));old.version=15;delete old.objects[0].fontId
+  const loaded=parseProject(JSON.stringify(old))[0]
+  assert.equal(loaded.fontId,undefined)
+  assert.deepEqual(changeText(loaded,'CAD',10,3).contours,loaded.contours)
+  const invalid=JSON.parse(serializeProject([createTextObject('A',10,3)]));invalid.objects[0].fontId='unknown'
+  assert.throws(()=>parseProject(JSON.stringify(invalid)),/fontId/)
+  assert.throws(()=>createTextObject('A',10,3,0,'unknown'),/font/)
+})

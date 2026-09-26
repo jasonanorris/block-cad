@@ -1,3 +1,4 @@
+import { parseLibrary, serializeLibrary } from './libraryFile'
 import type { CadObject } from './cadModel'
 import { parseProject, serializeProject } from './projectFile'
 
@@ -104,4 +105,46 @@ export async function deleteLocalProject(id: string, kind: SavedKind): Promise<v
     tx.oncomplete = () => resolve()
     tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Could not delete that saved item. Refresh the list and try again.'))
   })
+}
+
+// Read both stores in one transaction so a concurrent tab cannot produce a
+// backup containing metadata from one revision and model data from another.
+export async function exportLocalLibrary(): Promise<string> {
+  const db = await openDatabase()
+  const records = await new Promise<{ items: unknown[]; projects: Map<IDBValidKey, unknown> }>((resolve, reject) => {
+    const tx = db.transaction(['items', 'projects'], 'readonly')
+    const items = tx.objectStore('items').getAll(), projects = tx.objectStore('projects').getAll(), keys = tx.objectStore('projects').getAllKeys()
+    tx.oncomplete = () => resolve({ items: items.result, projects: new Map(keys.result.map((key, i) => [key, projects.result[i]])) })
+    tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Could not read the library for backup.'))
+  })
+  return serializeLibrary(records.items.map((raw) => {
+    if (!validMetadata(raw, 'part') && !validMetadata(raw, 'snapshot')) throw new Error('The library contains damaged metadata. No backup was created.')
+    const item = raw as SavedProject, project = records.projects.get(item.id)
+    if (typeof project !== 'string') throw new Error('A saved project is missing. No backup was created.')
+    const objects = parseProject(project)
+    if (objects.length !== item.objectCount) throw new Error('A saved project is damaged. No backup was created.')
+    return { kind: item.kind, name: item.name, createdAt: item.createdAt, objects }
+  }))
+}
+
+export async function importLocalLibrary(text: string): Promise<SavedProject[]> {
+  // Validate the entire file before opening a write transaction. Fresh storage
+  // IDs make repeated imports additive and never overwrite existing records.
+  const entries = parseLibrary(text)
+  const records = entries.map((entry) => ({ item: { id: crypto.randomUUID(), kind: entry.kind,
+    name: entry.name, createdAt: entry.createdAt, objectCount: entry.objects.length }, project: serializeProject(entry.objects) }))
+  if (!records.length) return []
+  const db = await openDatabase()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(['items', 'projects'], 'readwrite')
+    tx.oncomplete = () => resolve()
+    tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Could not import the library. No items were added.'))
+    try {
+      for (const record of records) {
+        tx.objectStore('items').add(record.item)
+        tx.objectStore('projects').add(record.project, record.item.id)
+      }
+    } catch (error) { tx.abort(); reject(error) }
+  })
+  return records.map((record) => record.item)
 }

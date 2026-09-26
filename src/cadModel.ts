@@ -1,3 +1,4 @@
+import type { TextFont } from './textFonts'
 import { regularPolygon } from './polygon'
 
 export type Vector3 = { x: number; y: number; z: number }
@@ -31,7 +32,7 @@ export type CadObject = BaseObject & (
   | { type: 'cone'; dimensions: { diameter: number; height: number } }
   | { type: 'wedge'; dimensions: Vector3 }
   | { type: 'prism'; dimensions: { diameter: number; height: number }; sides: number }
-  | { type: 'text'; text: string; fontSize: number; contours: SvgContours[]; dimensions: Vector3 }
+  | { type: 'text'; fontId?: TextFont; text: string; fontSize: number; contours: SvgContours[]; dimensions: Vector3 }
   | { type: 'svg'; dimensions: Vector3; contours: SvgContours }
   | { type: 'stl'; dimensions: Vector3; meshData: string }
 )
