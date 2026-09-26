@@ -257,9 +257,6 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 .example-projects select { width: 150px; }
 .section-tools input[type="checkbox"] { width: auto; }
 
-/* Tool navigation stays available while browsing a long model's tools. */
-.tool-navigation { display: flex; flex-wrap: wrap; gap: 5px; padding: 12px; position: sticky; top: 0; z-index: 4; background: #fff; border-bottom: 1px solid #dce3ef; }
-.tool-navigation button { font-size: 12px; padding: 5px 8px; }
 .tool-group { margin: 10px 0; scroll-margin-top: 90px; }
 .tool-group > summary { cursor: pointer; font-weight: 650; padding: 9px 0; }
 .tool-group-content { padding: 4px 0; }
@@ -281,3 +278,29 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 .object-child-row { padding-left: 18px; }
 .print-settings input { max-width: 100%; }
 .print-settings { margin: 12px 0; }
+
+/* A bounded tool shelf: selection and tabs stay available above the active panel. */
+.info-panel.tool-sidebar { padding: 0; min-height: 0; overflow: hidden; }
+.sidebar-selection { padding: 12px; border-bottom: 1px solid #e3e9f1; }
+.sidebar-selection .selection-card { margin: 0 0 8px; font-size: 12px; }
+.sidebar-selection > button { width: 100%; padding: 6px; font-size: 12px; }
+.tool-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; padding: 10px 12px; border-bottom: 1px solid #e3e9f1; }
+.tool-tabs button { padding: 8px 3px; font-size: 12px; border: 1px solid transparent; border-radius: 6px; background: #f3f6fa; color: #52657e; cursor: pointer; }
+.tool-tabs button[aria-selected="true"] { background: #e8f1ff; border-color: #91b5ef; color: #245cab; font-weight: 750; }
+.tool-tabs button:focus-visible, .tool-tab-panel:focus-visible { outline: 2px solid #3176e9; outline-offset: -2px; }
+.tool-tab-panel { min-height: 0; padding: 14px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.tool-tab-panel[hidden] { display: none; }
+.tool-tab-description { font-size: 11px; color: #718099; margin-bottom: 16px; }
+.tool-tab-panel .panel-section { padding-bottom: 12px; margin-bottom: 12px; }
+.tool-tab-panel .panel-section:last-child { margin-bottom: 0; border-bottom: 0; }
+.tool-tab-panel .shape-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tool-tab-panel .shape-button { padding: 10px 8px; gap: 7px; }
+.tool-tab-panel .shape-add { display: none; }
+@media (min-width: 801px) {
+  .app-main { grid-template-columns: minmax(0, 1fr) 320px; }
+  .info-panel.tool-sidebar { position: sticky; top: 12px; height: calc(100dvh - 100px); max-height: calc(100dvh - 24px); }
+  .sidebar-selection, .tool-tabs { flex-shrink: 0; }
+}
+@media (max-width: 800px) {
+  .tool-tab-panel { max-height: 65dvh; }
+}

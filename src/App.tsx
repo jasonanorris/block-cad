@@ -4,7 +4,8 @@ import Workspace from './Workspace'
 import ReferenceTools from './ReferenceTools'
 import { dropOntoBody } from './dropOntoBody'
 import { positionFromReference } from './referenceOrigin'
-import ToolGroup, { jumpToTools } from './ToolGroup'
+import ToolGroup from './ToolGroup'
+import ToolSidebar from './ToolSidebar'
 import ExampleProjects from './ExampleProjects'
 import SectionTools from './SectionTools'
 import { GeometryJobs } from './GeometryJobs'
@@ -805,20 +806,17 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             <div className="axis-label">{facePlane ? 'Face workplane' : `Workplane Y ${workplaneHeight} ${MODEL_UNIT}`} <span>·</span> X / Y / Z</div>
           </div>
         </section>
-        <aside className="info-panel" aria-label="Workspace information">
-          <nav className="tool-navigation" aria-label="Tool groups">
-            {['Shapes', 'Place', 'Objects', 'Combine', 'Arrange', 'Inspect'].map((label) =>
-              <button key={label} type="button" onClick={() => jumpToTools(`tools-${label.toLowerCase()}`)}>{label}</button>)}
-          </nav>
-          {!selectedObject && (
-            <div className="panel-section">
-              <p className="eyebrow">Getting started</p>
-              <h2>Take a look around</h2>
-              <p>Add a shape below, then click any object to select it. Click empty space to clear your selection.</p>
+        <ToolSidebar selection={<>
+            <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
+              <span className="selection-indicator" aria-hidden="true" />
+              <span>{selectedObjectIds.length > 1
+                ? `${selectedObjectIds.length} objects selected · ${selectedObject ? objectLabel(selectedObject, objects) : 'Shape'} active`
+                : selectedObject ? `${objectLabel(selectedObject, objects)} selected` : 'Nothing selected'}</span>
             </div>
-          )}
+        </>} hasSelection={!!selectedObject} panels={{
+          create: <>
           <div className="panel-section shapes-section">
-            <ToolGroup id="tools-shapes" title="Shapes" open>
+            <h3>Basic shapes</h3>
             <div className="shape-list">
               {(['box', 'cylinder', 'sphere', 'cone', 'wedge', 'prism'] as const).map((type) => (
                 <button className="shape-button" key={type} type="button" onClick={() => addObject(type)}>
@@ -844,6 +842,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               const [object] = onFaceWorkplane([createCustomShape(parameters, workplaneHeight)], facePlane)
               commit((current) => ({ objects: [...current.objects, object], selectedObjectIds: [object.id], selectedObjectId: object.id }))
             }} />
+            <ToolGroup id="tools-import" title="Import and examples">
             <button className="cut-example-button" type="button" onClick={addCutExample}>Add cutout example</button>
             <p className="cut-example-hint">Adds an editable box and cylinder cutter.</p>
             <button className="cut-example-button" type="button" onClick={() => svgInput.current?.click()}>Import SVG</button>
@@ -852,6 +851,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             <button className="cut-example-button" type="button" disabled={importingStl} onClick={() => stlInput.current?.click()}>{importingStl ? 'Importing STL…' : 'Import STL'}</button>
             <input ref={stlInput} type="file" accept=".stl,model/stl" onChange={importStlFile} hidden aria-label="Choose an STL file" />
             <p className="cut-example-hint">Imports a watertight STL at its original millimeter size.</p>
+            </ToolGroup>
             {derivedBodies.length > 0 && !booleanError && (
               <p className="cut-status" role="status">
                 {booleanGeometries.size === derivedBodies.length
@@ -861,20 +861,79 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                   : `Calculating ${previewPending} preview${previewPending === 1 ? '' : 's'} in background…`}
               </p>
             )}
+
+          </div>
+          </>,
+          edit: <div className="panel-section selection-section">
+            {!selectedObject && <p className="selection-hint">Select a shape in the canvas or Objects tab to edit its properties.</p>}
+            <div className="selection-actions">
+              <button type="button" disabled={selectedObjectIds.length === 0} onClick={duplicateSelected} title="Duplicate selected objects (Ctrl/Cmd+D)">Duplicate</button>
+              <button type="button" disabled={!canEditSelection} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>
+            </div>
+            <div className="clipboard-actions" role="group" aria-label="Copy and paste">
+              <button type="button" disabled={selectedObjectIds.length === 0} onClick={copySelected} title="Copy selected shapes and assemblies (Ctrl/Cmd+C)">Copy</button>
+              <button type="button" disabled={!hasCopiedObjects} onClick={pasteCopied} title="Paste copies with a 25 mm offset (Ctrl/Cmd+V)">Paste</button>
+            </div>
+            <ToolGroup id="tools-combine" title="Combine">
+            <HolePatternTools busy={positioning} disabled={!canEditActive || !selectedObject || isHoleObject(selectedObject) || !!selectedObject.hidden}
+              facePlane={!!facePlane} onApply={addHolePattern} />
+            <div className="join-actions combine-actions">
+              <button type="button" disabled={!canJoin} onClick={() => combineSelected('union')} title="Join two or more selected solids, including their selected holes">Join</button>
+              <button type="button" disabled={!canJoin} onClick={() => combineSelected('intersection')} title="Keep only the volume shared by two or more selected solids, then cut their linked holes">Intersect</button>
+              <button type="button" disabled={!canSeparate} onClick={separateSelected} title="Separate the selected combined shapes">Separate</button>
+            </div>
+            <div className="join-actions">
+              <button type="button" disabled={!canGroupCut} onClick={groupCutSelected} title="Group one selected solid with its selected holes">Group</button>
+              <button type="button" disabled={!canUngroupCut} onClick={ungroupCutSelected} title="Reveal the grouped holes linked to the selected solid">Ungroup</button>
+            </div>
+            <p className="selection-hint">Join keeps the union of two or more solids; Intersect keeps their shared volume. Separate restores the source solids.</p>
+            <p className="selection-hint">Group needs one solid and its linked holes selected. It hides the cutters and moves them with the solid. Ungroup reveals them again.</p>
             </ToolGroup>
-          </div>
-          <div className="panel-section">
-            <SavedProjectsPanel revision={libraryRevision} kind="part" canSave={selectedObjects.some((object) => !isHoleObject(object))}
-              onSave={savePart} onUse={useSavedPart} />
-            <SavedProjectsPanel revision={libraryRevision} kind="snapshot" canSave={true} onSave={saveSnapshot} onUse={restoreSnapshot} />
-            <LibraryTransfer onImported={() => setLibraryRevision((value) => value + 1)} />
-          </div>
-          <div className="panel-section">{splitting && <button type="button" onClick={() => splitJobs.cancel()}>Cancel split</button>}<SectionTools error={positionError} busy={positioning} onSplit={() => void splitSelected()} canSplit={canPosition && placementUnits.every((unit) => !isHoleObject(unit.body.anchor))} section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
+            {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}
+            {selectedObject?.type === 'custom' && <CustomShapeTools key={`${selectedObject.id}:${JSON.stringify(selectedObject.parameters)}`}
+              initial={selectedObject.parameters} action="Apply custom parameters" disabled={!canEditActive} onApply={(parameters) => {
+                const updated = changeCustomShape(selectedObject, parameters)
+                commit((current) => ({ ...current, objects: current.objects.map((object) => object.id === updated.id ? updated : object) }))
+              }} />}
+            {selectedObject?.type === 'text'  && <TextTools
+              key={`${selectedObject.id}:${selectedObject.text}:${selectedObject.fontSize}:${selectedObject.fontId}:${selectedObject.dimensions.y}`}
+              initialFont={selectedObject.fontId} initialText={selectedObject.text} initialSize={selectedObject.fontSize} initialHeight={selectedObject.dimensions.y}
+              action="Apply text" disabled={!canEditActive} onApply={(text, size, height, fontId) => {
+                const updated = changeText(selectedObject, text, size, height, fontId)
+                commit((current) => ({ ...current, objects: current.objects.map((object) => object.id === updated.id ? updated : object) }))
+              }} />}
+            {selectedObject && (
+              <ObjectInspector
+                key={selectedObject.id}
+                object={selectedObject}
+                solidTargets={solidTargets}
+                onUpdate={updateObject}
+                onSetCutTarget={setCutTarget}
+                onSetColor={(id, color) => editObjects((current) => colorObjects(current, id, color))}
+                onEditStart={begin}
+                onEditEnd={end}
+                disabled={!canEditActive}
+              />
+            )}
+
+          </div>,
+          objects: <div className="panel-section selection-section">
+            <h3>Objects</h3>
+            <p className="selection-hint">Shift+click to select multiple shapes. Use Edit for properties and combining.</p>
+            <ObjectList objects={objects} selectedIds={selectedObjectIds} onSelect={select} />
+            <div className="visibility-actions" role="group" aria-label="Visibility and locking">
+              <button type="button" disabled={!selectedAssembly.some((object) => !object.hidden)} onClick={() => setHidden(true)}>Hide</button>
+              <button type="button" disabled={!selectedAssembly.some((object) => object.hidden)} onClick={() => setHidden(false)}>Show</button>
+              <button type="button" disabled={!selectedAssembly.some((object) => !object.locked)} onClick={() => setLocked(true)}>Lock</button>
+              <button type="button" disabled={!selectedAssembly.some((object) => object.locked)} onClick={() => setLocked(false)}>Unlock</button>
+            </div>
+          </div>,
+          place: <>
           <div className="panel-section workplane-section">
-            <ToolGroup id="tools-place" title="Place">
+            <h3>Placement tools</h3>
             <ReferenceTools objects={objects} selectedIds={selectedObjectIds} origin={referenceOrigin} onOrigin={setReferenceOrigin}
               disabled={!canPosition} onPosition={(edge, offset) => void positionSelection((current, ids) => positionFromReference(current, ids, edge, referenceOrigin, offset))} />
-            <h3>Workplane</h3>
+            <ToolGroup id="tools-workplane" title="Workplane">
             <button type="button" aria-pressed={pickFace} disabled={positioning}
               onClick={() => { setPickMode(pickFace ? null : 'workplane'); setBoxSelectEnabled(false); setPositionError(null) }}>{pickFace ? 'Cancel face pick' : 'Pick face workplane'}</button>
             {pickFace && <p role="status">Click a solid face in the canvas. Escape cancels.</p>}
@@ -894,12 +953,13 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               title="Rest each selected body's finished bottom on the current workplane">Drop to workplane</button>
             <p className="selection-hint">New shapes rest on the current plane. Picking a face uses its triangle plane, including facets on curved meshes. The plane stays fixed when its source moves.</p>
             <p className="selection-hint">Drop moves each body along the plane normal, carrying its linked holes. The plane extends beyond the face. Height and Reset switch back to a horizontal plane. Snap and inspector coordinates use world axes.</p>
+            </ToolGroup>
             <FaceAlignmentTools disabled={!canPosition || placementUnits.length !== 1 || isHoleObject(placementUnits[0].body.anchor)}
               source={alignmentSource} target={alignmentTarget} picking={pickMode === 'align-source' || pickMode === 'align-target'} error={positionError}
               onStart={() => { setAlignmentSource(null); setAlignmentTarget(null); setPickMode('align-source'); setBoxSelectEnabled(false); setPositionError(null) }}
               onCancel={() => { setAlignmentSource(null); setAlignmentTarget(null); setPickMode(null) }}
               onApply={(offset) => { if (alignmentSource && alignmentTarget) void positionSelection(async (current, ids) => alignPickedFaces(current, ids, alignmentSource, alignmentTarget, offset)) }} />
-            <h3>Drop onto body</h3>
+            <ToolGroup id="tools-drop" title="Drop onto body">
             <label>Target body<select aria-label="Drop target body" value={validDropTarget} onChange={(event) => setDropTarget(event.target.value)}>
               <option value="">Choose a target</option>
               {dropTargets.map((body) => <option key={body.anchor.id} value={body.anchor.id}>{objectLabel(body.anchor, objects)}</option>)}
@@ -907,49 +967,11 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             <button type="button" disabled={!canPosition || !validDropTarget || placementUnits.some((unit) => isHoleObject(unit.body.anchor))}
               onClick={() => void positionSelection((current, ids) => dropOntoBody(current, ids, validDropTarget))}>Drop onto body</button>
             <p className="selection-hint">Move selected solids above the target in X/Z first. Drop places each at first surface contact from above, moving only world Y, with all linked holes. It can raise overlapping bodies. Other bodies are not obstacles.</p>
+            </ToolGroup>
             {positionError && <p className="position-error" role="alert">{positionError}</p>}
             {positioning && <p role="status">Calculating placement…</p>}
-            </ToolGroup>
+
           </div>
-          <div className="panel-section selection-section" id="tools-objects" tabIndex={-1}>
-            <h3>Selection</h3>
-            <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
-              <span className="selection-indicator" aria-hidden="true" />
-              <span>{selectedObjectIds.length > 1
-                ? `${selectedObjectIds.length} objects selected · ${selectedObject ? objectLabel(selectedObject, objects) : 'Shape'} active`
-                : selectedObject ? `${objectLabel(selectedObject, objects)} selected` : 'Nothing selected'}</span>
-            </div>
-            <p className="selection-hint">Shift+click shapes or the list to select more than one. The last selected shape is active; its properties appear below.</p>
-            <ObjectList objects={objects} selectedIds={selectedObjectIds} onSelect={select} />
-            <div className="selection-actions">
-              <button type="button" disabled={selectedObjectIds.length === 0} onClick={duplicateSelected} title="Duplicate selected objects (Ctrl/Cmd+D)">Duplicate</button>
-              <button type="button" disabled={!canEditSelection} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>
-            </div>
-            <div className="clipboard-actions" role="group" aria-label="Copy and paste">
-              <button type="button" disabled={selectedObjectIds.length === 0} onClick={copySelected} title="Copy selected shapes and assemblies (Ctrl/Cmd+C)">Copy</button>
-              <button type="button" disabled={!hasCopiedObjects} onClick={pasteCopied} title="Paste copies with a 25 mm offset (Ctrl/Cmd+V)">Paste</button>
-            </div>
-            <div className="visibility-actions" role="group" aria-label="Visibility and locking">
-              <button type="button" disabled={!selectedAssembly.some((object) => !object.hidden)} onClick={() => setHidden(true)}>Hide</button>
-              <button type="button" disabled={!selectedAssembly.some((object) => object.hidden)} onClick={() => setHidden(false)}>Show</button>
-              <button type="button" disabled={!selectedAssembly.some((object) => !object.locked)} onClick={() => setLocked(true)}>Lock</button>
-              <button type="button" disabled={!selectedAssembly.some((object) => object.locked)} onClick={() => setLocked(false)}>Unlock</button>
-            </div>
-            <ToolGroup id="tools-combine" title="Combine">
-            <HolePatternTools busy={positioning} disabled={!canEditActive || !selectedObject || isHoleObject(selectedObject) || !!selectedObject.hidden}
-              facePlane={!!facePlane} onApply={addHolePattern} />
-            <div className="join-actions combine-actions">
-              <button type="button" disabled={!canJoin} onClick={() => combineSelected('union')} title="Join two or more selected solids, including their selected holes">Join</button>
-              <button type="button" disabled={!canJoin} onClick={() => combineSelected('intersection')} title="Keep only the volume shared by two or more selected solids, then cut their linked holes">Intersect</button>
-              <button type="button" disabled={!canSeparate} onClick={separateSelected} title="Separate the selected combined shapes">Separate</button>
-            </div>
-            <div className="join-actions">
-              <button type="button" disabled={!canGroupCut} onClick={groupCutSelected} title="Group one selected solid with its selected holes">Group</button>
-              <button type="button" disabled={!canUngroupCut} onClick={ungroupCutSelected} title="Reveal the grouped holes linked to the selected solid">Ungroup</button>
-            </div>
-            <p className="selection-hint">Join keeps the union of two or more solids; Intersect keeps their shared volume. Separate restores the source solids.</p>
-            <p className="selection-hint">Group needs one solid and its linked holes selected. It hides the cutters and moves them with the solid. Ungroup reveals them again.</p>
-            </ToolGroup>
             <ToolGroup id="tools-arrange" title="Arrange">
             <div className="align-actions" role="group" aria-label="Mirror selection">
               {(['x', 'y', 'z'] as const).map((axis) => (
@@ -989,53 +1011,26 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
             <p className="selection-hint">Select at least three bodies. The first and last centers on the chosen axis stay fixed. Equal gaps needs enough room between them; centers can overlap.</p>
             </ToolGroup>
-            <div id="tools-inspect" tabIndex={-1}><h3>Inspect</h3></div>
-            {positioning && <p className="selection-hint" role="status">Calculating placement…</p>}
-            {positionError && <p className="position-error" role="alert">{positionError}</p>}
-            {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}
-            {selectedObject?.type === 'custom' && <CustomShapeTools key={`${selectedObject.id}:${JSON.stringify(selectedObject.parameters)}`}
-              initial={selectedObject.parameters} action="Apply custom parameters" disabled={!canEditActive} onApply={(parameters) => {
-                const updated = changeCustomShape(selectedObject, parameters)
-                commit((current) => ({ ...current, objects: current.objects.map((object) => object.id === updated.id ? updated : object) }))
-              }} />}
-            {selectedObject?.type === 'text'  && <TextTools
-              key={`${selectedObject.id}:${selectedObject.text}:${selectedObject.fontSize}:${selectedObject.fontId}:${selectedObject.dimensions.y}`}
-              initialFont={selectedObject.fontId} initialText={selectedObject.text} initialSize={selectedObject.fontSize} initialHeight={selectedObject.dimensions.y}
-              action="Apply text" disabled={!canEditActive} onApply={(text, size, height, fontId) => {
-                const updated = changeText(selectedObject, text, size, height, fontId)
-                commit((current) => ({ ...current, objects: current.objects.map((object) => object.id === updated.id ? updated : object) }))
-              }} />}
-            {selectedObject && (
-              <ObjectInspector
-                key={selectedObject.id}
-                object={selectedObject}
-                solidTargets={solidTargets}
-                onUpdate={updateObject}
-                onSetCutTarget={setCutTarget}
-                onSetColor={(id, color) => editObjects((current) => colorObjects(current, id, color))}
-                onEditStart={begin}
-                onEditEnd={end}
-                disabled={!canEditActive}
-              />
-            )}
-          </div>
+          </>,
+          inspect: <>
+          <div className="panel-section">{splitting && <button type="button" onClick={() => splitJobs.cancel()}>Cancel split</button>}<SectionTools error={positionError} busy={positioning} onSplit={() => void splitSelected()} canSplit={canPosition && placementUnits.every((unit) => !isHoleObject(unit.body.anchor))} section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
           <div className="panel-section controls-section">
             <PointMeasurementTools error={positionError} points={measurementPoints} picking={pickMode === 'measure-first' || pickMode === 'measure-second'}
               onStart={() => { setMeasurementPoints([]); setPickMode('measure-first'); setBoxSelectEnabled(false); setPositionError(null) }}
               onClear={() => { setMeasurementPoints([]); setPickMode(null) }} />
             <MeasurementPanel objects={objects} selectedObjectIds={selectedObjectIds} activeObjectId={selectedObjectId} />
           </div>
-          <div className="panel-section controls-section">
-            <h3>Camera controls</h3>
-            <div className="control-row"><span>Orbit</span><kbd>Drag</kbd></div>
-            <div className="control-row"><span>Zoom</span><kbd>Scroll</kbd></div>
-            <div className="control-row"><span>Pan</span><kbd>Right drag</kbd></div>
-            <div className="control-row"><span>Nudge X / Z</span><kbd>Arrow keys</kbd></div>
-            <div className="control-row"><span>Nudge Y</span><kbd>Page Up / Down</kbd></div>
-            <p className="selection-hint">Shift moves 10 grid spaces. Snap uses the selected grid size; free movement uses 1 mm.</p>
+            <button type="button" onClick={() => setShowShortcuts(true)}>Keyboard and mouse shortcuts</button>
+          </>,
+          library: <>
+          <div className="panel-section">
+            <SavedProjectsPanel revision={libraryRevision} kind="part" canSave={selectedObjects.some((object) => !isHoleObject(object))}
+              onSave={savePart} onUse={useSavedPart} />
+            <SavedProjectsPanel revision={libraryRevision} kind="snapshot" canSave={true} onSave={saveSnapshot} onUse={restoreSnapshot} />
+            <LibraryTransfer onImported={() => setLibraryRevision((value) => value + 1)} />
           </div>
-          <div className="panel-note"><span className="note-icon" aria-hidden="true">i</span><p>Ctrl/Cmd+Z undoes · Ctrl/Cmd+Shift+Z redoes</p></div>
-        </aside>
+          </>,
+        }} />
       </main>
     </div>
   )

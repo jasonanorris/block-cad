@@ -2,7 +2,7 @@
 
 ## Start with an example
 
-Open **Shapes → Example projects**, choose the nameplate, section demo, or eight-hole flange, and click **Load example**. Loading an example replaces the model; **Undo** restores your previous work. All example shapes remain editable.
+Open **Create → Example projects**, choose the nameplate, section demo, or eight-hole flange, and click **Load example**. Loading an example replaces the model; **Undo** restores your previous work. All example shapes remain editable.
 
 ## Build a model
 
@@ -15,7 +15,18 @@ Open **Shapes → Example projects**, choose the nameplate, section demo, or eig
 
 ## Find tools
 
-Use the sidebar's **Shapes**, **Place**, **Objects**, **Combine**, **Arrange**, and **Inspect** buttons to jump to a tool group. Shapes, Place, Combine, and Arrange collapse with their headings. Objects and common selection actions stay visible; on desktop the canvas stays alongside the tools as you scroll.
+The right sidebar shows one tool tab at a time:
+
+| Tab | Tools |
+| --- | --- |
+| Create | Basic shapes, text, custom shapes, imports, examples |
+| Edit | Selected shape properties, duplicate/delete, copy/paste, Combine, hole patterns |
+| Objects | Object list, search, selection, hide/show, lock/unlock |
+| Place | Reference origin, workplanes, face alignment, dropping, Arrange (mirror, resize, arrays, align, distribute) |
+| Inspect | Section view/splitting, measurements, shortcut help |
+| Library | Parts, snapshots, library backups |
+
+The selection summary and **Edit selection** shortcut stay above the tabs. Switching tabs preserves unfinished inputs, expanded groups, selection, and each tab's scroll position. It does not add an Undo step. On desktop the active panel scrolls beneath the tabs; narrow screens keep the sidebar below the canvas. Focus the tabs and use Left/Right arrows or Home/End to switch with the keyboard.
 
 The object list shows up to 50 rows per page. Use **Previous objects**, **Next objects**, search, and filters to find shapes. **Show selected page** jumps to a selected row that is visible under the current filters and expanded assemblies.
 
@@ -31,13 +42,13 @@ Reference origins and workplanes are workspace aids: changing them does not move
 
 ## Reuse custom shapes
 
-Open **Shapes → Custom shapes** and choose Tube, Rounded box, or L bracket. Set the dimensions, wall thickness, or corner radius, then **Add custom shape**. The shape starts on the current workplane. Select it and use **Edit custom shape → Apply custom parameters** to revise it in one Undo step while retaining its center, rotation, scale, color, and links. Parameter dimensions describe the unscaled source; inspector resizing applies scale afterward.
+Open **Create → Custom shapes** and choose Tube, Rounded box, or L bracket. Set the dimensions, wall thickness, or corner radius, then **Add custom shape**. The shape starts on the current workplane. Select it and use **Edit custom shape → Apply custom parameters** to revise it in one Undo step while retaining its center, rotation, scale, color, and links. Parameter dimensions describe the unscaled source; inspector resizing applies scale afterward.
 
 Tubes have a concentric opening. Rounded boxes round the four vertical corners, with flat tops and bottoms; this is not a general edge fillet tool. L brackets have a horizontal base and an upright leg with uniform wall thickness. Save a custom shape to **Parts library** for reuse; inserted copies retain editable parameters. Parameter dimensions accept 0.01–1,000 mm (corner radius can be zero). Wall thickness and radius must fit the shape.
 
 ## Drill hole patterns
 
-Select a visible, unlocked solid or joined body. Open **Combine → Hole patterns**, choose Row, Grid, or Bolt circle, and set hole diameter, depth, counts, spacing, and offsets. **Add hole pattern** adds up to 200 linked cylinder cutters in one Undo step. Each cutter stays editable in the object list and is grouped with its target.
+Select a visible, unlocked solid or joined body. Open **Edit → Combine → Hole patterns**, choose Row, Grid, or Bolt circle, and set hole diameter, depth, counts, spacing, and offsets. **Add hole pattern** adds up to 200 linked cylinder cutters in one Undo step. Each cutter stays editable in the object list and is grouped with its target.
 
 With a face workplane active, the pattern starts at its picked origin and cuts inward along its normal. Otherwise the pattern is centered above the target's finished bounds and cuts down from its highest Y. Spacing and offsets use the pattern plane's X/Z axes; the bolt-circle angle runs from +X toward +Z. Depth is measured inward from that plane. A 0.02 mm extension above the plane avoids a coincident entry surface. Holes outside the solid do not cut it; inspect the result. For through holes, choose sufficient depth to exit the body. Pattern settings generate individual editable cutters; there is no persistent pattern constraint.
 
@@ -49,7 +60,7 @@ Faces use the clicked mesh triangle planes, including facets on curved surfaces.
 
 ## Measure two points
 
-Open **Point-to-point measurement** near the existing Measurements panel and choose **Measure two points**. Click two visible finished-solid surfaces. Markers and a line show the picks; the readout reports straight-line distance and signed world X/Y/Z differences (second minus first), rounded to 0.001 mm. Camera views can help you pick precisely. There is no vertex snapping or automatic nearest-surface measurement. Measurements do not change the model or Undo history, clear after model edits, and are not saved/exported. Escape cancels picking; **Clear point measurement** removes the result.
+Open **Inspect → Point-to-point measurement** and choose **Measure two points**. Click two visible finished-solid surfaces. Markers and a line show the picks; the readout reports straight-line distance and signed world X/Y/Z differences (second minus first), rounded to 0.001 mm. Camera views can help you pick precisely. There is no vertex snapping or automatic nearest-surface measurement. Measurements do not change the model or Undo history, clear after model edits, and are not saved/exported. Escape cancels picking; **Clear point measurement** removes the result.
 
 Surface picking skips cutter wireframes, pending Boolean source previews, hidden shapes, and clipped-away surfaces. Workplane, alignment, measurement, and box-selection modes are mutually exclusive.
 
@@ -59,17 +70,17 @@ Open **Text shape**, enter wording, font size and extrusion, then **Add text**. 
 
 ## Inspect interiors
 
-Enable **Section view** and choose an axis and plane position. Flip side changes the visible half. It is an uncapped visual cutaway: measurements and exports still use the entire model. Disable it to see the whole model again. The section-demo example has an enclosed cavity visible around Y=15 mm.
+Open **Inspect → Section view** and choose an axis and plane position. Flip side changes the visible half. It is an uncapped visual cutaway: measurements and exports still use the entire model. Disable it to see the whole model again. The section-demo example has an enclosed cavity visible around Y=15 mm.
 
 ## Split a solid
 
-Select a solid or joined assembly and open **Section view**. Enable the section, choose X/Y/Z, and enter a position through the model. **Split selected at section** replaces each selected finished body with two closed mesh solids, keeping their world positions and display color. The section preview turns off so both halves are visible. Select a half and move it to inspect the capped surface.
+Select a solid or joined assembly and open **Inspect → Section view**. Enable the section, choose X/Y/Z, and enter a position through the model. **Split selected at section** replaces each selected finished body with two closed mesh solids, keeping their world positions and display color. The section preview turns off so both halves are visible. Select a half and move it to inspect the capped surface.
 
 Split bakes the joins, holes, text, and primitive parameters into mesh geometry. The resulting pieces can be transformed, cut, joined, saved, and exported. **Undo** restores the original editable sources and selection in one step. All selected bodies must have material on both sides of the plane, and their linked shapes must be visible/unlocked; otherwise the whole action is rejected. Flip side only affects the preview, not which halves are kept.
 
 ## Background calculations
 
-Boolean previews calculate in a background worker. Unchanged bodies retain their meshes, while changed bodies show source geometry until the latest preview arrives. Progress appears under Shapes. Edits made during a calculation supersede its result; New/empty models cancel pending preview work. If a worker fails or a calculation exceeds 30 seconds, use **Retry previews** in the error message. Measurements, reference bounds, splitting, export checks, and exports use separate background workers with a 60-second limit. Use the pending operation’s Cancel button to stop it; cancellation leaves the model intact and prevents a download. Retry measurements/checks after cancellation or failure. Changing the model invalidates old results. Placement and import validation still calculate on the main thread and can pause editing for complex models.
+Boolean previews calculate in a background worker. Unchanged bodies retain their meshes, while changed bodies show source geometry until the latest preview arrives. Progress appears in Create. Edits made during a calculation supersede its result; New/empty models cancel pending preview work. If a worker fails or a calculation exceeds 30 seconds, use **Retry previews** in the error message. Measurements, reference bounds, splitting, export checks, and exports use separate background workers with a 60-second limit. Use the pending operation’s Cancel button to stop it; cancellation leaves the model intact and prevents a download. Retry measurements/checks after cancellation or failure. Changing the model invalidates old results. Placement and import validation still calculate on the main thread and can pause editing for complex models.
 
 ## Save your work
 
