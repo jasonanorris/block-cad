@@ -144,7 +144,7 @@ Open **Section view**, enable it, choose X/Y/Z, and move the plane with **Positi
 
 ### 63 — Geometry reuse and idle rendering
 
-Boolean previews now reuse unchanged bodies. Editing a cutter rebuilds its affected body; names, colors, visibility, and locking do not trigger Boolean rebuilds. Replaced/removed geometries are disposed, and errors in one body no longer remove unrelated valid previews. Finished measurement/placement bounds share a bounded 128-entry cache with independent result boxes. Object rows and meshes skip unrelated React updates. The canvas renders on demand, with explicit camera/gizmo invalidation, so it stops drawing when idle. Geometry calculations still run on the main thread; complex individual Boolean operations can still pause editing.
+Boolean previews now reuse unchanged bodies. Editing a cutter rebuilds its affected body; names, colors, visibility, and locking do not trigger Boolean rebuilds. Replaced/removed geometries are disposed, and errors in one body no longer remove unrelated valid previews. Finished measurement/placement bounds share a bounded 128-entry cache with independent result boxes. Object rows and meshes skip unrelated React updates. The canvas renders on demand, with explicit camera/gizmo invalidation, so it stops drawing when idle. Milestones 71 and 77 move previews and several geometry operations into workers; placement and import validation can still pause editing.
 
 ### 64 — Release preparation
 
@@ -176,7 +176,7 @@ Text creation and editing now offer **Helvetiker Regular**, **Helvetiker Bold**,
 
 ### 71 — Background Boolean previews
 
-A dedicated worker now calculates Boolean previews and transfers mesh arrays back to the renderer. The main thread reuses unchanged meshes, coalesces intermediate edits to the latest desired body, and rejects obsolete replies. Changed bodies temporarily show source shapes; unaffected finished previews remain visible. Only one request runs at a time, avoiding a backlog of redundant work. Empty/New scenes terminate outstanding preview work. Body errors preserve unaffected previews; worker startup/crash/30-second timeout errors offer **Retry previews**. Replaced and removed meshes are disposed. This worker covers previews; measurements, placement, split, import validation, and exports still run on the main thread. Production output includes the worker bundle and Manifold WASM asset.
+A dedicated worker now calculates Boolean previews and transfers mesh arrays back to the renderer. The main thread reuses unchanged meshes, coalesces intermediate edits to the latest desired body, and rejects obsolete replies. Changed bodies temporarily show source shapes; unaffected finished previews remain visible. Only one request runs at a time, avoiding a backlog of redundant work. Empty/New scenes terminate outstanding preview work. Body errors preserve unaffected previews; worker startup/crash/30-second timeout errors offer **Retry previews**. Replaced and removed meshes are disposed. This worker covers previews; milestone 77 adds separate workers for measurements, reference bounds, splitting, export review, and exports. Production output includes the worker bundle and Manifold WASM asset.
 
 ### 72 — Portable library backups
 
@@ -197,3 +197,19 @@ Select one body and use **Place → Align faces** to pick its moving face and a 
 ### 76 — Point-to-point measurement
 
 **Point-to-point measurement → Measure two points** lets you click two visible finished-solid surfaces. Markers and a line show the selected points; the panel reports Euclidean distance and signed world-axis differences (second minus first), rounded to 0.001 mm. Measurements are workspace aids: they do not modify geometry or Undo, are not saved/exported, and clear after model edits. Escape cancels and Clear removes the result. Picking skips cutters, source overlays, hidden/pending bodies, and clipped-away surfaces. There is no vertex snapping or minimum-clearance calculation. Workplane picking, face alignment, measurement, and box selection share exclusive interaction modes.
+
+### 77 — Cancellable background geometry
+
+Measurements, reference bounds, splitting, export checks, and STL/3MF generation now run in reusable workers. Pending operations offer cancellation, which terminates the worker, and failed checks/readouts can be retried. Obsolete replies cannot change the model or download an outdated export. Splits remain atomic and undoable. Each job has a 60-second timeout; preview workers retain their separate 30-second limit. Placement and import validation still run on the main thread.
+
+### 78 — Larger project handling
+
+Project format 18 stores identical imported/baked STL data once in a shared mesh table while retaining independently editable instances. Formats 1–17 still load. The object list shows at most 50 rows per page, with search, Previous/Next, and Show selected page. Assembly labels and filtering reuse lookup tables, and history compares shared model data without serializing the whole scene. `npm run benchmark:large` checks repeated-mesh storage and a 5,000-object list. Its 200-copy fixture is 98.6% smaller than the previous file representation; this is not a general memory or geometry-speed guarantee.
+
+### 79 — Printability review
+
+Export review checks disconnected regions, a configurable print volume, small source dimensions/custom walls, and narrow connected-region bounds. The default volume is 220 × 250 × 220 mm in X/Y/Z, centered on X/Z with its floor at Y=0. Apply settings to rerun checks; a zero feature threshold disables small-feature warnings. Settings reset when opening a new review. Warnings allow downloading, while geometry errors block it. These are heuristic checks, not a measurement of wall thickness after cuts, bridges, overhangs, or clearance.
+
+### 80 — Publishing (deferred)
+
+Keep the application local for now, as requested. No hosting destination or public deployment is configured. Launch it with `npm run dev` and open the URL printed by Vite.

@@ -1,6 +1,6 @@
 # Local release checks
 
-This is a local browser CAD prototype. Release preparation does not deploy or publish it.
+This is a local browser CAD prototype. Publishing (milestone 80) is deferred by user request. Release preparation does not deploy or publish it.
 
 ## Automated checks
 
@@ -9,12 +9,15 @@ npm install
 npm test
 npm run build
 npm run benchmark
+npm run benchmark:large
 npm run preview -- --host 127.0.0.1 --port 4175
 ```
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews use a worker with separate scheduling tests; measurements and export calculations still run on the main thread.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 111 tests.
+
+`npm run benchmark:large` verifies shared-mesh storage for 200 repeated sphere meshes and bounded object rows for 5,000 objects. Timings are informational; storage deduplication and the 50-row page limit are assertions.
 
 `npm run samples` regenerates the three bundled examples from source; tests load them, validate their projects, and export STL/3MF.
 
@@ -43,6 +46,12 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Physically pick a moving face and target face, align with an offset, and Undo/Redo. Confirm the target stays fixed and all linked cutters move rigidly. Selection/model changes must clear pending picks.
 - Pick two surface points, check the line and signed X/Y/Z differences, then cancel with Escape. Measurement must leave Save output/Undo unchanged and clear after a model edit. Verify switching to workplane and box-selection modes.
 
+- Load more than 50 objects; navigate pages, search, filter assemblies, and use Show selected page. Verify selection survives paging.
+- Save/load repeated STL copies in format 18 and load an older inline-mesh file. Check independent transforms and a shared mesh table, including projects embedded in library backups.
+- Cancel and retry measurements/reference bounds and export checks. Cancel a split/export while pending; no partial model changes or downloads may occur. Complete a split and Undo/Redo it.
+- In production preview, verify the geometry-task worker and WASM load for measurement, split, export review, STL, and 3MF. Closing export review must cancel pending work.
+- Review a disconnected model, a body outside the print volume, and small walls/holes. Change volume/threshold, apply settings, and verify updated warnings. Zero threshold disables feature warnings; warnings do not block valid downloads.
+
 ## Known limits
 
 - Custom shapes are three built-in parameterized generators. Rounded boxes only round vertical corners; this is not general edge filleting.
@@ -59,7 +68,8 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - STL has no unit metadata; this app treats coordinates as millimeters.
 - Geometry exports do not include display colors.
 - Local storage is specific to the browser and site address.
-- Previews run in a worker, with a 30-second timeout per body; other geometry calculations and the large initial bundle remain performance limits.
+- Previews have a 30-second timeout per body; measurement/reference/split/export jobs have a 60-second timeout. Placement, import validation, worker input copying, and the large initial bundle remain performance limits.
+- Print-feature checks are heuristics over source dimensions/custom walls and connected-region bounds, not post-cut wall-thickness, overhang, bridge, or clearance analysis. Print settings reset for each export review.
 - Split results are baked meshes. Undo restores editable sources; each half has the existing 100,000-triangle limit.
 - Library backups are limited to 50 MB / 250 entries / 10,000 source shapes and exclude autosave and the currently open unsaved model.
 

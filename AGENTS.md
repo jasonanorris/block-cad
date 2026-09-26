@@ -41,13 +41,16 @@ npm test
 # preview-cache benchmark
 npm run benchmark
 
+# repeated-mesh storage and large object-list benchmark
+npm run benchmark:large
+
 # regenerate bundled example projects
 npm run samples
 ```
 
 ## Geometry and browser checks
 
-Boolean previews use `src/booleanPreview.worker.ts`, scheduled by `BackgroundPreview.ts`. Keep one request in flight, discard obsolete results, and dispose replaced meshes. Other geometry operations still run on the main thread. Production smoke checks must load the worker JS and Manifold WASM through Vite preview.
+Boolean previews use `src/booleanPreview.worker.ts`, scheduled by `BackgroundPreview.ts`. Keep one request in flight, discard obsolete results, and dispose replaced meshes. Measurements, reference bounds, split, export review, and STL/3MF generation use `geometryTask.worker.ts` via `GeometryJobs.ts`. Cancellation terminates active workers; reject stale results and keep split commits atomic. These jobs have a 60-second timeout. Placement and import validation still run on the main thread. Production smoke checks must load the worker JS and Manifold WASM through Vite preview.
 
 Browser-only storage regression helpers (run with Vite, from the browser console):
 
@@ -56,11 +59,11 @@ Browser-only storage regression helpers (run with Vite, from the browser console
 (await import('/tests/browser-library-transfer.mjs')).runTransferChecks()
 ```
 
-Both helpers remove the temporary entries they create. Project format 17 adds validated custom-shape parameters and reads earlier versions (font IDs were added in 16). Custom geometry must agree between source meshes and Manifold. Surface tools share the finished-surface picker and must invalidate picks when the model changes. Library backup format 1 embeds validated project files and imports additively in one IndexedDB transaction.
+Both helpers remove the temporary entries they create. Project format 18 deduplicates STL payloads using a mesh table and reads formats 1–17. Resolve references and validate shared payloads before creating runtime objects. Custom-shape parameters were added in 17 and font IDs in 16. Custom geometry must agree between source meshes and Manifold. Surface tools share the finished-surface picker and must invalidate picks when the model changes. Library backup format 1 embeds validated project files and imports additively in one IndexedDB transaction.
 
 ## Deployment
 
-Deployment target: TBD
+Publishing is deferred by user request; keep the app local. Deployment target: TBD.
 
 Possible targets:
 

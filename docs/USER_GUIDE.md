@@ -17,6 +17,8 @@ Open **Shapes → Example projects**, choose the nameplate, section demo, or eig
 
 Use the sidebar's **Shapes**, **Place**, **Objects**, **Combine**, **Arrange**, and **Inspect** buttons to jump to a tool group. Shapes, Place, Combine, and Arrange collapse with their headings. Objects and common selection actions stay visible; on desktop the canvas stays alongside the tools as you scroll.
 
+The object list shows up to 50 rows per page. Use **Previous objects**, **Next objects**, search, and filters to find shapes. **Show selected page** jumps to a selected row that is visible under the current filters and expanded assemblies.
+
 ## Position precisely
 
 - **Place → Ruler / reference origin:** enter origin coordinates and choose **Set reference origin**, or choose **Origin at selection**. Select Minimum, Center, or Maximum of the finished selection bounds. The three offsets show its position relative to that origin. Edit the offsets and **Apply reference position** to translate the selection together. A colored axis marker shows the origin. Coordinates are in world X/Y/Z; readouts round to 0.001 mm.
@@ -65,9 +67,9 @@ Select a solid or joined assembly and open **Section view**. Enable the section,
 
 Split bakes the joins, holes, text, and primitive parameters into mesh geometry. The resulting pieces can be transformed, cut, joined, saved, and exported. **Undo** restores the original editable sources and selection in one step. All selected bodies must have material on both sides of the plane, and their linked shapes must be visible/unlocked; otherwise the whole action is rejected. Flip side only affects the preview, not which halves are kept.
 
-## Background previews
+## Background calculations
 
-Boolean previews calculate in a background worker. Unchanged bodies retain their meshes, while changed bodies show source geometry until the latest preview arrives. Progress appears under Shapes. Edits made during a calculation supersede its result; New/empty models cancel pending preview work. If a worker fails or a calculation exceeds 30 seconds, use **Retry previews** in the error message. Measurements, placement, splitting, imports, and exports still calculate on the main thread and can pause editing for complex models.
+Boolean previews calculate in a background worker. Unchanged bodies retain their meshes, while changed bodies show source geometry until the latest preview arrives. Progress appears under Shapes. Edits made during a calculation supersede its result; New/empty models cancel pending preview work. If a worker fails or a calculation exceeds 30 seconds, use **Retry previews** in the error message. Measurements, reference bounds, splitting, export checks, and exports use separate background workers with a 60-second limit. Use the pending operation’s Cancel button to stop it; cancellation leaves the model intact and prevents a download. Retry measurements/checks after cancellation or failure. Changing the model invalidates old results. Placement and import validation still calculate on the main thread and can pause editing for complex models.
 
 ## Save your work
 
@@ -78,10 +80,14 @@ Boolean previews calculate in a background worker. Unchanged bodies retain their
 
 Open **Library backup / transfer → Export library backup** to download all saved parts and snapshots in one file. Import it on another browser/site with **Import library backup**. Import validates the whole file, then adds every entry in one transaction using fresh storage IDs. Existing entries and the open model stay unchanged; repeated imports create duplicates. Names, dates, fonts, colors, assemblies, and empty snapshots are preserved. Limits are 50 MB, 250 saved items, and 10,000 source shapes per file. Failed imports add nothing. Library import is separate from model Undo.
 
+Project format 18 stores repeated STL meshes once while preserving each copy’s transform and properties. Older project files still load.
+
 Local parts, snapshots, and autosave do not synchronize automatically across browsers or addresses. Clearing browser storage removes them. Keep downloaded project files as backups.
 
 ## Export for printing
 
-Choose **All bodies** or **Selection**, then Export STL or Export 3MF. Review dimensions, empty bodies, and disconnected regions before downloading. A selected joined member exports the entire joined assembly and its cuts. Hidden shapes are included. Model colors are not currently exported. These checks do not measure wall thickness, overhangs, or printer fit.
+Choose **All bodies** or **Selection**, then Export STL or Export 3MF. Review dimensions, empty bodies, and disconnected regions before downloading. A selected joined member exports the entire joined assembly and its cuts. Hidden shapes are included. Model colors are not currently exported. Open **Print volume and feature checks** to set printer dimensions and a small-feature threshold, then **Apply print settings**. The volume is centered on world X/Z and extends upward from Y=0; moving a body outside that volume produces a warning. Defaults are X=220, Y=250, Z=220 mm and a 0.8 mm feature threshold. Settings reset for each new export review.
+
+Small-feature warnings inspect source dimensions, custom walls, and narrow connected-region bounds. They do not measure wall thickness after cuts, bridges, overhangs, or minimum clearance. A threshold of 0 disables these warnings. Disconnected-region, volume, and feature warnings allow export; geometry errors block downloading. Use **Cancel checks** or **Cancel export** to stop pending work.
 
 Press **?** for the keyboard and mouse guide. Undo/Redo covers model edits; camera, filters, clipping, and library management are separate preferences/actions.
