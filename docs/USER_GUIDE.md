@@ -27,6 +27,30 @@ Placement carries every linked hole and is one Undo step. Hidden or locked selec
 
 Reference origins and workplanes are workspace aids: changing them does not move the model or add an Undo step, and they are not saved/exported. New, Load, and examples reset them. A face workplane stays fixed if its source is moved or deleted, and extends beyond the face. Curved meshes supply their picked triangle's plane. Picking skips cutters and clipped-away surfaces; an open section has no pickable cap. Snapping, gizmos, and inspector coordinates continue to use world axes.
 
+## Reuse custom shapes
+
+Open **Shapes → Custom shapes** and choose Tube, Rounded box, or L bracket. Set the dimensions, wall thickness, or corner radius, then **Add custom shape**. The shape starts on the current workplane. Select it and use **Edit custom shape → Apply custom parameters** to revise it in one Undo step while retaining its center, rotation, scale, color, and links. Parameter dimensions describe the unscaled source; inspector resizing applies scale afterward.
+
+Tubes have a concentric opening. Rounded boxes round the four vertical corners, with flat tops and bottoms; this is not a general edge fillet tool. L brackets have a horizontal base and an upright leg with uniform wall thickness. Save a custom shape to **Parts library** for reuse; inserted copies retain editable parameters. Parameter dimensions accept 0.01–1,000 mm (corner radius can be zero). Wall thickness and radius must fit the shape.
+
+## Drill hole patterns
+
+Select a visible, unlocked solid or joined body. Open **Combine → Hole patterns**, choose Row, Grid, or Bolt circle, and set hole diameter, depth, counts, spacing, and offsets. **Add hole pattern** adds up to 200 linked cylinder cutters in one Undo step. Each cutter stays editable in the object list and is grouped with its target.
+
+With a face workplane active, the pattern starts at its picked origin and cuts inward along its normal. Otherwise the pattern is centered above the target's finished bounds and cuts down from its highest Y. Spacing and offsets use the pattern plane's X/Z axes; the bolt-circle angle runs from +X toward +Z. Depth is measured inward from that plane. A 0.02 mm extension above the plane avoids a coincident entry surface. Holes outside the solid do not cut it; inspect the result. For through holes, choose sufficient depth to exit the body. Pattern settings generate individual editable cutters; there is no persistent pattern constraint.
+
+## Align two faces
+
+Select one moving solid assembly, then open **Place → Align faces → Pick alignment faces**. Click its moving face, then a face on a separate target body. Set **Face offset** and **Apply face alignment**. The picked points align, and the outward normals face each other. A positive offset leaves a gap along the target normal; negative offsets overlap. Every joined member and linked cutter moves and rotates together. The target stays fixed and may be locked. Undo restores the complete move.
+
+Faces use the clicked mesh triangle planes, including facets on curved surfaces. Alignment uses the smallest normal rotation without an additional twist control and does not check other collisions. Hidden/locked moving dependencies are rejected. Model or selection changes clear the picked faces; Escape cancels picking.
+
+## Measure two points
+
+Open **Point-to-point measurement** near the existing Measurements panel and choose **Measure two points**. Click two visible finished-solid surfaces. Markers and a line show the picks; the readout reports straight-line distance and signed world X/Y/Z differences (second minus first), rounded to 0.001 mm. Camera views can help you pick precisely. There is no vertex snapping or automatic nearest-surface measurement. Measurements do not change the model or Undo history, clear after model edits, and are not saved/exported. Escape cancels picking; **Clear point measurement** removes the result.
+
+Surface picking skips cutter wireframes, pending Boolean source previews, hidden shapes, and clipped-away surfaces. Workplane, alignment, measurement, and box-selection modes are mutually exclusive.
+
 ## Make lettering
 
 Open **Text shape**, enter wording, font size and extrusion, then **Add text**. The lettering lies flat on the current workplane and is one object. To engrave, select Hole and its target, then lower the lettering into the surface. To emboss, overlap a small part of its depth with the base and Join. **Edit text → Apply text** updates the wording while retaining placement and links. Changing wording can change its footprint; recheck placement afterward. Choose Helvetiker Regular, Helvetiker Bold, or Optimer Regular in the Font selector. Font changes preserve placement and links but can change the footprint. Fonts are bundled for offline use; unsupported characters are reported. Existing lettering from older projects uses Helvetiker Regular when edited.

@@ -11,6 +11,8 @@ import type { FrameRequest } from './frameCamera'
 import { expandAssemblyIds } from './selectionOperations'
 import BoxSelection from './BoxSelection'
 import FacePicker from './FacePicker'
+import PointMeasurementOverlay from './PointMeasurementOverlay'
+import type { SurfacePick } from './surfaceTools'
 import type { WorkplaneFrame } from './workplane'
 import type { ScreenRectangle } from './boxSelection'
 
@@ -37,7 +39,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
 }) {
   const sourceGeometry = useMemo(() => createSourceGeometry(object), [object.type, object.dimensions,
     object.type === 'svg' || object.type === 'text' ? object.contours : null, object.type === 'stl' ? object.meshData : null,
-    object.type === 'prism' ? object.sides : null])
+    object.type === 'prism' ? object.sides : null, object.type === 'custom' ? object.parameters : null])
   useEffect(() => () => sourceGeometry.dispose(), [sourceGeometry])
   if (object.hidden) return null
   const { position, rotation, scale } = object
@@ -104,7 +106,7 @@ function CadScene({
   booleanGeometries,
   section,
   referenceOrigin,
-  facePlane, pickFace, onPickFace, onExitFace, onFaceError,
+  measurementPoints, facePlane, pickFace, onPickFace, onExitFace, onFaceError,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean>; onRectangle: (rectangle: ScreenRectangle | null) => void }) {
   const onSelectMesh = useCallback((id: string, additive: boolean) => {
     if (!pickFace && !gizmoInteractionRef.current) onSelectObject(id, additive)
@@ -163,6 +165,7 @@ function CadScene({
         onTransformStart={onTransformStart}
         onTransformEnd={onTransformEnd}
       />
+      <PointMeasurementOverlay points={measurementPoints} />
       <FacePicker enabled={pickFace} onPick={onPickFace} onExit={onExitFace} onError={onFaceError} />
       <BoxSelection enabled={boxSelectEnabled} onSelect={onSelectMany} onExit={onExitBoxSelect} onRectangle={onRectangle} />
     </>
@@ -170,9 +173,10 @@ function CadScene({
 }
 
 type WorkspaceProps = {
+  measurementPoints: Vector3[]
   facePlane: WorkplaneFrame | null
   pickFace: boolean
-  onPickFace: (frame: WorkplaneFrame) => void
+  onPickFace: (pick: SurfacePick) => void
   onExitFace: () => void
   onFaceError: (message: string) => void
   referenceOrigin: Vector3

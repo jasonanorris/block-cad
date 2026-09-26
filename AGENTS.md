@@ -56,7 +56,7 @@ Browser-only storage regression helpers (run with Vite, from the browser console
 (await import('/tests/browser-library-transfer.mjs')).runTransferChecks()
 ```
 
-Both helpers remove the temporary entries they create. Project format 16 adds text font IDs and reads earlier versions. Library backup format 1 embeds validated project files and imports additively in one IndexedDB transaction.
+Both helpers remove the temporary entries they create. Project format 17 adds validated custom-shape parameters and reads earlier versions (font IDs were added in 16). Custom geometry must agree between source meshes and Manifold. Surface tools share the finished-surface picker and must invalidate picks when the model changes. Library backup format 1 embeds validated project files and imports additively in one IndexedDB transaction.
 
 ## Deployment
 

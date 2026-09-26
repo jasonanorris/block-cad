@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Matrix3, Mesh, Raycaster, Vector2 } from 'three'
-import { faceWorkplane, type WorkplaneFrame } from './workplane'
+import type { SurfacePick } from './surfaceTools'
 
 export default function FacePicker({ enabled, onPick, onExit, onError }: {
-  enabled: boolean; onPick: (frame: WorkplaneFrame) => void; onExit: () => void; onError: (message: string) => void
+  enabled: boolean; onPick: (pick: SurfacePick) => void; onExit: () => void; onError: (message: string) => void
 }) {
   const { camera, scene, gl } = useThree()
   useEffect(() => {
@@ -23,7 +23,7 @@ export default function FacePicker({ enabled, onPick, onExit, onError }: {
       const hit = ray.intersectObjects(meshes, false)[0]
       if (!hit?.face) { onError('Click a visible finished solid face. Cutters and section openings cannot be picked.'); return }
       const normal = hit.face.normal.clone().applyMatrix3(new Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize()
-      onPick(faceWorkplane(hit.point, normal))
+      onPick({ objectId: String(hit.object.userData.cadObjectId), point: { x: hit.point.x, y: hit.point.y, z: hit.point.z }, normal: { x: normal.x, y: normal.y, z: normal.z } })
     }
     const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { stop(event); onExit() } }
     canvas.addEventListener('pointerdown', stop, true)

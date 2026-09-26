@@ -38,8 +38,17 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Check the production preview worker JS and WASM load successfully. Change one cutter rapidly; only its newest result may appear. Color/name edits should not trigger new work. New must cancel outstanding work, and a worker error must offer Retry previews.
 - Export/import a library backup, including an empty snapshot and joined part. Reimport adds fresh entries without overwrites. Malformed input and quota failures must add no partial entries. Run `(await import('/tests/browser-library-transfer.mjs')).runTransferChecks()` with Vite for automated IndexedDB checks; it deletes its own temporary entries.
 
+- Create, edit, Save/Load, copy, and library-insert all three custom shapes. Check unchanged exterior dimensions with a tube wall edit, bracket orientation, rounded-box radius limits, and preserved parameters after Undo/Redo. Verify Boolean worker and STL/3MF output for a cut custom body.
+- Add row, grid, and bolt-circle hole patterns to a joined target. Check offsets, blind depth, side-face workplanes, editable cutter links, locked target rejection, and a single Undo step for the whole pattern.
+- Physically pick a moving face and target face, align with an offset, and Undo/Redo. Confirm the target stays fixed and all linked cutters move rigidly. Selection/model changes must clear pending picks.
+- Pick two surface points, check the line and signed X/Y/Z differences, then cancel with Escape. Measurement must leave Save output/Undo unchanged and clear after a model edit. Verify switching to workplane and box-selection modes.
+
 ## Known limits
 
+- Custom shapes are three built-in parameterized generators. Rounded boxes only round vertical corners; this is not general edge filleting.
+- Hole patterns generate separate cutters, with no persistent pattern constraint or automatic through-depth calculation.
+- Face alignment uses picked triangle normals and points, without collision checking or additional twist control.
+- Point measurement uses clicked surface points, without vertex snapping; it is not minimum body-to-body clearance.
 - Face workplanes use the picked mesh triangle plane, stay fixed, and extend beyond the picked face. World-axis snapping is not reoriented.
 - Surface drop resolves vertical contact against one chosen target; it does not resolve other obstacles or stability/overhangs. It limits each action to five million projected triangle comparisons.
 - Section views are not capped, printable slices.

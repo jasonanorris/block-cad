@@ -271,3 +271,8 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 @media (min-width: 801px) {
   .workspace-panel { position: sticky; top: 12px; }
 }
+.point-measurement-result { margin: 12px 0; font-size: 13px; }
+.point-measurement-result dt { display: inline-block; min-width: 72px; font-weight: 600; }
+.point-measurement-result dd { display: inline; margin: 0; font-variant-numeric: tabular-nums; }
+.point-measurement-result > dd::after { content: ''; display: block; }
+.point-measurement-result > div { margin-top: 5px; }
