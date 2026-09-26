@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import type { CadObject } from './cadModel'
 import { writeAutosave } from './autosave'
 
-export function useAutosave(objects: CadObject[]) {
+export function useAutosave(objects: CadObject[], enabled: boolean) {
   const [status, setStatus] = useState('Saving locally…')
   const revision = useRef(0)
 
   useEffect(() => {
     const current = ++revision.current
+    if (!enabled) {
+      setStatus('Local autosave paused — use Save; New or Load starts a fresh draft.')
+      return
+    }
     let timer: number
     let started = false
     setStatus('Saving locally…')
@@ -30,7 +34,7 @@ export function useAutosave(objects: CadObject[]) {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('pagehide', save)
     }
-  }, [objects])
+  }, [objects, enabled])
 
   return status
 }

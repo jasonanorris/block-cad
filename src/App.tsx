@@ -48,7 +48,9 @@ const cameraViews: { view: CameraView; label: string }[] = [
 
 const gridSizes = [1, 5, 10, 20]
 
-export default function App({ initialObjects, recoveryNotice = '' }: { initialObjects: CadObject[]; recoveryNotice?: string }) {
+export default function App({ initialObjects, recoveryNotice = '', initialAutosaveEnabled = true }: {
+  initialObjects: CadObject[]; recoveryNotice?: string; initialAutosaveEnabled?: boolean
+}) {
   const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => initialObjects)
   const { objects, selectedObjectId, selectedObjectIds } = scene
   const sceneRef = useRef(scene)
@@ -56,7 +58,8 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
   const [positioning, setPositioning] = useState(false)
   const [positionError, setPositionError] = useState<string | null>(null)
   const [alignmentEdge, setAlignmentEdge] = useState<AlignmentEdge>('center')
-  const autosaveStatus = useAutosave(objects)
+  const [autosaveEnabled, setAutosaveEnabled] = useState(initialAutosaveEnabled)
+  const autosaveStatus = useAutosave(objects, autosaveEnabled)
   const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveryNotice)
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [snapEnabled, setSnapEnabled] = useState(false)
@@ -122,6 +125,8 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
 
   function newProject() {
     reset([])
+    setAutosaveEnabled(true)
+    setShowRecoveryNotice(false)
     setToolMode('translate')
     setWorkplane(0)
     setProjectError(null)
@@ -226,6 +231,8 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
     try {
       const loadedObjects = parseProject(await file.text())
       reset(loadedObjects)
+      setAutosaveEnabled(true)
+      setShowRecoveryNotice(false)
       setToolMode('translate')
       setWorkplane(0)
       setProjectError(null)
