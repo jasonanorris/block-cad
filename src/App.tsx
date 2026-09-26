@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
+import ReferenceTools from './ReferenceTools'
+import { dropOntoBody } from './dropOntoBody'
+import { positionFromReference } from './referenceOrigin'
+import ToolGroup, { jumpToTools } from './ToolGroup'
 import ExampleProjects from './ExampleProjects'
 import SectionTools from './SectionTools'
 import { defaultSection, type SectionView } from './sectionView'
@@ -22,7 +26,7 @@ import { copyCadObjects, expandAssemblyIds } from './selectionOperations'
 import { nudgeSelectedObjects } from './selectionOperations'
 import MeasurementPanel from './MeasurementPanel'
 import ViewCube from './ViewCube'
-import { getObjectTopHeight } from './workplane'
+import { getObjectTopHeight, onFaceWorkplane, dropToFaceWorkplane, type WorkplaneFrame } from './workplane'
 import { importSvg } from './svgImport'
 import { importStl } from './stlImport'
 import type { FrameRequest } from './frameCamera'
@@ -61,6 +65,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const { objects, selectedObjectId, selectedObjectIds } = scene
   const sceneRef = useRef(scene)
   sceneRef.current = scene
+  const [dropTarget, setDropTarget] = useState('')
   const [positioning, setPositioning] = useState(false)
   const [positionError, setPositionError] = useState<string | null>(null)
   const [alignmentEdge, setAlignmentEdge] = useState<AlignmentEdge>('center')
@@ -76,6 +81,13 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const [boxSelectEnabled, setBoxSelectEnabled] = useState(false)
   const exitBoxSelect = useCallback(() => setBoxSelectEnabled(false), [])
   const [gridSize, setGridSize] = useState(5)
+  const [facePlane, setFacePlane] = useState<WorkplaneFrame | null>(null)
+  const [pickFace, setPickFace] = useState(false)
+  const exitFace = useCallback(() => setPickFace(false), [])
+  const acceptFace = useCallback((frame: WorkplaneFrame) => {
+    setFacePlane(frame); setWorkplaneHeight(0); setWorkplaneDraft('0'); setPickFace(false); setPositionError(null)
+  }, [])
+  const [referenceOrigin, setReferenceOrigin] = useState<Vector3>({ x: 0, y: 0, z: 0 })
   const [workplaneHeight, setWorkplaneHeight] = useState(0)
   const [workplaneDraft, setWorkplaneDraft] = useState('0')
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
@@ -113,6 +125,10 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const canNudge = selectedIds.size > 0 && objects.every((object) => !nudgeIds.has(object.id) || (!object.locked && !object.hidden))
   const placementUnits = getPlacementUnits(objects, selectedIds)
   const canPosition = !positioning && canPositionUnits(objects, placementUnits)
+  const movingIds = new Set(placementUnits.flatMap((unit) => [...unit.ids]))
+  const dropTargets = getSolidBodies(objects).filter((body) =>
+    body.members.every((object) => !object.hidden) && [...body.members, ...body.holes].every((object) => !movingIds.has(object.id)))
+  const validDropTarget = dropTargets.some((body) => body.anchor.id === dropTarget) ? dropTarget : ''
   const canAlign = canPosition && placementUnits.length > 1
   const selectedSolids = selectedObjects.filter((object) => !isHoleObject(object))
   const selectedHoles = selectedObjects.filter(isHoleObject)
@@ -145,6 +161,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     setShowRecoveryNotice(false)
     setToolMode('translate')
     setWorkplane(0)
+    setReferenceOrigin({ x: 0, y: 0, z: 0 })
     setSection(defaultSection)
     setProjectError(null)
     setExportRequest(null)
@@ -155,6 +172,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   function setWorkplane(height: number) {
     if (!Number.isFinite(height)) return
     const rounded = Number(height.toFixed(3))
+    setFacePlane(null)
+    setPickFace(false)
     setWorkplaneHeight(rounded)
     setWorkplaneDraft(String(rounded))
   }
@@ -194,9 +213,9 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     event.target.value = ''
     if (!file) return
     try {
-      const index = objects.length
-      const imported = importSvg(await file.text(), file.name, workplaneHeight,
-        (index % 3) * 30, Math.floor(index / 3) * 30)
+      const index = facePlane ? 0 : objects.length
+      const imported = onFaceWorkplane(importSvg(await file.text(), file.name, workplaneHeight,
+        (index % 3) * 30, Math.floor(index / 3) * 30), facePlane)
       commit((current) => ({ ...current,
         objects: [...current.objects, ...imported],
         selectedObjectIds: imported.map((object) => object.id),
@@ -214,9 +233,9 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     if (!file) return
     setImportingStl(true)
     try {
-      const index = objects.length
-      const imported = await importStl(await file.arrayBuffer(), file.name, workplaneHeight,
-        (index % 3) * 30, Math.floor(index / 3) * 30)
+      const index = facePlane ? 0 : objects.length
+      const [imported] = onFaceWorkplane([await importStl(await file.arrayBuffer(), file.name, workplaneHeight,
+        (index % 3) * 30, Math.floor(index / 3) * 30)], facePlane)
       commit((current) => ({ ...current,
         objects: [...current.objects, imported],
         selectedObjectIds: [imported.id],
@@ -241,6 +260,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
       setShowRecoveryNotice(false)
       setToolMode('translate')
       setWorkplane(0)
+      setReferenceOrigin({ x: 0, y: 0, z: 0 })
       setSection(defaultSection)
       setProjectError(null)
       setExportRequest(null)
@@ -288,15 +308,15 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
 
   function addObject(type: PrimitiveType) {
     // Keep new shapes apart so each one can be seen and selected immediately.
-    const index = objects.length
-    const object = createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30, workplaneHeight)
+    const index = facePlane ? 0 : objects.length
+    const [object] = onFaceWorkplane([createCadObject(type, (index % 3) * 30, Math.floor(index / 3) * 30, workplaneHeight)], facePlane)
     commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id, selectedObjectIds: [object.id] }))
   }
 
   function addCutExample() {
-    const x = (objects.length % 3) * 40
-    const z = Math.floor(objects.length / 3) * 40
-    const [box, cutter] = createCutExample(x, z, workplaneHeight)
+    const x = facePlane ? 0 : (objects.length % 3) * 40
+    const z = facePlane ? 0 : Math.floor(objects.length / 3) * 40
+    const [box, cutter] = onFaceWorkplane(createCutExample(x, z, workplaneHeight), facePlane)
     commit((current) => ({ objects: [...current.objects, box, cutter], selectedObjectId: cutter.id, selectedObjectIds: [cutter.id] }))
   }
 
@@ -409,7 +429,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     const height = workplaneHeight
     const sources = await readLocalProject(id, 'part')
     if (sceneRef.current !== snapshot) throw new Error('The model or selection changed. Insert the part again.')
-    const copies = insertPart(sources, height)
+    const copies = onFaceWorkplane(insertPart(sources, height), facePlane)
     commit((current) => current === snapshot ? { objects: [...current.objects, ...copies],
       selectedObjectIds: copies.map((object) => object.id), selectedObjectId: copies[0]?.id ?? null } : current)
   }
@@ -430,7 +450,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   }
 
   function addText(text: string, size: number, height: number) {
-    const object = createTextObject(text, size, height, workplaneHeight)
+    const [object] = onFaceWorkplane([createTextObject(text, size, height, workplaneHeight)], facePlane)
     commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id, selectedObjectIds: [object.id] }))
   }
 
@@ -640,7 +660,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           </div>
           <div className="workspace-toolbar" aria-label="Transform tools">
             <button type="button" className={`tool-button${boxSelectEnabled ? ' is-active' : ''}`}
-              aria-pressed={boxSelectEnabled} onClick={() => setBoxSelectEnabled((enabled) => !enabled)}>Box select</button>
+              aria-pressed={boxSelectEnabled} onClick={() => { setBoxSelectEnabled((enabled) => !enabled); setPickFace(false) }}>Box select</button>
             {([
               ['translate', 'Move'],
               ['rotate', 'Rotate'],
@@ -686,7 +706,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="workspace-frame">
-            <Workspace
+            <Workspace facePlane={facePlane} pickFace={pickFace} onPickFace={acceptFace} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
               section={section}
               objects={objects}
               selectedObjectId={canTransformSelected ? selectedObjectId : null}
@@ -710,12 +730,16 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               onTransformEnd={end}
             />
             <ViewCube cameraView={cameraView} orientation={cameraOrientation} onChange={setCameraView} />
-            <div className="workspace-hint">{snapHint || (boxSelectEnabled ? 'Drag a selection rectangle · Shift adds · Esc returns to camera controls'
+            <div className="workspace-hint">{pickFace ? 'Click a solid face to set the workplane · Escape cancels' : snapHint || (boxSelectEnabled ? 'Drag a selection rectangle · Shift adds · Esc returns to camera controls'
               : `${cameraView === 'perspective' ? 'Drag to orbit · ' : ''}Scroll to zoom · Right drag to pan`)}</div>
-            <div className="axis-label">Workplane Y {workplaneHeight} {MODEL_UNIT} <span>·</span> X / Y / Z</div>
+            <div className="axis-label">{facePlane ? 'Face workplane' : `Workplane Y ${workplaneHeight} ${MODEL_UNIT}`} <span>·</span> X / Y / Z</div>
           </div>
         </section>
         <aside className="info-panel" aria-label="Workspace information">
+          <nav className="tool-navigation" aria-label="Tool groups">
+            {['Shapes', 'Place', 'Objects', 'Combine', 'Arrange', 'Inspect'].map((label) =>
+              <button key={label} type="button" onClick={() => jumpToTools(`tools-${label.toLowerCase()}`)}>{label}</button>)}
+          </nav>
           {!selectedObject && (
             <div className="panel-section">
               <p className="eyebrow">Getting started</p>
@@ -724,7 +748,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           )}
           <div className="panel-section shapes-section">
-            <h3>Shapes</h3>
+            <ToolGroup id="tools-shapes" title="Shapes" open>
             <div className="shape-list">
               {(['box', 'cylinder', 'sphere', 'cone', 'wedge', 'prism'] as const).map((type) => (
                 <button className="shape-button" key={type} type="button" onClick={() => addObject(type)}>
@@ -739,6 +763,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               commit((current) => current === scene ? { objects: loaded, selectedObjectIds: [], selectedObjectId: null } : current)
               setSection(defaultSection)
               setWorkplane(0)
+              setReferenceOrigin({ x: 0, y: 0, z: 0 })
               setAutosaveEnabled(true)
               setShowRecoveryNotice(false)
               setExportRequest(null)
@@ -762,6 +787,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                   : 'Calculating model…'}
               </p>
             )}
+            </ToolGroup>
           </div>
           <div className="panel-section">
             <SavedProjectsPanel kind="part" canSave={selectedObjects.some((object) => !isHoleObject(object))}
@@ -770,8 +796,15 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           </div>
           <div className="panel-section"><SectionTools section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
           <div className="panel-section workplane-section">
+            <ToolGroup id="tools-place" title="Place">
+            <ReferenceTools objects={objects} selectedIds={selectedObjectIds} origin={referenceOrigin} onOrigin={setReferenceOrigin}
+              disabled={!canPosition} onPosition={(edge, offset) => void positionSelection((current, ids) => positionFromReference(current, ids, edge, referenceOrigin, offset))} />
             <h3>Workplane</h3>
-            <label className="workplane-height-field">Height (mm)
+            <button type="button" aria-pressed={pickFace} disabled={positioning}
+              onClick={() => { setPickFace(!pickFace); setBoxSelectEnabled(false); setPositionError(null) }}>{pickFace ? 'Cancel face pick' : 'Pick face workplane'}</button>
+            {pickFace && <p role="status">Click a solid face in the canvas. Escape cancels.</p>}
+            {facePlane && <p role="status">Face workplane active. New shapes start at the picked point, facing outward.</p>}
+            <label className="workplane-height-field">Horizontal height (mm)
               <input type="number" step="any" value={workplaneDraft} disabled={positioning}
                 onChange={(event) => setWorkplaneDraft(event.target.value)}
                 onBlur={(event) => applyWorkplaneDraft(event.currentTarget.value)}
@@ -779,15 +812,26 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </label>
             <div className="workplane-actions">
               <button type="button" disabled={!selectedObject || positioning} onClick={() => selectedObject && setWorkplane(getObjectTopHeight(selectedObject))}>Use selected top</button>
-              <button type="button" disabled={workplaneHeight === 0 || positioning} onClick={() => setWorkplane(0)}>Reset to 0</button>
+              <button type="button" disabled={(!facePlane && workplaneHeight === 0) || positioning} onClick={() => setWorkplane(0)}>Reset to 0</button>
             </div>
             <button type="button" className="cut-example-button" disabled={!canPosition}
-              onClick={() => void positionSelection((current, ids) => dropToWorkplane(current, ids, workplaneHeight))}
+              onClick={() => void positionSelection((current, ids) => facePlane ? dropToFaceWorkplane(current, ids, facePlane) : dropToWorkplane(current, ids, workplaneHeight))}
               title="Rest each selected body's finished bottom on the current workplane">Drop to workplane</button>
-            <p className="selection-hint">New shapes rest on this horizontal plane. Existing shapes stay where they are.</p>
-            <p className="selection-hint">Drop moves each selected body to this plane, carrying its linked holes. It supports Undo.</p>
+            <p className="selection-hint">New shapes rest on the current plane. Picking a face uses its triangle plane, including facets on curved meshes. The plane stays fixed when its source moves.</p>
+            <p className="selection-hint">Drop moves each body along the plane normal, carrying its linked holes. The plane extends beyond the face. Height and Reset switch back to a horizontal plane. Snap and inspector coordinates use world axes.</p>
+            <h3>Drop onto body</h3>
+            <label>Target body<select aria-label="Drop target body" value={validDropTarget} onChange={(event) => setDropTarget(event.target.value)}>
+              <option value="">Choose a target</option>
+              {dropTargets.map((body) => <option key={body.anchor.id} value={body.anchor.id}>{objectLabel(body.anchor, objects)}</option>)}
+            </select></label>
+            <button type="button" disabled={!canPosition || !validDropTarget || placementUnits.some((unit) => isHoleObject(unit.body.anchor))}
+              onClick={() => void positionSelection((current, ids) => dropOntoBody(current, ids, validDropTarget))}>Drop onto body</button>
+            <p className="selection-hint">Move selected solids above the target in X/Z first. Drop places each at first surface contact from above, moving only world Y, with all linked holes. It can raise overlapping bodies. Other bodies are not obstacles.</p>
+            {positionError && <p className="position-error" role="alert">{positionError}</p>}
+            {positioning && <p role="status">Calculating placement…</p>}
+            </ToolGroup>
           </div>
-          <div className="panel-section selection-section">
+          <div className="panel-section selection-section" id="tools-objects" tabIndex={-1}>
             <h3>Selection</h3>
             <div className={`selection-card${selectedObject ? ' is-selected' : ''}`} aria-live="polite">
               <span className="selection-indicator" aria-hidden="true" />
@@ -811,6 +855,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               <button type="button" disabled={!selectedAssembly.some((object) => !object.locked)} onClick={() => setLocked(true)}>Lock</button>
               <button type="button" disabled={!selectedAssembly.some((object) => object.locked)} onClick={() => setLocked(false)}>Unlock</button>
             </div>
+            <ToolGroup id="tools-combine" title="Combine">
             <div className="join-actions combine-actions">
               <button type="button" disabled={!canJoin} onClick={() => combineSelected('union')} title="Join two or more selected solids, including their selected holes">Join</button>
               <button type="button" disabled={!canJoin} onClick={() => combineSelected('intersection')} title="Keep only the volume shared by two or more selected solids, then cut their linked holes">Intersect</button>
@@ -822,6 +867,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
             <p className="selection-hint">Join keeps the union of two or more solids; Intersect keeps their shared volume. Separate restores the source solids.</p>
             <p className="selection-hint">Group needs one solid and its linked holes selected. It hides the cutters and moves them with the solid. Ungroup reveals them again.</p>
+            </ToolGroup>
+            <ToolGroup id="tools-arrange" title="Arrange">
             <div className="align-actions" role="group" aria-label="Mirror selection">
               {(['x', 'y', 'z'] as const).map((axis) => (
                 <button key={axis} type="button" disabled={!canPosition}
@@ -859,6 +906,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                 Distribute {axis.toUpperCase()}</button>)}
             </div>
             <p className="selection-hint">Select at least three bodies. The first and last centers on the chosen axis stay fixed. Equal gaps needs enough room between them; centers can overlap.</p>
+            </ToolGroup>
+            <div id="tools-inspect" tabIndex={-1}><h3>Inspect</h3></div>
             {positioning && <p className="selection-hint" role="status">Calculating placement…</p>}
             {positionError && <p className="position-error" role="alert">{positionError}</p>}
             {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}

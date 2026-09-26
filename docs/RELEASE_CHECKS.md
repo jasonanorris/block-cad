@@ -28,8 +28,15 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Save/load a project, reload for autosave recovery, insert a library part, and restore a snapshot. Check Undo/Redo and independent cutter links.
 - Try invalid text, malformed project data, empty intersections, locked selections, and unavailable storage. Failed actions must leave the model intact.
 
+- Open sidebar navigation groups with mouse/keyboard; selection and model must remain unchanged. Check narrow-screen layout and desktop canvas visibility while scrolling.
+- Set a reference origin, position a joined/cut selection by minimum/center/maximum offsets, then Undo/Redo. Confirm linked cutters travel once and locked dependencies reject the action.
+- Pick top, side, underside, and sloped faces. Add a primitive, text, SVG, STL, and library part; confirm they face outward and rest on the plane. Drop an existing body, Undo, reset, and cancel picking with Escape. Check face picking and Box select are mutually exclusive.
+- Drop onto a rotated body and into a cut pocket. A through hole without support must fail without moving the model. Check multiple selected bodies and a locked target; Undo must restore all moved shapes in one step.
+
 ## Known limits
 
+- Face workplanes use the picked mesh triangle plane, stay fixed, and extend beyond the picked face. World-axis snapping is not reoriented.
+- Surface drop resolves vertical contact against one chosen target; it does not resolve other obstacles or stability/overhangs. It limits each action to five million projected triangle comparisons.
 - Section views are not capped, printable slices.
 - Gaps compare world bounding boxes, not exact surface distances.
 - Object snapping uses source bounds before cuts/joins.

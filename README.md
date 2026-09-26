@@ -149,3 +149,19 @@ Boolean previews now reuse unchanged bodies. Editing a cutter rebuilds its affec
 ### 64 — Release preparation
 
 **Example projects** provides an editable text nameplate, a cavity for section-view inspection, and an eight-hole flange. Loading one is undoable. Sample JSON files live in `public/samples`; `npm run samples` regenerates them. The regression suite validates and exports every sample. `npm run benchmark` measures preview reuse for 100 cut bodies. See the user guide and release-check document above for workflows, verification commands, and current limits. This milestone prepares the local app; it does not deploy or publish it.
+
+### 65 — Workspace organization
+
+The sidebar now groups **Shapes**, **Place**, **Combine**, and **Arrange** in collapsible sections. Navigation buttons open and focus the requested section, with **Objects** and **Inspect** shortcuts. Common selection actions remain visible. On desktop the canvas stays alongside the sidebar while scrolling; narrow screens retain the stacked layout. Opening/collapsing tools does not change selection, geometry, or Undo.
+
+### 66 — Ruler and reference origin
+
+Under **Place → Ruler / reference origin**, enter world X/Y/Z coordinates and choose **Set reference origin**, or use the selection's finished minimum, center, or maximum as the origin. A colored axis marker displays it. Offset fields show that selection reference relative to the origin, rounded to 0.001 mm. **Apply reference position** translates the whole selection together, including all linked cutters, in one Undo step. Hidden/locked dependencies are rejected. Origins are workspace preferences, excluded from saves/exports and reset on New, Load, and examples.
+
+### 67 — Face workplanes
+
+**Pick face workplane** lets you click a finished solid surface. The grid rotates to its triangle plane, with its origin at the picked point and its normal facing outward. New primitives, text, SVG/STL imports, cutout examples, and library parts use that frame. **Drop to workplane** translates each finished body along the normal until it touches the plane, carrying linked holes without rotating it. Escape cancels picking; horizontal height, Use selected top, and Reset restore a horizontal plane. Cutters, source overlays, and clipped-away surfaces cannot be picked. Curved surfaces use the mesh facet clicked, and section openings have no synthetic cap to pick. The plane extends beyond the face and stays fixed after source edits. World-axis snapping and inspector coordinates remain unchanged. No project-format change is needed.
+
+### 68 — Drop onto another body
+
+In **Place**, choose a separate visible target body and **Drop onto body**. Each selected solid moves only in world Y to first contact from above, using overlapping finished surface triangles. This handles slopes, pocket floors, joins, cuts, and imported meshes without treating the target as a bounding box. X/Z and rotation stay fixed; all linked cutters travel with their solid. Locked targets can be used, but hidden/locked moving dependencies, hole-only selections, empty bodies, and missing footprint overlap reject the entire operation. Each successful drop is one Undo step. Overlapping bodies may be raised to reach the topmost contact. Other bodies are not obstacles, and contact does not guarantee physical stability. The operation yields between batches and caps work at five million triangle comparisons; very detailed meshes can use a face workplane instead.

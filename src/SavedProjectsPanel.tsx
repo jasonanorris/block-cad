@@ -40,7 +40,7 @@ export default function SavedProjectsPanel({ kind, canSave, onSave, onUse }: {
         {kind === 'part' ? 'Save selection as part' : 'Save snapshot'}</button>
       <button type="button" disabled={busy} onClick={() => void run(async () => {}, 'List refreshed.')}>Refresh list</button>
     </div>
-    <p className="selection-hint">{kind === 'part' ? 'Saved parts include joined members and all linked holes. Insert places independent copies at the center of the current workplane; move them afterward if they overlap.' : 'A snapshot saves the entire project. Restore replaces the current model as one undoable edit.'}</p>
+    <p className="selection-hint">{kind === 'part' ? 'Saved parts include joined members and all linked holes. Insert places independent copies at the current workplane origin; move them afterward if they overlap.' : 'A snapshot saves the entire project. Restore replaces the current model as one undoable edit.'}</p>
     <p className="selection-hint">Stored only in this browser and site address. Use project Save for a portable backup. Each save creates a new entry.</p>
     {busy && <p role="status">Working…</p>}
     {error && <p className="position-error" role="alert">{error}</p>}

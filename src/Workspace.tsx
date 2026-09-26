@@ -3,13 +3,15 @@ import { Canvas } from '@react-three/fiber'
 import { DoubleSide, FrontSide, type BufferGeometry, type Mesh, type Plane } from 'three'
 import { clippedRaycast, sectionPlane, type SectionView } from './sectionView'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
-import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
+import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform, type Vector3 } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
 import { DEFAULT_OBJECT_COLOR } from './objectColor'
 import { createSourceGeometry } from './sourceGeometry'
 import type { FrameRequest } from './frameCamera'
 import { expandAssemblyIds } from './selectionOperations'
 import BoxSelection from './BoxSelection'
+import FacePicker from './FacePicker'
+import type { WorkplaneFrame } from './workplane'
 import type { ScreenRectangle } from './boxSelection'
 
 const CadObjectMesh = memo(function CadObjectMesh({
@@ -21,6 +23,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
   selectedMeshRef,
   cutGeometry,
   clippingPlanes,
+  surfaceReady,
 }: {
   object: CadObject
   isSelected: boolean
@@ -29,6 +32,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
   onSelect: (id: string, additive: boolean) => void
   selectedMeshRef: RefObject<Mesh | null>
   clippingPlanes: Plane[]
+  surfaceReady: boolean
   cutGeometry?: BufferGeometry
 }) {
   const sourceGeometry = useMemo(() => createSourceGeometry(object), [object.type, object.dimensions,
@@ -43,7 +47,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
 
   return (
     <mesh
-      userData={{ cadObjectId: object.id }}
+      userData={{ cadObjectId: object.id, cadSurface: surfaceReady && !wireframe }}
       raycast={clippedRaycast}
       ref={isActive ? selectedMeshRef : undefined}
       visible={!hiddenInGroup || isSelected}
@@ -99,10 +103,12 @@ function CadScene({
   gizmoInteractionRef,
   booleanGeometries,
   section,
+  referenceOrigin,
+  facePlane, pickFace, onPickFace, onExitFace, onFaceError,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean>; onRectangle: (rectangle: ScreenRectangle | null) => void }) {
   const onSelectMesh = useCallback((id: string, additive: boolean) => {
-    if (!gizmoInteractionRef.current) onSelectObject(id, additive)
-  }, [gizmoInteractionRef, onSelectObject])
+    if (!pickFace && !gizmoInteractionRef.current) onSelectObject(id, additive)
+  }, [gizmoInteractionRef, onSelectObject, pickFace])
   const selectedMeshRef = useRef<Mesh | null>(null)
   const clippingPlanes = useMemo(() => { const plane = sectionPlane(section); return plane ? [plane] : [] }, [section])
   const hiddenGroupedIds = new Set(getSolidBodies(objects).flatMap((body) => {
@@ -113,16 +119,22 @@ function CadScene({
     ]
   }))
 
+  const pendingSurfaces = new Set(getSolidBodies(objects).filter((body) =>
+    (body.members.length > 1 || body.holes.length > 0) && !booleanGeometries.has(body.anchor.id))
+    .flatMap((body) => body.members.map((member) => member.id)))
   return (
     <>
       <color attach="background" args={['#f8faff']} />
+      <axesHelper args={[12]} position={[referenceOrigin.x, referenceOrigin.y, referenceOrigin.z]} />
       <ambientLight intensity={1.6} />
       <directionalLight position={[50, 90, 40]} intensity={2.4} />
-      <gridHelper args={[200, 200 / gridSize, '#a9b8cf', '#dce3ef']} position={[0, workplaneHeight - 0.01, 0]} />
+      <gridHelper args={[200, 200 / gridSize, '#a9b8cf', '#dce3ef']} position={facePlane ? [facePlane.origin.x, facePlane.origin.y, facePlane.origin.z] : [0, workplaneHeight - 0.01, 0]}
+        rotation={facePlane ? [facePlane.rotation.x, facePlane.rotation.y, facePlane.rotation.z] : [0, 0, 0]} />
       {objects.map((object) => (
         <CadObjectMesh
           key={object.id}
           object={object}
+          surfaceReady={!pendingSurfaces.has(object.id)}
           isSelected={selectedObjectIds.includes(object.id)}
           isActive={object.id === selectedObjectId}
           hiddenInGroup={hiddenGroupedIds.has(object.id)}
@@ -142,7 +154,7 @@ function CadScene({
         onSnapHint={onSnapHint}
         snapEnabled={snapEnabled}
         gridSize={gridSize}
-        boxSelectEnabled={boxSelectEnabled}
+        boxSelectEnabled={boxSelectEnabled || pickFace}
         cameraView={cameraView}
         frameRequest={frameRequest}
         frameSelectionIds={expandAssemblyIds(objects, new Set(selectedObjectIds), true)}
@@ -151,12 +163,19 @@ function CadScene({
         onTransformStart={onTransformStart}
         onTransformEnd={onTransformEnd}
       />
+      <FacePicker enabled={pickFace} onPick={onPickFace} onExit={onExitFace} onError={onFaceError} />
       <BoxSelection enabled={boxSelectEnabled} onSelect={onSelectMany} onExit={onExitBoxSelect} onRectangle={onRectangle} />
     </>
   )
 }
 
 type WorkspaceProps = {
+  facePlane: WorkplaneFrame | null
+  pickFace: boolean
+  onPickFace: (frame: WorkplaneFrame) => void
+  onExitFace: () => void
+  onFaceError: (message: string) => void
+  referenceOrigin: Vector3
   section: SectionView
   objects: CadObject[]
   selectedObjectId: string | null
@@ -190,7 +209,7 @@ export default function Workspace(props: WorkspaceProps) {
         frameloop="demand"
         onCreated={({ gl }) => { gl.localClippingEnabled = true }}
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
-        onPointerMissed={(event) => { if (!props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
+        onPointerMissed={(event) => { if (!props.pickFace && !props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
       >
         <CadScene {...props} gizmoInteractionRef={gizmoInteractionRef} onRectangle={setRectangle} />
       </Canvas>

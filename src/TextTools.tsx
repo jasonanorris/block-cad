@@ -15,7 +15,7 @@ export default function TextTools({ initialText = 'CAD', initialSize = 10, initi
       try { onApply(text, Number(size), Number(height)); setError(null) }
       catch (error) { setError(error instanceof Error ? error.message : 'Could not build the text.') }
     }}>{action}</button>
-    <p className="selection-hint">Helvetiker lettering lies flat on X/Z. Use Shape mode → Hole for engraving, or Join with a base for raised labels. Spaces and line breaks are supported.</p>
+    <p className="selection-hint">Helvetiker lettering starts flat on the current workplane. Use Shape mode → Hole for engraving, or Join with a base for raised labels. Spaces and line breaks are supported.</p>
     {error && <p role="alert" className="position-error">{error}</p>}
   </details>
 }
