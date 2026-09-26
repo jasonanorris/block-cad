@@ -72,36 +72,6 @@ function assemblyKey(object: CadObject, objects: CadObject[]): string {
   return solid.joinGroupId ? `join:${solid.joinGroupId}` : `object:${solid.id}`
 }
 
-export function alignmentCandidates(objects: CadObject[], ids: Set<string>, activeId: string | null): CadObject[] {
-  const active = objects.find((object) => object.id === activeId && ids.has(object.id))
-  if (!active) return []
-  const visited = new Set([assemblyKey(active, objects)])
-  return objects.filter((object) => {
-    if (!ids.has(object.id)) return false
-    const key = assemblyKey(object, objects)
-    if (visited.has(key)) return false
-    visited.add(key)
-    return true
-  })
-}
-
-export function alignSelectedObjects(objects: CadObject[], ids: Set<string>, activeId: string | null, axis: Axis): CadObject[] {
-  const active = objects.find((object) => object.id === activeId)
-  if (!active) return objects
-  let aligned = objects
-  for (const candidate of alignmentCandidates(objects, ids, activeId)) {
-    const current = aligned.find((object) => object.id === candidate.id)!
-    const delta = active.position[axis] - current.position[axis]
-    if (delta === 0) continue
-    const movingId = isHoleObject(current) && current.groupedWithTarget ? current.cutTargetId : current.id
-    aligned = updateObjectWithGroups(aligned, movingId, (object) => ({
-      ...object,
-      position: { ...object.position, [axis]: object.position[axis] + delta },
-    }))
-  }
-  return aligned
-}
-
 // Move each selected assembly once, even when several of its members are selected.
 export function nudgeSelectedObjects(objects: CadObject[], ids: Set<string>, axis: Axis, amount: number): CadObject[] {
   let moved = objects

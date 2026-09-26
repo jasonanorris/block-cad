@@ -10,7 +10,7 @@ import { export3mf } from './threeMfExport'
 import type { CameraView } from './SceneControls'
 import { useBooleanPreview } from './useBooleanPreview'
 import { updateObjectWithGroups } from './groupTransforms'
-import { alignSelectedObjects, alignmentCandidates, copyCadObjects, expandAssemblyIds } from './selectionOperations'
+import { copyCadObjects, expandAssemblyIds } from './selectionOperations'
 import { nudgeSelectedObjects } from './selectionOperations'
 import MeasurementPanel from './MeasurementPanel'
 import ViewCube from './ViewCube'
@@ -19,6 +19,7 @@ import { importSvg } from './svgImport'
 import { importStl } from './stlImport'
 import type { FrameRequest } from './frameCamera'
 import { useAutosave } from './useAutosave'
+import { alignByBounds, canPositionUnits, getPlacementUnits, type AlignmentEdge } from './placement'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -50,6 +51,11 @@ const gridSizes = [1, 5, 10, 20]
 export default function App({ initialObjects, recoveryNotice = '' }: { initialObjects: CadObject[]; recoveryNotice?: string }) {
   const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => initialObjects)
   const { objects, selectedObjectId, selectedObjectIds } = scene
+  const sceneRef = useRef(scene)
+  sceneRef.current = scene
+  const [positioning, setPositioning] = useState(false)
+  const [positionError, setPositionError] = useState<string | null>(null)
+  const [alignmentEdge, setAlignmentEdge] = useState<AlignmentEdge>('center')
   const autosaveStatus = useAutosave(objects)
   const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveryNotice)
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
@@ -86,10 +92,9 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
   const canTransformSelected = canEditActive && !selectedObject?.hidden
   const nudgeIds = expandAssemblyIds(objects, selectedIds, true)
   const canNudge = selectedIds.size > 0 && objects.every((object) => !nudgeIds.has(object.id) || (!object.locked && !object.hidden))
-  const alignCandidates = alignmentCandidates(objects, selectedIds, selectedObjectId)
-  const alignmentIds = expandAssemblyIds(objects, selectedIds, true)
-  const canAlign = alignCandidates.length > 0 &&
-    objects.every((object) => !alignmentIds.has(object.id) || (!object.locked && !object.hidden))
+  const placementUnits = getPlacementUnits(objects, selectedIds)
+  const canPosition = !positioning && canPositionUnits(objects, placementUnits)
+  const canAlign = canPosition && placementUnits.length > 1
   const selectedSolids = selectedObjects.filter((object) => !isHoleObject(object))
   const selectedHoles = selectedObjects.filter(isHoleObject)
   const selectedSolidIds = new Set(selectedSolids.map((object) => object.id))
@@ -359,13 +364,24 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
     })
   }
 
+  async function positionSelection(operation: (objects: CadObject[], ids: Set<string>) => Promise<CadObject[]>) {
+    if (positioning) return
+    const snapshot = scene
+    setPositioning(true)
+    setPositionError(null)
+    try {
+      const positioned = await operation(snapshot.objects, new Set(snapshot.selectedObjectIds))
+      if (sceneRef.current !== snapshot) throw new Error('The model or selection changed. Try the positioning action again.')
+      commit((current) => current === snapshot ? { ...current, objects: positioned } : current)
+    } catch (error) {
+      setPositionError(error instanceof Error ? error.message : 'Could not position the selected shapes.')
+    } finally {
+      setPositioning(false)
+    }
+  }
+
   function alignSelected(axis: keyof Vector3) {
-    commit((current) => {
-      const ids = new Set(current.selectedObjectIds)
-      const affected = expandAssemblyIds(current.objects, ids, true)
-      if (current.objects.some((object) => affected.has(object.id) && (object.locked || object.hidden))) return current
-      return { ...current, objects: alignSelectedObjects(current.objects, ids, current.selectedObjectId, axis) }
-    })
+    void positionSelection((current, ids) => alignByBounds(current, ids, selectedObjectId, axis, alignmentEdge))
   }
 
   const nudgeSelection = useCallback((axis: keyof Vector3, amount: number) => {
@@ -711,11 +727,21 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
             </div>
             <p className="selection-hint">Join keeps the union of two or more solids; Intersect keeps their shared volume. Separate restores the source solids.</p>
             <p className="selection-hint">Group needs one solid and its linked holes selected. It hides the cutters and moves them with the solid. Ungroup reveals them again.</p>
-            <div className="align-actions" role="group" aria-label="Align selected centers to active shape">
+            <label className="alignment-mode">Align by
+              <select value={alignmentEdge} onChange={(event) => setAlignmentEdge(event.target.value as AlignmentEdge)}>
+                <option value="min">Minimum edge</option>
+                <option value="center">Center</option>
+                <option value="max">Maximum edge</option>
+              </select>
+            </label>
+            <div className="align-actions" role="group" aria-label="Align selected bounds to active shape">
               {(['x', 'y', 'z'] as const).map((axis) => (
-                <button key={axis} type="button" disabled={!canAlign} onClick={() => alignSelected(axis)} title={`Align selected centers on ${axis.toUpperCase()} to the active shape`}>Align {axis.toUpperCase()}</button>
+                <button key={axis} type="button" disabled={!canAlign} onClick={() => alignSelected(axis)} title={`Align the ${alignmentEdge} on world ${axis.toUpperCase()} to the active shape`}>Align {axis.toUpperCase()}</button>
               ))}
             </div>
+            <p className="selection-hint">Select two or more bodies. The active body stays fixed; the others match its edge or center on a world axis. All linked holes move with their solid.</p>
+            {positioning && <p className="selection-hint" role="status">Calculating placement…</p>}
+            {positionError && <p className="position-error" role="alert">{positionError}</p>}
             {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}
             {selectedObject && (
               <ObjectInspector

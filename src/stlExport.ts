@@ -1,25 +1,9 @@
-import { BoxGeometry, CylinderGeometry, Mesh, Scene, SphereGeometry, type BufferGeometry } from 'three'
+import { Mesh, Scene, type BufferGeometry } from 'three'
 import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { getSolidBodies, type CadObject } from './cadModel'
 import { buildSolidGeometry } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
-import { svgGeometry } from './svgGeometry'
-import { stlMeshGeometry } from './stlMesh'
-
-function geometryFor(object: CadObject): BufferGeometry {
-  switch (object.type) {
-    case 'box':
-      return new BoxGeometry(object.dimensions.x, object.dimensions.y, object.dimensions.z)
-    case 'cylinder':
-      return new CylinderGeometry(object.dimensions.diameter / 2, object.dimensions.diameter / 2, object.dimensions.height, 32)
-    case 'sphere':
-      return new SphereGeometry(object.dimensions.diameter / 2, 32, 16)
-    case 'svg':
-      return svgGeometry(object.contours, object.dimensions)
-    case 'stl':
-      return stlMeshGeometry(object.meshData)
-  }
-}
+import { createSourceGeometry } from './sourceGeometry'
 
 function reverseWinding(geometry: BufferGeometry) {
   const index = geometry.getIndex()
@@ -54,7 +38,7 @@ export async function exportStl(objects: CadObject[]): Promise<ArrayBuffer> {
       const object = body.anchor
       const geometry = runtime && (body.members.length > 1 || body.holes.length > 0)
         ? buildSolidGeometry(body, runtime)
-        : geometryFor(object)
+        : createSourceGeometry(object)
       geometries.push(geometry)
       if (object.scale.x * object.scale.y * object.scale.z < 0) reverseWinding(geometry)
 
