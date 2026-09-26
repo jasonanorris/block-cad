@@ -93,3 +93,7 @@ Turn on **Object snap** and drag a Move handle to match the active source shape'
 ### 52 — Radial arrays
 
 Select shapes and open **Radial array**. Set a world rotation axis, count including the original, angle per copy, and pivot X/Y/Z in millimeters. **Create radial array** copies and rotates the selection and all linked holes around that pivot, preserving scale and independent join/cutter links for each copy. For a full circle without a duplicate at the starting point, use an angle of 360 divided by the count (for example, 8 copies at 45°). Negative angles reverse direction. Start with shapes away from the rotation axis to avoid overlapping copies. Counts are 2–100 with up to 1,000 new source shapes. The original stays in place, copies are selected, and one Undo removes the array.
+
+### 53 — Distribute bodies
+
+Select three or more independent bodies, choose **Equal gaps** or **Centers**, and click **Distribute X/Y/Z**. Bodies are ordered by their finished bounding-box centers on that world axis; the two end bodies stay fixed. Equal gaps accounts for different body widths and refuses a selection without enough room. Center spacing can overlap wide bodies. Joined assemblies count once, and all linked holes travel with their body. Hidden, locked, and empty geometry is rejected. Each action is one Undo step.

@@ -87,3 +87,34 @@ export async function dropToWorkplane(objects: CadObject[], ids: Set<string>, he
   const bounds = await Promise.all(units.map(getPlacementBounds))
   return translateUnits(objects, units, bounds.map((box) => height - box.min.y), 'y')
 }
+
+export type DistributionMode = 'centers' | 'gaps'
+
+export async function distributeByBounds(objects: CadObject[], ids: Set<string>, axis: keyof Vector3,
+  mode: DistributionMode): Promise<CadObject[]> {
+  const units = getPlacementUnits(objects, ids)
+  if (units.length < 3) throw new Error('Select at least three independent bodies to distribute.')
+  if (!canPositionUnits(objects, units)) throw new Error('Show and unlock the selected shapes and their linked holes before positioning.')
+  const bounds = await Promise.all(units.map(getPlacementBounds))
+  const center = (box: Box3) => (box.min[axis] + box.max[axis]) / 2
+  const ordered = bounds.map((box, index) => ({ box, index }))
+    .sort((a, b) => center(a.box) - center(b.box) || a.index - b.index)
+  const first = ordered[0].box, last = ordered.at(-1)!.box
+  const offsets = units.map(() => 0)
+  if (mode === 'centers') {
+    const spacing = (center(last) - center(first)) / (ordered.length - 1)
+    ordered.slice(1, -1).forEach(({ box, index }, step) => {
+      offsets[index] = center(first) + (step + 1) * spacing - center(box)
+    })
+  } else {
+    const totalWidth = bounds.reduce((sum, box) => sum + box.max[axis] - box.min[axis], 0)
+    const gap = (last.max[axis] - first.min[axis] - totalWidth) / (ordered.length - 1)
+    if (gap < -1e-7) throw new Error('Not enough room for equal gaps. Move the end bodies farther apart or use Centers.')
+    let nextMin = first.max[axis] + Math.max(0, gap)
+    for (const { box, index } of ordered.slice(1, -1)) {
+      offsets[index] = nextMin - box.min[axis]
+      nextMin += box.max[axis] - box.min[axis] + Math.max(0, gap)
+    }
+  }
+  return translateUnits(objects, units, offsets, axis)
+}

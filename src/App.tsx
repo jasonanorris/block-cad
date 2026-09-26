@@ -19,7 +19,7 @@ import { importSvg } from './svgImport'
 import { importStl } from './stlImport'
 import type { FrameRequest } from './frameCamera'
 import { useAutosave } from './useAutosave'
-import { alignByBounds, canPositionUnits, dropToWorkplane, getPlacementUnits, type AlignmentEdge } from './placement'
+import { alignByBounds, distributeByBounds, type DistributionMode, canPositionUnits, dropToWorkplane, getPlacementUnits, type AlignmentEdge } from './placement'
 import { mirrorSelection } from './mirrorSelection'
 import { repeatSelection } from './repeatSelection'
 import RepeatTools from './RepeatTools'
@@ -73,6 +73,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [objectSnapEnabled, setObjectSnapEnabled] = useState(false)
   const [snapHint, setSnapHint] = useState('')
+  const [distributionMode, setDistributionMode] = useState<DistributionMode>('gaps')
   const [snapEnabled, setSnapEnabled] = useState(false)
   const [boxSelectEnabled, setBoxSelectEnabled] = useState(false)
   const exitBoxSelect = useCallback(() => setBoxSelectEnabled(false), [])
@@ -785,6 +786,18 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               ))}
             </div>
             <p className="selection-hint">Select two or more bodies. The active body stays fixed; the others match its edge or center on a world axis. All linked holes move with their solid.</p>
+            <label className="alignment-mode">Distribute by
+              <select aria-label="Distribution mode" value={distributionMode} onChange={(event) => setDistributionMode(event.target.value as DistributionMode)}>
+                <option value="gaps">Equal gaps</option><option value="centers">Centers</option>
+              </select>
+            </label>
+            <div className="align-actions" role="group" aria-label="Distribute selected bodies">
+              {(['x', 'y', 'z'] as const).map((axis) => <button key={axis} type="button"
+                disabled={!canPosition || placementUnits.length < 3}
+                onClick={() => void positionSelection((current, ids) => distributeByBounds(current, ids, axis, distributionMode))}>
+                Distribute {axis.toUpperCase()}</button>)}
+            </div>
+            <p className="selection-hint">Select at least three bodies. The first and last centers on the chosen axis stay fixed. Equal gaps needs enough room between them; centers can overlap.</p>
             {positioning && <p className="selection-hint" role="status">Calculating placement…</p>}
             {positionError && <p className="position-error" role="alert">{positionError}</p>}
             {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}
