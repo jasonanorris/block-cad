@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
+import ObjectList from './ObjectList'
+import { objectLabel, shapeLabels } from './objectLabels'
 import ObjectInspector from './ObjectInspector'
-import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type CadObjectType, type ObjectTransform, type PrimitiveType, type Vector3 } from './cadModel'
+import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type ObjectTransform, type PrimitiveType, type Vector3 } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
 import { exportStl } from './stlExport'
@@ -30,24 +32,6 @@ import { resizeSelection } from './resizeSelection'
 import { selectedExportObjects, type ExportScope } from './exportSelection'
 import ShortcutHelp from './ShortcutHelp'
 import ExportReview, { type ExportFormat } from './ExportReview'
-
-const shapeLabels: Record<CadObjectType, string> = {
-  box: 'Box',
-  cylinder: 'Cylinder',
-  sphere: 'Sphere',
-  cone: 'Cone',
-  wedge: 'Wedge',
-  prism: 'Prism',
-  svg: 'SVG',
-  stl: 'STL',
-}
-
-function objectLabel(object: CadObject, objects: CadObject[]) {
-  const shape = `${shapeLabels[object.type]}${isHoleObject(object) ? ' hole' : ''}`
-  const grouped = isHoleObject(object) ? object.groupedWithTarget :
-    objects.some((hole) => isHoleObject(hole) && hole.groupedWithTarget && hole.cutTargetId === object.id)
-  return `${object.name ? `${object.name} · ` : ''}${shape}${object.joinGroupId ? object.joinMode === 'intersection' ? ' · Intersected' : ' · Joined' : ''}${grouped ? ' · Grouped' : ''}${object.hidden ? ' · Hidden' : ''}${object.locked ? ' · Locked' : ''}`
-}
 
 const cameraViews: { view: CameraView; label: string }[] = [
   { view: 'perspective', label: 'Perspective' },
@@ -746,16 +730,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                 : selectedObject ? `${objectLabel(selectedObject, objects)} selected` : 'Nothing selected'}</span>
             </div>
             <p className="selection-hint">Shift+click shapes or the list to select more than one. The last selected shape is active; its properties appear below.</p>
-            {objects.length > 0 && (
-              <div className="object-list" role="group" aria-label="Objects">
-                {objects.map((object, index) => (
-                  <button key={object.id} type="button" className={object.hidden ? 'is-hidden' : undefined} aria-pressed={selectedObjectIds.includes(object.id)} onClick={(event) => select(object.id, event.shiftKey)}>
-                    <span>{objectLabel(object, objects)}</span>
-                    <span>#{index + 1}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <ObjectList objects={objects} selectedIds={selectedObjectIds} onSelect={select} />
             <div className="selection-actions">
               <button type="button" disabled={selectedObjectIds.length === 0} onClick={duplicateSelected} title="Duplicate selected objects (Ctrl/Cmd+D)">Duplicate</button>
               <button type="button" disabled={!canEditSelection} onClick={deleteSelected} title="Delete selected objects (Delete or Backspace)">Delete</button>

@@ -109,3 +109,7 @@ Choose **Selection** in the header's **Export** scope selector, then **Export ST
 ### 56 — Shortcut help
 
 Click **Shortcuts** above the workspace or press **?** to open the keyboard and mouse guide. It covers selection, Box select, camera controls, framing, editing, Undo/Redo, and nudging. Escape or **Close shortcuts** closes the dialog and returns focus to the previous control. Modeling shortcuts are paused while typing or while a dialog is open. The guide does not change selection, project data, or Undo history.
+
+### 57 — Object-list organization
+
+Search the Objects list by name, shape, status, or `#number`, and filter to solids, holes, hidden, locked, or selected shapes. Joined members and linked holes appear under their assembly's first solid; the arrow collapses or expands them. Search/filter results expand matching children and retain their parent as labeled assembly context. Filtering and collapsing only affect the list, never model visibility, selection, or Undo history. Shift+click still adds or removes individual shapes.
