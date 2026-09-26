@@ -34,6 +34,9 @@ npm run dev
 
 # build
 npm run build
+
+# regression tests
+npm test
 ```
 
 ## Deployment

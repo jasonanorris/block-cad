@@ -66,7 +66,9 @@ export async function exportStl(objects: CadObject[]): Promise<ArrayBuffer> {
     }
 
     scene.updateMatrixWorld(true)
-    return new STLExporter().parse(scene, { binary: true }).buffer
+    const result = new STLExporter().parse(scene, { binary: true })
+    if (result.getUint32(80, true) === 0) throw new Error('The model has no printable solid geometry.')
+    return result.buffer
   } finally {
     for (const geometry of geometries) geometry.dispose()
   }

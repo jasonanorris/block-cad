@@ -36,8 +36,7 @@ export async function readAutosave(): Promise<{ objects: CadObject[]; savedAt: n
 }
 
 export async function writeAutosave(objects: CadObject[]): Promise<number> {
-  // A name can temporarily be blank while its input is focused.
-  const project = serializeProject(objects.map((object) => ({ ...object, name: object.name?.trim() || undefined })))
+  const project = serializeProject(objects)
   const db = await openDatabase()
   const savedAt = Date.now()
   await new Promise<void>((resolve, reject) => {

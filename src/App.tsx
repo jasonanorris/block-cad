@@ -675,7 +675,7 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
                 ? `${selectedObjectIds.length} objects selected · ${selectedObject ? objectLabel(selectedObject, objects) : 'Shape'} active`
                 : selectedObject ? `${objectLabel(selectedObject, objects)} selected` : 'Nothing selected'}</span>
             </div>
-            <p className="selection-hint">Shift+click shapes or the list to select more than one.</p>
+            <p className="selection-hint">Shift+click shapes or the list to select more than one. The last selected shape is active; its properties appear below.</p>
             {objects.length > 0 && (
               <div className="object-list" role="group" aria-label="Objects">
                 {objects.map((object, index) => (
@@ -709,6 +709,8 @@ export default function App({ initialObjects, recoveryNotice = '' }: { initialOb
               <button type="button" disabled={!canGroupCut} onClick={groupCutSelected} title="Group one selected solid with its selected holes">Group</button>
               <button type="button" disabled={!canUngroupCut} onClick={ungroupCutSelected} title="Reveal the grouped holes linked to the selected solid">Ungroup</button>
             </div>
+            <p className="selection-hint">Join keeps the union of two or more solids; Intersect keeps their shared volume. Separate restores the source solids.</p>
+            <p className="selection-hint">Group needs one solid and its linked holes selected. It hides the cutters and moves them with the solid. Ungroup reveals them again.</p>
             <div className="align-actions" role="group" aria-label="Align selected centers to active shape">
               {(['x', 'y', 'z'] as const).map((axis) => (
                 <button key={axis} type="button" disabled={!canAlign} onClick={() => alignSelected(axis)} title={`Align selected centers on ${axis.toUpperCase()} to the active shape`}>Align {axis.toUpperCase()}</button>

@@ -165,7 +165,8 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
 }
 
 export function serializeProject(objects: CadObject[]): string {
-  return JSON.stringify({ format: PROJECT_FORMAT, version: PROJECT_VERSION, units: MODEL_UNIT, objects }, null, 2) + '\n'
+  const normalized = objects.map((object) => ({ ...object, name: object.name?.trim() || undefined }))
+  return JSON.stringify({ format: PROJECT_FORMAT, version: PROJECT_VERSION, units: MODEL_UNIT, objects: normalized }, null, 2) + '\n'
 }
 
 export function parseProject(text: string): CadObject[] {
