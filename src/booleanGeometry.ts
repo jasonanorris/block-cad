@@ -4,7 +4,7 @@ import type { CadObject, SolidBody } from './cadModel'
 import { stlMeshManifold } from './stlMesh'
 import { basicShapeGeometry } from './basicShapeGeometry'
 
-function objectMatrix(object: CadObject): Matrix4 {
+export function objectMatrix(object: CadObject): Matrix4 {
   const { position, rotation, scale } = object
   const quaternion = new Quaternion().setFromEuler(new Euler(rotation.x, rotation.y, rotation.z, 'XYZ'))
   return new Matrix4().compose(
@@ -17,7 +17,8 @@ function objectMatrix(object: CadObject): Matrix4 {
 // Manifold cylinders point along Z. The workspace's cylinder axis is Y.
 const CYLINDER_TO_Y = new Matrix4().makeRotationX(-Math.PI / 2)
 
-export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): BufferGeometry {
+// The callback reads the result while its temporary Manifold objects are alive.
+export function readSolidManifold<T>(body: SolidBody, runtime: ManifoldToplevel, read: (solid: Manifold) => T): T {
   const allocated: Manifold[] = []
   const track = (solid: Manifold) => { allocated.push(solid); return solid }
 
@@ -88,6 +89,14 @@ export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): 
       result = track(result.subtract(transformed))
     }
 
+    return read(result)
+  } finally {
+    for (const solid of allocated) solid.delete()
+  }
+}
+
+export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): BufferGeometry {
+  return readSolidManifold(body, runtime, (result) => {
     const mesh = result.getMesh()
     const positions = new Float32Array(mesh.numVert * 3)
     for (let vertex = 0; vertex < mesh.numVert; vertex++) {
@@ -100,7 +109,5 @@ export function buildSolidGeometry(body: SolidBody, runtime: ManifoldToplevel): 
     geometry.setIndex(new Uint32BufferAttribute(mesh.triVerts, 1))
     geometry.computeVertexNormals()
     return geometry
-  } finally {
-    for (const solid of allocated) solid.delete()
-  }
+  })
 }

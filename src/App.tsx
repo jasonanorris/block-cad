@@ -23,6 +23,7 @@ import { alignByBounds, canPositionUnits, dropToWorkplane, getPlacementUnits, ty
 import { mirrorSelection } from './mirrorSelection'
 import { repeatSelection } from './repeatSelection'
 import RepeatTools from './RepeatTools'
+import ExportReview, { type ExportFormat } from './ExportReview'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -79,7 +80,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   }, [])
   const [cameraOrientation, setCameraOrientation] = useState('rotateX(-25deg) rotateY(-35deg)')
   const [projectError, setProjectError] = useState<string | null>(null)
-  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportRequest, setExportRequest] = useState<{ objects: CadObject[]; format: ExportFormat } | null>(null)
   const [svgError, setSvgError] = useState<string | null>(null)
   const [stlError, setStlError] = useState<string | null>(null)
   const [importingStl, setImportingStl] = useState(false)
@@ -136,7 +137,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     setToolMode('translate')
     setWorkplane(0)
     setProjectError(null)
-    setExportError(null)
+    setExportRequest(null)
     setSvgError(null)
     setStlError(null)
   }
@@ -169,24 +170,13 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  async function exportModel() {
-    if (objects.length === 0) return
-    try {
-      download(new Blob([await exportStl(objects)], { type: 'model/stl' }), 'block-cad-model.stl')
-      setExportError(null)
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Could not export the model.')
-    }
-  }
-
-  async function exportPrintModel() {
-    if (objects.length === 0) return
-    try {
-      download(new Blob([await export3mf(objects)], { type: 'model/3mf' }), 'block-cad-model.model.3mf')
-      setExportError(null)
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : 'Could not export the 3MF model.')
-    }
+  async function downloadReviewedExport() {
+    if (!exportRequest || sceneRef.current.objects !== exportRequest.objects) throw new Error('The model changed. Please export again.')
+    const { objects: snapshot, format } = exportRequest
+    const data = format === 'stl' ? await exportStl(snapshot) : await export3mf(snapshot)
+    if (sceneRef.current.objects !== snapshot) throw new Error('The model changed. Please export again.')
+    download(new Blob([data], { type: format === 'stl' ? 'model/stl' : 'model/3mf' }),
+      format === 'stl' ? 'block-cad-model.stl' : 'block-cad-model.model.3mf')
   }
 
   async function importSvgFile(event: ChangeEvent<HTMLInputElement>) {
@@ -242,7 +232,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
       setToolMode('translate')
       setWorkplane(0)
       setProjectError(null)
-      setExportError(null)
+      setExportRequest(null)
       setSvgError(null)
       setStlError(null)
     } catch (error) {
@@ -568,8 +558,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           <button type="button" onClick={newProject}>New</button>
           <button type="button" onClick={saveProject}>Save</button>
           <button type="button" onClick={() => fileInput.current?.click()}>Load</button>
-          <button type="button" onClick={exportModel} disabled={objects.length === 0} title="Export all shapes as a binary STL (millimeters)">Export STL</button>
-          <button type="button" onClick={exportPrintModel} disabled={objects.length === 0} title="Export finished solids as a 3MF model (millimeters)">Export 3MF</button>
+          <button type="button" onClick={() => setExportRequest({ objects, format: 'stl' })} disabled={objects.length === 0} title="Check and export all shapes as STL (millimeters)">Export STL</button>
+          <button type="button" onClick={() => setExportRequest({ objects, format: '3mf' })} disabled={objects.length === 0} title="Check and export finished solids as 3MF (millimeters)">Export 3MF</button>
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={loadProject} hidden aria-label="Choose a Block CAD project file" />
         </div>
       </header>
@@ -579,7 +569,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
       </div>}
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
       {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
-      {exportError && <div className="project-error" role="alert">Could not export model: {exportError}</div>}
+      {exportRequest && <ExportReview objects={exportRequest.objects} currentObjects={objects} format={exportRequest.format}
+        onClose={() => setExportRequest(null)} onDownload={downloadReviewedExport} />}
       {svgError && <div className="project-error" role="alert">Could not import SVG: {svgError}</div>}
       {stlError && <div className="project-error" role="alert">Could not import STL: {stlError}</div>}
       <main className="app-main">

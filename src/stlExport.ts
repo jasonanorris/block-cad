@@ -3,7 +3,6 @@ import { STLExporter } from 'three/addons/exporters/STLExporter.js'
 import { getSolidBodies, type CadObject } from './cadModel'
 import { buildSolidGeometry } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
-import { createSourceGeometry } from './sourceGeometry'
 
 function reverseWinding(geometry: BufferGeometry) {
   const index = geometry.getIndex()
@@ -30,15 +29,12 @@ export async function exportStl(objects: CadObject[]): Promise<ArrayBuffer> {
   const scene = new Scene()
   const geometries: BufferGeometry[] = []
   const bodies = getSolidBodies(objects)
-  const hasBooleans = bodies.some((body) => body.members.length > 1 || body.holes.length > 0)
-  const runtime = hasBooleans ? await loadManifold() : null
+  const runtime = await loadManifold()
 
   try {
     for (const body of bodies) {
       const object = body.anchor
-      const geometry = runtime && (body.members.length > 1 || body.holes.length > 0)
-        ? buildSolidGeometry(body, runtime)
-        : createSourceGeometry(object)
+      const geometry = buildSolidGeometry(body, runtime)
       geometries.push(geometry)
       if (object.scale.x * object.scale.y * object.scale.z < 0) reverseWinding(geometry)
 
