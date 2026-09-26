@@ -116,10 +116,18 @@ Search the Objects list by name, shape, status, or `#number`, and filter to soli
 
 ### 58 — Model colors
 
-Use **Color** in the active shape's inspector to choose its display color. Joined solids share the chosen color; holes keep independent source colors. Locked shapes cannot be recolored. The object list shows swatches, and selected shapes retain their orange highlight. Colors survive Undo/Redo, duplication, arrays, autosave, and project Save/Load. Project format 14 adds optional hexadecimal colors and still reads versions 1–13. STL and current 3MF exports remain geometry-only.
+Use **Color** in the active shape's inspector to choose its display color. Changing a joined member's color applies it to the whole joined solid; joined previews use their first member's color. Holes keep independent source colors. Locked shapes cannot be recolored. The object list shows swatches, and selected shapes retain their orange highlight. Colors survive Undo/Redo, duplication, arrays, autosave, and project Save/Load. Project format 14 adds optional hexadecimal colors and still reads versions 1–13. STL and current 3MF exports remain geometry-only.
 
 ### 59 — Local parts library
 
 Select one or more solids, open **Parts library**, enter a name, and choose **Save selection as part**. Complete joined assemblies and every linked cutter are saved, including colors; unrelated shapes and hole-only selections are excluded. Stored parts are centered on X/Z with their finished bottom at zero. **Insert part** adds visible, unlocked copies at the current workplane with new object and join IDs. Each insertion is one Undo step. Each save adds an independent named entry. **Refresh list** picks up changes from other tabs; deletion requires confirmation and does not remove already inserted shapes.
 
 Parts are kept in IndexedDB (`block-cad-library`) for this browser and exact site address, separately from autosave. Storage failures are shown without changing the project. Use project **Save** to keep portable backups; clearing site storage removes the library. Library management is separate from modeling Undo.
+
+### 60 — Named project snapshots
+
+Open **Project snapshots**, enter a name, and choose **Save snapshot** to keep the entire model, including names, colors, hidden/locked states, joined bodies, and hole links. Empty projects can be saved too. Each save creates a separate dated entry; it never overwrites an earlier snapshot. **Restore snapshot** validates its contents before replacing the current model and clears selection. Restoration is one Undo step; Undo restores the previous model and selection, and Redo reapplies the snapshot. Restoring also resumes local autosave. A model or selection change during loading cancels restoration.
+
+Snapshots share the local library database but remain separate from parts and autosave. They survive New, Load, and reloads at the same site address. They contain model data only, not camera/workplane preferences or Undo history. Snapshot deletion requires confirmation and cannot be undone; it does not change the open model. Use project Save for portable backups.
+
+For repeatable storage checks, run Vite and execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates temporary entries, tests persistence, kind isolation, atomic write failures, and damaged data rejection, then deletes its test entries.

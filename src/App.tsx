@@ -406,6 +406,21 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
       selectedObjectIds: copies.map((object) => object.id), selectedObjectId: copies[0]?.id ?? null } : current)
   }
 
+  async function saveSnapshot(name: string) {
+    await saveLocalProject('snapshot', name, scene.objects)
+  }
+
+  async function restoreSnapshot(id: string) {
+    const before = sceneRef.current
+    const restored = await readLocalProject(id, 'snapshot')
+    if (sceneRef.current !== before) throw new Error('The model or selection changed. Restore the snapshot again.')
+    commit((current) => current === before ? { objects: restored,
+      selectedObjectIds: [], selectedObjectId: null } : current)
+    setAutosaveEnabled(true)
+    setShowRecoveryNotice(false)
+    setExportRequest(null)
+  }
+
   function insertArray({ copies, lastCopiedIds }: ReturnType<typeof repeatSelection>) {
     const snapshot = scene
     if (!copies.length) return
@@ -726,6 +741,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           <div className="panel-section">
             <SavedProjectsPanel kind="part" canSave={selectedObjects.some((object) => !isHoleObject(object))}
               onSave={savePart} onUse={useSavedPart} />
+            <SavedProjectsPanel kind="snapshot" canSave={true} onSave={saveSnapshot} onUse={restoreSnapshot} />
           </div>
           <div className="panel-section workplane-section">
             <h3>Workplane</h3>

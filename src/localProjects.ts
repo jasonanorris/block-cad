@@ -62,10 +62,15 @@ export async function saveLocalProject(kind: SavedKind, name: string, objects: C
   const db = await openDatabase()
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(['items', 'projects'], 'readwrite')
-    tx.objectStore('items').add(item)
-    tx.objectStore('projects').add(project, item.id)
     tx.oncomplete = () => resolve()
     tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Could not save locally. Browser storage may be full or unavailable.'))
+    try {
+      tx.objectStore('items').add(item)
+      tx.objectStore('projects').add(project, item.id)
+    } catch (error) {
+      tx.abort()
+      reject(error)
+    }
   })
   return item
 }
@@ -79,7 +84,11 @@ export async function readLocalProject(id: string, kind: SavedKind): Promise<Cad
     tx.onabort = tx.onerror = () => reject(tx.error ?? new Error('Could not read the saved project.'))
   })
   if (!validMetadata(stored.item, kind) || typeof stored.project !== 'string') throw new Error('This saved item is missing or damaged. Refresh the list and try again.')
-  return parseProject(stored.project)
+  const objects = parseProject(stored.project)
+  if (objects.length !== stored.item.objectCount || kind === 'part' && !objects.length) {
+    throw new Error('The saved item is damaged. The current project was left unchanged.')
+  }
+  return objects
 }
 
 export async function deleteLocalProject(id: string, kind: SavedKind): Promise<void> {

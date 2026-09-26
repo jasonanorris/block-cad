@@ -127,7 +127,7 @@ export default function ObjectInspector({
             onFocus={onEditStart} onBlur={onEditEnd}
             onChange={(event) => onSetColor(object.id, event.target.value)} />
         </label>
-        <p className="selection-hint">Joined solids share a color. Selected shapes keep the orange highlight. Colors are saved in projects; STL/3MF exports contain geometry only.</p>
+        <p className="selection-hint">Changing this color applies to all joined members. Selected shapes keep the orange highlight. Colors are saved in projects; STL/3MF exports contain geometry only.</p>
         <h4>Shape mode</h4>
         <div className="shape-mode" role="group" aria-label={`${shapeName} shape mode`}>
           <button type="button" aria-pressed={!object.cutTargetId} onClick={() => onSetCutTarget(object.id, null)}>Solid</button>
