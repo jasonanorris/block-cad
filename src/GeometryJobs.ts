@@ -1,3 +1,4 @@
+import { EdgeBuildError } from './edgeDiagnostics'
 import type { GeometryKind, GeometryRequest, GeometryResponse, GeometryTasks } from './geometryTasks'
 
 export type GeometryWorker = { onmessage: ((event: MessageEvent<GeometryResponse>) => void) | null;
@@ -27,7 +28,7 @@ export class GeometryJobs {
           worker.onmessage = ({ data }) => {
             if (this.worker !== worker || data.id !== this.pending?.id) return
             const pending = this.pending; this.pending = null; pending.cleanup()
-            if (data.error) pending.reject(new Error(data.error)); else pending.resolve(data.result)
+            if (data.error) pending.reject(new EdgeBuildError(data.error, data.edgeKeys)); else pending.resolve(data.result)
           }
           worker.onerror = (event) => { event.preventDefault?.(); if (this.worker === worker) this.stop(new Error('Background geometry failed. Retry the operation.')) }
         }

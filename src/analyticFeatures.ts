@@ -1,3 +1,4 @@
+import { EdgeBuildError } from './edgeDiagnostics'
 import { Matrix4, Vector3 } from 'three'
 import type { CadObject } from './cadModel'
 import { isHoleObject } from './cadModel'
@@ -9,14 +10,14 @@ import type { AnalyticHistory } from './analyticData'
 import { MAX_BREP_BYTES } from './analyticData'
 import { MAX_EDGE_FEATURES, MAX_FEATURE_EDGES, validateEdgeFeatures, type EdgeFeature, type EdgeOperation } from './edgeFeatureData'
 import type { FeatureEdge } from './edgeFeatures'
-import { KernelScope, kernelBoolean, kernelEdges, kernelFeature, kernelMesh, kernelPrimitive, kernelTransform, readBrep, validateKernelShape, writeBrep } from './analyticKernel'
+import { KernelScope, describeKernelEdge, kernelBoolean, kernelEdges, kernelFeature, kernelMesh, kernelPrimitive, kernelTransform, readBrep, validateKernelShape, writeBrep } from './analyticKernel'
 
 function replay(oc: CadKernel, scope: KernelScope, history: AnalyticHistory) {
   let shape = readBrep(oc, scope, history.baseBrep)
   validateKernelShape(oc, scope, shape)
   for (let i = 0; i < history.features.length; i++) {
     try { shape = kernelFeature(oc, scope, shape, history.features[i]) }
-    catch (error) { throw new Error(`Feature ${i + 1}: ${error instanceof Error ? error.message : 'Geometry could not be built.'}`) }
+    catch (error) { throw new EdgeBuildError(`Feature ${i + 1}: ${error instanceof Error ? error.message : 'Geometry could not be built.'}`, error instanceof EdgeBuildError ? error.edgeKeys : []) }
   }
   return shape
 }
@@ -47,12 +48,18 @@ async function job<T>(work: (oc: CadKernel, scope: KernelScope) => T): Promise<T
   catch (error) { throw error instanceof Error ? error : new Error('The CAD kernel could not build this geometry. Try smaller radii or another edge selection.') }
   finally { scope.dispose() }
 }
-export async function findAnalyticEdges(objects: CadObject[], ids: string[]): Promise<FeatureEdge[]> {
+export async function findAnalyticEdges(objects: CadObject[], ids: string[], featureId?: string): Promise<FeatureEdge[]> {
   return job((oc, scope) => {
     const c = context(oc, scope, objects, ids)
-    return kernelEdges(oc, scope, c.shape).map(edge => {
+    const featureIndex = featureId ? c.history.features.findIndex(f => f.id === featureId) : -1
+    if (featureId && featureIndex < 0) throw new Error('Separate later joins/cuts before locating this feature.')
+    const shape = featureId ? replay(oc, scope, { ...c.history, features: c.history.features.slice(0, featureIndex) }) : c.shape
+    const available = kernelEdges(oc, scope, shape)
+    const listed = featureId ? c.history.features[featureIndex].edges.map(stored => available.find(edge => edge.key === stored.key)).filter(edge => !!edge) : available
+    if (featureId && listed.length !== c.history.features[featureIndex].edges.length) throw new Error('An edge could not be located for this feature.')
+    return listed.map(edge => {
       const path = edge.path.map(p => { const v = new Vector3(p.x, p.y, p.z).applyMatrix4(c.matrix); return { x: v.x, y: v.y, z: v.z } })
-      return { a: path[0], b: path.at(-1)!, path, key: edge.key, normalA: { x: 0, y: 0, z: 0 }, normalB: { x: 0, y: 0, z: 0 }, angle: 0, maxSize: 10000, maxRadius: 10000 }
+      return { ...describeKernelEdge(oc, scope, shape, edge), a: path[0], b: path.at(-1)!, path, key: edge.key, normalA: { x: 0, y: 0, z: 0 }, normalB: { x: 0, y: 0, z: 0 }, angle: 0, maxSize: 10000, maxRadius: 10000 }
     })
   })
 }

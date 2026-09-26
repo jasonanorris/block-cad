@@ -98,3 +98,24 @@ test('advanced sources support joined solids, scaled sources, and reusable libra
  assert.deepEqual(new Set(joined.replacedIds),new Set([a.id,c.id]))
  assert.ok(joined.object.dimensions.x>30)
 })
+
+test('advanced edge labels, saved-feature locations, and failure references agree with the geometry',async()=>{
+ const {EdgeBuildError}=await import('../src/edgeDiagnostics.ts')
+ const b=shape(),edges=await findAnalyticEdges([b],[b.id])
+ assert.ok(edges.every(e=>e.edgeType==='outside' && e.curveType==='straight'))
+ const hole={...shape('hole'),dimensions:{x:12,y:12,z:12},position:{x:0,y:8,z:0},cutTargetId:b.id}
+ const pocket=(await findAnalyticEdges([b,hole],[b.id])).filter(e=>e.path.every(p=>close(p.y,2)))
+ assert.equal(pocket.length,4);assert.ok(pocket.every(e=>e.edgeType==='inside' && e.curveType==='straight'))
+ const circular=(await findAnalyticEdges([b,{...hole,type:'cylinder',dimensions:{diameter:10,height:12}}],[b.id])).filter(e=>e.path.every(p=>close(p.y,2)))
+ assert.equal(circular.length,1);assert.equal(circular[0].edgeType,'inside');assert.equal(circular[0].curveType,'curved')
+ const first=(await previewAnalyticFeature([b],[b.id],[edges[3],edges[0]],'fillet',1)).object
+ const located=await findAnalyticEdges([first],[first.id],first.analyticHistory.features[0].id)
+ assert.deepEqual(located.map(e=>e.key),[edges[3].key,edges[0].key])
+ assert.deepEqual(located.map(e=>e.path),[edges[3].path,edges[0].path])
+ await assert.rejects(previewAnalyticFeature([b],[b.id],[edges[0]],'fillet',1000),error=>{
+  assert.ok(error instanceof EdgeBuildError);assert.match(error.message,/selected edge 1 \(1000 mm\)/)
+  assert.ok(error.edgeKeys.every(key=>key===edges[0].key))
+  if(!error.edgeKeys.length) assert.match(error.message,/did not identify/)
+  return true
+ })
+})

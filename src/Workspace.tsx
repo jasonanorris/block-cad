@@ -108,7 +108,7 @@ function CadScene({
   booleanGeometries,
   section,
   referenceOrigin,
-  edgeSession, featureEdges, selectedEdge, edgePreviewing, onPickEdge, onCancelEdge,
+  edgeSession, featureEdges, selectedEdge, focusedEdge, failedEdgeKeys, edgePreviewing, onPickEdge, onCancelEdge,
   measurementPoints, facePlane, pickFace, onPickFace, onExitFace, onFaceError,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean>; onRectangle: (rectangle: ScreenRectangle | null) => void }) {
   const onSelectMesh = useCallback((id: string, additive: boolean) => {
@@ -169,7 +169,7 @@ function CadScene({
         onTransformEnd={onTransformEnd}
       />
       <PointMeasurementOverlay points={measurementPoints} />
-      <EdgePicker enabled={edgeSession} edges={featureEdges} selected={selectedEdge} previewing={edgePreviewing} onPick={onPickEdge} onCancel={onCancelEdge} />
+      <EdgePicker enabled={edgeSession} edges={featureEdges} selected={selectedEdge} focused={focusedEdge} failedKeys={failedEdgeKeys} previewing={edgePreviewing} onPick={onPickEdge} onCancel={onCancelEdge} />
       <FacePicker enabled={pickFace} onPick={onPickFace} onExit={onExitFace} onError={onFaceError} />
       <BoxSelection enabled={boxSelectEnabled} onSelect={onSelectMany} onExit={onExitBoxSelect} onRectangle={onRectangle} />
     </>
@@ -180,6 +180,8 @@ type WorkspaceProps = {
   edgeSession: boolean
   featureEdges: FeatureEdge[]
   selectedEdge: number[]
+  focusedEdge: number | null
+  failedEdgeKeys: string[]
   edgePreviewing: boolean
   onPickEdge: (index: number) => void
   onCancelEdge: () => void

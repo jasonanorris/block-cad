@@ -12,8 +12,8 @@ test('geometry jobs reuse idle workers and route results and errors by request I
   w.onmessage({data:{id:w.requests[0].id,result:{size:[1,2,3],span:null,gaps:[]}}})
   assert.deepEqual((await first).size,[1,2,3])
   const second=jobs.run('measure',input);assert.equal(workers.length,1)
-  const rejected=assert.rejects(second,/Bad geometry/)
-  w.onmessage({data:{id:w.requests[1].id,error:'Bad geometry'}});await rejected
+  const rejected=assert.rejects(second,error=>{assert.match(error.message,/Bad geometry/);assert.deepEqual(error.edgeKeys,['edge-ref']);return true})
+  w.onmessage({data:{id:w.requests[1].id,error:'Bad geometry',edgeKeys:['edge-ref']}});await rejected
  }finally{jobs.dispose()}
 })
 

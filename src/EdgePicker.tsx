@@ -3,8 +3,8 @@ import { useThree } from '@react-three/fiber'
 import { BufferGeometry, Mesh, Raycaster, Vector2, Vector3 } from 'three'
 import type { FeatureEdge } from './edgeFeatures'
 
-export default function EdgePicker({ enabled, edges, selected, previewing, onPick, onCancel }: {
-  enabled: boolean; edges: FeatureEdge[]; selected: number[]; previewing: boolean; onPick: (index: number) => void; onCancel: () => void
+export default function EdgePicker({ enabled, edges, selected, focused, failedKeys, previewing, onPick, onCancel }: {
+  enabled: boolean; edges: FeatureEdge[]; selected: number[]; focused: number | null; failedKeys: string[]; previewing: boolean; onPick: (index: number) => void; onCancel: () => void
 }) {
   const { camera, scene, gl, invalidate } = useThree()
   const [hover, setHover] = useState<number | null>(null)
@@ -54,6 +54,6 @@ export default function EdgePicker({ enabled, edges, selected, previewing, onPic
   }, [enabled, edges, previewing, camera, scene, gl, invalidate, onPick, onCancel])
   if (previewing) return null
   return <group>{geometries.map((geometry, index) => <lineSegments key={index} geometry={geometry} renderOrder={10}>
-    <lineBasicMaterial color={index === hover ? '#e84f12' : selected.includes(index) ? '#059669' : '#2879ca'} depthTest depthWrite={false} />
+    <lineBasicMaterial color={index === focused || index === hover ? '#e84f12' : failedKeys.includes(edges[index].key ?? '') ? '#dc2626' : selected.includes(index) ? '#059669' : edges[index].edgeType === 'inside' ? '#8b5cf6' : edges[index].edgeType === 'transition' ? '#64748b' : '#2879ca'} depthTest depthWrite={false} />
   </lineSegments>)}</group>
 }

@@ -791,7 +791,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="workspace-frame">
-            <Workspace edgeSession={edgeActive} featureEdges={edgeTools.edges} selectedEdge={edgeTools.selected} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
+            <Workspace edgeSession={edgeActive} featureEdges={edgeTools.displayEdges} selectedEdge={edgeTools.editing ? edgeTools.displayEdges.map((_, index) => index) : edgeTools.selected} focusedEdge={edgeTools.focusedEdge} failedEdgeKeys={edgeTools.failedKeys} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
               section={section}
               objects={displayObjects}
               selectedObjectId={canTransformSelected ? selectedObjectId : null}

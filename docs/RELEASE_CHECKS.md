@@ -15,7 +15,7 @@ npm run preview -- --host 127.0.0.1 --port 4175
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 131 tests.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 132 tests.
 
 `npm run benchmark:large` verifies shared-mesh storage for 200 repeated sphere meshes and bounded object rows for 5,000 objects. Timings are informational; storage deduplication and the 50-row page limit are assertions.
 
@@ -90,6 +90,7 @@ The font licenses are shipped in `public/licenses/helvetiker.txt` and `public/li
 
 ### Advanced CAD acceptance
 
+- Verify inside/outside/transition and straight/curved labels on boxes, pockets, and hole rims. Hover/focus a size field and check its orange viewport highlight, including after reopening saved feature history. An oversized radius must report sizes and implicated edges when available, mark those fields/edges, and leave Save unchanged; unknown failures must not blame a specific edge.
 - Choose Advanced CAD and physically pick two meeting edges. Set different individual sizes, Preview/Apply, Undo/Redo, Save/Load, edit overrides, remove the feature, and export STL/3MF. No kernel asset should be required for ordinary mesh-tool use.
 - Build a hexagonal prism corner blend, an edge ending in an existing rounded surface, a rectangular pocket bottom fillet, and a circular blind-hole bottom fillet. Verify valid solids and expected radii/material changes, not only successful responses.
 - Check transformed native sources, joined solids, analytic library copies, dependent-history failures, invalid radii, and invalid saved analytic references. Format 21 must continue loading formats 1–20.

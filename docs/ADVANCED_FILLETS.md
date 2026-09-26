@@ -7,7 +7,7 @@ The staged OpenCascade integration was approved and implemented. Advanced CAD is
 - Fillets meeting at nonperpendicular corners, tested on a hexagonal prism.
 - A later edge fillet ending in an existing rounded surface.
 - Inside-edge fillets on rectangular pockets and circular blind holes.
-- Different radii on meeting edges through **Individual edge sizes**. Blank fields use the common size; overrides remain editable after Save/Load.
+- Different radii on meeting edges through **Selected edges and individual sizes**. Blank fields use the common size; overrides remain editable after Save/Load.
 - Analytic chamfers, feature history editing/removal, Preview/Apply/Cancel, Undo/Redo, transformed bodies, joined/cut source bodies, library reuse, and STL/3MF exports.
 
 ## Architecture
@@ -49,3 +49,9 @@ Not every combination of corner topology and radii can be built. Preview reports
 - [OpenCascade.js prebuilt modules](https://ocjs.org/docs/app-dev-workflow/pre-built)
 - [OpenCascade.js custom builds](https://ocjs.org/docs/app-dev-workflow/custom-builds)
 - [OCCT fillet API reference](https://occt3d.com/dev/doc/refman/html/class_b_rep_fillet_a_p_i___make_fillet.html) — current upstream reference; binding use is checked against the pinned package's declarations and executable tests rather than assumed to match the latest C++ release.
+
+## Edge selection and failure feedback
+
+Selected rows label straight/curved geometry and inside/outside/transition material boundaries. Boundary labels sample the solid around the curve midpoint at two distances and fall back to transition when ambiguous; they are hints, not eligibility guarantees. Outside edges are blue, inside edges purple, transitions gray, and selected edges green. Hovering or focusing a size field highlights its edge orange. Reopening a feature replays the preceding history to locate its input edges in stored order.
+
+Failed fillet contours are mapped to selected edge references and entered sizes. These references survive the worker boundary, mark the corresponding fields invalid, and color the edges red. When the kernel supplies no contour diagnosis, feedback explicitly describes a failed combination without blaming a particular edge. Changing settings clears stale failure highlights; Cancel and model/selection changes clear all temporary references. No project format change is needed.

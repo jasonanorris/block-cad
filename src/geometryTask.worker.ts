@@ -1,3 +1,4 @@
+import { EdgeBuildError } from './edgeDiagnostics'
 import { findFeatureEdges, previewEdgeFeature, editEdgeFeature } from './edgeFeatures'
 import { measureSelection } from './measurements'
 import { selectionReference } from './referenceOrigin'
@@ -13,7 +14,7 @@ worker.onmessage = async ({ data }) => {
   try {
     let result: GeometryResponse['result']
     switch (data.kind) {
-      case 'edges': result = data.input.advanced ? await (await import('./analyticFeatures')).findAnalyticEdges(data.input.objects, data.input.ids) : await findFeatureEdges(data.input.objects, data.input.ids); break
+      case 'edges': result = data.input.advanced ? await (await import('./analyticFeatures')).findAnalyticEdges(data.input.objects, data.input.ids, data.input.featureId) : await findFeatureEdges(data.input.objects, data.input.ids); break
       case 'edgePreview': result = data.input.advanced ? await (await import('./analyticFeatures')).previewAnalyticFeature(data.input.objects, data.input.ids, data.input.edges, data.input.operation, data.input.size) : await previewEdgeFeature(data.input.objects, data.input.ids, data.input.edges, data.input.operation, data.input.size); break
       case 'edgeEdit': result = data.input.advanced ? await (await import('./analyticFeatures')).editAnalyticFeature(data.input.objects, data.input.ids, data.input.featureId, data.input.change) : await editEdgeFeature(data.input.objects, data.input.ids, data.input.featureId, data.input.change); break
       case 'measure': result = await measureSelection(data.input.objects, data.input.ids, data.input.activeId); break
@@ -23,5 +24,5 @@ worker.onmessage = async ({ data }) => {
       case 'export': result = await (data.input.format === 'stl' ? exportStl(data.input.objects) : export3mf(data.input.objects)); break
     }
     worker.postMessage({ id: data.id, result }, result instanceof ArrayBuffer ? [result] : [])
-  } catch (error) { worker.postMessage({ id: data.id, error: error instanceof Error ? error.message : 'Geometry operation failed.' }) }
+  } catch (error) { worker.postMessage({ id: data.id, error: error instanceof Error ? error.message : 'Geometry operation failed.', ...(error instanceof EdgeBuildError ? { edgeKeys: error.edgeKeys } : {}) }) }
 }

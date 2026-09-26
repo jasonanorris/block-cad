@@ -1,3 +1,4 @@
+import { EdgeBuildError } from './edgeDiagnostics'
 import { Matrix4, Vector3 } from 'three'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 import type { TopoDS_Shape, TopoDS_Edge, TopAbs_ShapeEnum, ChFi3d_FilletShape } from 'opencascade.js/dist/opencascade.full.js'
@@ -96,20 +97,58 @@ export function kernelEdges(oc: CadKernel, scope: KernelScope, shape: TopoDS_Sha
   }
   return result
 }
+// Sample the material around an edge midpoint. Ambiguous and tangent cases
+// remain transitions; labels never grant eligibility or replace kernel checks.
+export function describeKernelEdge(oc: CadKernel, scope: KernelScope, shape: TopoDS_Shape, item: KernelEdge) {
+  const curve = scope.keep(new oc.BRepAdaptor_Curve_2(item.edge))
+  const curveType = curve.GetType() === oc.GeomAbs_CurveType.GeomAbs_Line ? 'straight' as const : 'curved' as const
+  const center = new Vector3(item.path[24].x, item.path[24].y, item.path[24].z)
+  const tangent = new Vector3(item.path[25].x - item.path[23].x, item.path[25].y - item.path[23].y, item.path[25].z - item.path[23].z).normalize()
+  const u = tangent.clone().cross(Math.abs(tangent.y) < .9 ? new Vector3(0, 1, 0) : new Vector3(1, 0, 0)).normalize(), v = tangent.clone().cross(u)
+  const classifier = scope.keep(new oc.BRepClass3d_SolidClassifier_2(shape))
+  const votes: string[] = []
+  for (const radius of [.01, .002]) {
+    let inside = 0, outside = 0
+    for (let i = 0; i < 24; i++) {
+      const angle = (i + .37) * Math.PI * 2 / 24, p = center.clone().addScaledVector(u, radius * Math.cos(angle)).addScaledVector(v, radius * Math.sin(angle))
+      const sample = new oc.gp_Pnt_3(p.x, p.y, p.z)
+      try { classifier.Perform(sample, 1e-7); const state = classifier.State(); if (state === oc.TopAbs_State.TopAbs_IN) inside++; else if (state === oc.TopAbs_State.TopAbs_OUT) outside++ }
+      finally { sample.delete() }
+    }
+    votes.push(inside + outside < 20 ? 'transition' : inside > outside + 2 ? 'inside' : outside > inside + 2 ? 'outside' : 'transition')
+  }
+  const edgeType = votes[0] === votes[1] && votes[0] === 'inside' ? 'inside' : votes[0] === votes[1] && votes[0] === 'outside' ? 'outside' : 'transition'
+  return { curveType, edgeType } as const
+}
 export function kernelFeature(oc: CadKernel, scope: KernelScope, shape: TopoDS_Shape, feature: EdgeFeature) {
   const available = kernelEdges(oc, scope, shape)
   const builder = scope.keep(feature.operation === 'fillet' ? new oc.BRepFilletAPI_MakeFillet(shape, oc.ChFi3d_FilletShape.ChFi3d_Rational as ChFi3d_FilletShape) : new oc.BRepFilletAPI_MakeChamfer(shape))
   const used = new Set<string>()
-  for (const selection of feature.edges) {
+  const resolved: { edge: TopoDS_Edge; key: string; radius: number; number: number }[] = []
+  for (const [index, selection] of feature.edges.entries()) {
     const matches = available.filter(edge => edge.key === selection.key)
-    if (matches.length !== 1 || !selection.key || used.has(selection.key)) throw new Error('An edge changed or is ambiguous. Remove dependent later features and select edges again.')
+    if (matches.length !== 1 || !selection.key || used.has(selection.key)) throw new EdgeBuildError(`Selected edge ${index + 1} changed or is ambiguous. Remove dependent later features and select edges again.`, selection.key ? [selection.key] : [])
     used.add(selection.key)
     const radius = selection.size ?? feature.size
-    if (!Number.isFinite(radius) || radius < .01 || radius > 10000) throw new Error('Each radius must be 0.01 to 10,000 mm.')
+    if (!Number.isFinite(radius) || radius < .01 || radius > 10000) throw new EdgeBuildError(`Selected edge ${index + 1}: enter a size from 0.01 to 10,000 mm.`, [selection.key])
+    resolved.push({ edge: matches[0].edge, key: selection.key, radius, number: index + 1 })
     builder.Add_2(radius, matches[0].edge)
   }
-  builder.Build(scope.keep(new oc.Message_ProgressRange_1()))
-  if (!builder.IsDone()) throw new Error('These radii cannot be built on the selected edges. Reduce the sizes or change the selection.')
+  const failure = () => {
+    let faulty: typeof resolved = []
+    try {
+      if ('NbFaultyContours' in builder) {
+        const contours = Array.from({ length: builder.NbFaultyContours() }, (_, i) => builder.FaultyContour(i + 1))
+        faulty = resolved.filter(item => contours.includes(builder.Contour(item.edge)))
+      }
+    } catch { /* Some kernel failures do not expose contour diagnostics. */ }
+    const detail = (faulty.length ? faulty : resolved).map(item => `selected edge ${item.number} (${item.radius} mm)`).join(', ')
+    return new EdgeBuildError(faulty.length
+      ? `Could not build ${feature.operation} at ${detail}. Reduce these sizes or remove edges from the selection.`
+      : `Could not build this ${feature.operation} combination: ${detail}. The kernel did not identify a single failing edge. Reduce sizes or preview fewer edges.`, faulty.map(item => item.key))
+  }
+  try { builder.Build(scope.keep(new oc.Message_ProgressRange_1())) } catch { throw failure() }
+  if (!builder.IsDone()) throw failure()
   const result = scope.keep(builder.Shape()); validateKernelShape(oc, scope, result); return result
 }
 export function kernelMesh(oc: CadKernel, scope: KernelScope, shape: TopoDS_Shape) {
