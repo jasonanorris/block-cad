@@ -4,6 +4,8 @@ A simple browser-based 3D modeling project. You can add, select, move, rotate, s
 
 ## Local development
 
+The app autosaves the current project locally after a short pause in editing and restores it on launch. **Saved locally** means the browser has completed the save; recovery does not restore selection or Undo history. New and Load replace the local draft, including an empty New project. Use **Save** for a portable JSON backup. Recovery belongs to this browser and URL (including the port), can be cleared by browser storage settings, and uses the most recently saved tab if several tabs are open. Changes made immediately before a crash may not have reached storage. Storage failures are shown in the status bar and do not stop editing or downloading projects.
+
 Requires Node.js 20.19+ or 22.12+.
 
 ```bash

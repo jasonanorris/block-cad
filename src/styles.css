@@ -22,6 +22,9 @@ body { margin: 0; min-width: 320px; }
 .project-actions button:disabled { cursor: default; opacity: .5; }
 .project-actions button:disabled:hover { border-color: #dfe6f0; background: #fff; color: #52657e; }
 .project-error { padding: 10px 30px; border-bottom: 1px solid #f1cccc; background: #fff4f4; color: #a43e3e; font-size: 12px; }
+.autosave-status, .recovery-notice { padding: 8px 30px; margin: 0; font-size: 12px; color: #52657e; background: #eef5ff; }
+.recovery-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.recovery-notice button { font: inherit; padding: 4px 8px; border: 1px solid #b7cdf0; border-radius: 4px; cursor: pointer; }
 
 .app-main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 18px; padding: 22px; min-height: 0; }
 .workspace-panel { min-width: 0; height: calc(100vh - 120px); min-height: 560px; align-self: start; display: flex; flex-direction: column; }

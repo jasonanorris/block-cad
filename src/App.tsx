@@ -18,6 +18,7 @@ import { getObjectTopHeight } from './workplane'
 import { importSvg } from './svgImport'
 import { importStl } from './stlImport'
 import type { FrameRequest } from './frameCamera'
+import { useAutosave } from './useAutosave'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -46,9 +47,11 @@ const cameraViews: { view: CameraView; label: string }[] = [
 
 const gridSizes = [1, 5, 10, 20]
 
-export default function App() {
-  const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => [createCadObject('box')])
+export default function App({ initialObjects, recoveryNotice = '' }: { initialObjects: CadObject[]; recoveryNotice?: string }) {
+  const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => initialObjects)
   const { objects, selectedObjectId, selectedObjectIds } = scene
+  const autosaveStatus = useAutosave(objects)
+  const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveryNotice)
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [snapEnabled, setSnapEnabled] = useState(false)
   const [gridSize, setGridSize] = useState(5)
@@ -530,6 +533,10 @@ export default function App() {
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={loadProject} hidden aria-label="Choose a Block CAD project file" />
         </div>
       </header>
+      <div className="autosave-status" role="status">{autosaveStatus}</div>
+      {showRecoveryNotice && <div className="recovery-notice" role="status">{recoveryNotice}
+        <button type="button" onClick={() => setShowRecoveryNotice(false)}>Dismiss</button>
+      </div>}
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
       {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
       {exportError && <div className="project-error" role="alert">Could not export model: {exportError}</div>}
