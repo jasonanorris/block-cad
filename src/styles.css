@@ -241,3 +241,15 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 .color-field { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
 .color-field input { width: 52px; height: 30px; padding: 2px; border: 1px solid #dfe6f0; background: white; border-radius: 6px; }
 .object-swatch { display: inline-block; width: 9px; height: 9px; border: 1px solid #0003; border-radius: 2px; margin-right: 5px; }
+.saved-projects { font-size: 12px; }
+.saved-projects summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.saved-projects label { display: flex; flex-direction: column; gap: 5px; margin: 8px 0; }
+.saved-projects input { min-width: 0; padding: 7px; border: 1px solid #dfe6f0; border-radius: 6px; font: inherit; }
+.saved-projects button { padding: 6px 8px; border: 1px solid #b7cdf0; border-radius: 6px; background: #eef5ff; font: inherit; cursor: pointer; }
+.saved-projects button:disabled { opacity: .5; cursor: default; }
+.saved-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.saved-projects ul { list-style: none; padding: 0; max-height: 280px; overflow: auto; }
+.saved-projects li { padding: 10px 0; border-top: 1px solid #dfe6f0; }
+.saved-projects li > strong, .saved-projects li > span { display: block; overflow-wrap: anywhere; margin-bottom: 6px; }
+.saved-projects li > span { color: #718199; font-size: 11px; }
+.saved-delete { margin-top: 8px; padding: 8px; background: #fff3ef; }

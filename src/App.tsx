@@ -32,6 +32,9 @@ import ResizeTools from './ResizeTools'
 import { resizeSelection } from './resizeSelection'
 import { selectedExportObjects, type ExportScope } from './exportSelection'
 import ShortcutHelp from './ShortcutHelp'
+import SavedProjectsPanel from './SavedProjectsPanel'
+import { readLocalProject, saveLocalProject } from './localProjects'
+import { insertPart, preparePart } from './partsLibrary'
 import ExportReview, { type ExportFormat } from './ExportReview'
 
 const cameraViews: { view: CameraView; label: string }[] = [
@@ -387,6 +390,22 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     void positionSelection((current, ids) => alignByBounds(current, ids, selectedObjectId, axis, alignmentEdge))
   }
 
+  async function savePart(name: string) {
+    const snapshot = scene
+    const sources = await preparePart(snapshot.objects, new Set(snapshot.selectedObjectIds))
+    await saveLocalProject('part', name, sources)
+  }
+
+  async function useSavedPart(id: string) {
+    const snapshot = sceneRef.current
+    const height = workplaneHeight
+    const sources = await readLocalProject(id, 'part')
+    if (sceneRef.current !== snapshot) throw new Error('The model or selection changed. Insert the part again.')
+    const copies = insertPart(sources, height)
+    commit((current) => current === snapshot ? { objects: [...current.objects, ...copies],
+      selectedObjectIds: copies.map((object) => object.id), selectedObjectId: copies[0]?.id ?? null } : current)
+  }
+
   function insertArray({ copies, lastCopiedIds }: ReturnType<typeof repeatSelection>) {
     const snapshot = scene
     if (!copies.length) return
@@ -703,6 +722,10 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                   : 'Calculating model…'}
               </p>
             )}
+          </div>
+          <div className="panel-section">
+            <SavedProjectsPanel kind="part" canSave={selectedObjects.some((object) => !isHoleObject(object))}
+              onSave={savePart} onUse={useSavedPart} />
           </div>
           <div className="panel-section workplane-section">
             <h3>Workplane</h3>

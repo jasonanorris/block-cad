@@ -117,3 +117,9 @@ Search the Objects list by name, shape, status, or `#number`, and filter to soli
 ### 58 — Model colors
 
 Use **Color** in the active shape's inspector to choose its display color. Joined solids share the chosen color; holes keep independent source colors. Locked shapes cannot be recolored. The object list shows swatches, and selected shapes retain their orange highlight. Colors survive Undo/Redo, duplication, arrays, autosave, and project Save/Load. Project format 14 adds optional hexadecimal colors and still reads versions 1–13. STL and current 3MF exports remain geometry-only.
+
+### 59 — Local parts library
+
+Select one or more solids, open **Parts library**, enter a name, and choose **Save selection as part**. Complete joined assemblies and every linked cutter are saved, including colors; unrelated shapes and hole-only selections are excluded. Stored parts are centered on X/Z with their finished bottom at zero. **Insert part** adds visible, unlocked copies at the current workplane with new object and join IDs. Each insertion is one Undo step. Each save adds an independent named entry. **Refresh list** picks up changes from other tabs; deletion requires confirmation and does not remove already inserted shapes.
+
+Parts are kept in IndexedDB (`block-cad-library`) for this browser and exact site address, separately from autosave. Storage failures are shown without changing the project. Use project **Save** to keep portable backups; clearing site storage removes the library. Library management is separate from modeling Undo.
