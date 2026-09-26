@@ -144,6 +144,10 @@ h1 { margin-bottom: 0; font-size: 23px; letter-spacing: -.035em; line-height: 1.
 .alignment-mode { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 12px; }
 .alignment-mode select { max-width: 170px; padding: 6px; border: 1px solid #b7cdf0; border-radius: 6px; background: #fff; font: inherit; }
 .position-error { color: #a43e3e; font-size: 12px; margin-top: 8px; }
+.repeat-tools { margin: 12px 0; font-size: 12px; }
+.repeat-tools summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.repeat-tools label { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; }
+.repeat-tools input, .repeat-tools select { width: 80px; padding: 6px; border: 1px solid #b7cdf0; border-radius: 6px; font: inherit; }
 .join-actions button { padding: 8px 10px; border: 1px solid #b7cdf0; border-radius: 7px; background: #eef5ff; color: #315fa8; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
 .join-actions button:hover:not(:disabled) { background: #e1efff; }
 .join-actions button:focus-visible { outline: 2px solid #3176e9; outline-offset: 2px; }

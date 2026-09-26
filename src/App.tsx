@@ -21,6 +21,8 @@ import type { FrameRequest } from './frameCamera'
 import { useAutosave } from './useAutosave'
 import { alignByBounds, canPositionUnits, dropToWorkplane, getPlacementUnits, type AlignmentEdge } from './placement'
 import { mirrorSelection } from './mirrorSelection'
+import { repeatSelection } from './repeatSelection'
+import RepeatTools from './RepeatTools'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -392,6 +394,17 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     void positionSelection((current, ids) => alignByBounds(current, ids, selectedObjectId, axis, alignmentEdge))
   }
 
+  function repeatSelected(axis: keyof Vector3, count: number, spacing: number) {
+    const snapshot = scene
+    const { copies, lastCopiedIds } = repeatSelection(objects, new Set(selectedObjectIds), axis, count, spacing)
+    if (!copies.length) return
+    commit((current) => current === snapshot ? {
+      objects: [...current.objects, ...copies],
+      selectedObjectIds: copies.map((object) => object.id),
+      selectedObjectId: lastCopiedIds.get(selectedObjectId ?? '') ?? copies.at(-1)!.id,
+    } : current)
+  }
+
   const nudgeSelection = useCallback((axis: keyof Vector3, amount: number) => {
     editObjects((current) => {
       const ids = new Set(selectedObjectIds)
@@ -739,13 +752,6 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
             <p className="selection-hint">Join keeps the union of two or more solids; Intersect keeps their shared volume. Separate restores the source solids.</p>
             <p className="selection-hint">Group needs one solid and its linked holes selected. It hides the cutters and moves them with the solid. Ungroup reveals them again.</p>
-            <label className="alignment-mode">Align by
-              <select value={alignmentEdge} onChange={(event) => setAlignmentEdge(event.target.value as AlignmentEdge)}>
-                <option value="min">Minimum edge</option>
-                <option value="center">Center</option>
-                <option value="max">Maximum edge</option>
-              </select>
-            </label>
             <div className="align-actions" role="group" aria-label="Mirror selection">
               {(['x', 'y', 'z'] as const).map((axis) => (
                 <button key={axis} type="button" disabled={!canPosition}
@@ -753,6 +759,14 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               ))}
             </div>
             <p className="selection-hint">Mirror flips the arrangement around its shared center on a world axis, including linked holes.</p>
+            <RepeatTools disabled={!selectedObjectIds.length || positioning} onRepeat={repeatSelected} />
+            <label className="alignment-mode">Align by
+              <select value={alignmentEdge} onChange={(event) => setAlignmentEdge(event.target.value as AlignmentEdge)}>
+                <option value="min">Minimum edge</option>
+                <option value="center">Center</option>
+                <option value="max">Maximum edge</option>
+              </select>
+            </label>
             <div className="align-actions" role="group" aria-label="Align selected bounds to active shape">
               {(['x', 'y', 'z'] as const).map((axis) => (
                 <button key={axis} type="button" disabled={!canAlign} onClick={() => alignSelected(axis)} title={`Align the ${alignmentEdge} on world ${axis.toUpperCase()} to the active shape`}>Align {axis.toUpperCase()}</button>
