@@ -105,3 +105,7 @@ Open **Resize selection**, choose a world dimension, enter its target size in mi
 ### 55 — Export selected bodies
 
 Choose **Selection** in the header's **Export** scope selector, then **Export STL** or **Export 3MF**. The review reports only those finished bodies and identifies its scope. Selecting any solid member of a joined assembly includes the whole assembly and every linked cutter, even hidden or ungrouped cutters. Unrelated bodies and separately selected holes are excluded; a hole-only or empty selection cannot export. **All bodies** retains the full-project export. Downloads use a `block-cad-selection` filename for selection exports. The review captures the scope and selected bodies when opened; editing the model invalidates it. Export does not modify the model, selection, or Undo history.
+
+### 56 — Shortcut help
+
+Click **Shortcuts** above the workspace or press **?** to open the keyboard and mouse guide. It covers selection, Box select, camera controls, framing, editing, Undo/Redo, and nudging. Escape or **Close shortcuts** closes the dialog and returns focus to the previous control. Modeling shortcuts are paused while typing or while a dialog is open. The guide does not change selection, project data, or Undo history.

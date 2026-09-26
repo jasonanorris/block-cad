@@ -28,6 +28,7 @@ import { radialArray } from './radialArray'
 import ResizeTools from './ResizeTools'
 import { resizeSelection } from './resizeSelection'
 import { selectedExportObjects, type ExportScope } from './exportSelection'
+import ShortcutHelp from './ShortcutHelp'
 import ExportReview, { type ExportFormat } from './ExportReview'
 
 const shapeLabels: Record<CadObjectType, string> = {
@@ -90,6 +91,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   }, [])
   const [cameraOrientation, setCameraOrientation] = useState('rotateX(-25deg) rotateY(-35deg)')
   const [projectError, setProjectError] = useState<string | null>(null)
+  const [showShortcuts, setShowShortcuts] = useState(false)
   const [exportScope, setExportScope] = useState<ExportScope>('all')
   const [exportRequest, setExportRequest] = useState<{ objects: CadObject[]; exportObjects: CadObject[]; scope: ExportScope; format: ExportFormat } | null>(null)
   const [svgError, setSvgError] = useState<string | null>(null)
@@ -497,7 +499,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.altKey) return
+      if (event.defaultPrevented || event.altKey || document.querySelector('dialog[open]')) return
       const target = event.target
       if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
 
@@ -508,7 +510,10 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
         arrowup: ['z', -1], arrowdown: ['z', 1],
         pageup: ['y', 1], pagedown: ['y', -1],
       }
-      if (modifier && key === 'z') {
+      if (!modifier && key === '?') {
+        event.preventDefault()
+        if (!event.repeat) setShowShortcuts(true)
+      } else if (modifier && key === 'z') {
         event.preventDefault()
         if (!event.repeat) (event.shiftKey ? redo : undo)()
       } else if (modifier && key === 'y') {
@@ -586,6 +591,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
       </div>}
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
       {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
+      {showShortcuts && <ShortcutHelp onClose={() => setShowShortcuts(false)} />}
       {exportRequest && <ExportReview objects={exportRequest.exportObjects} stale={objects !== exportRequest.objects} scope={exportRequest.scope} format={exportRequest.format}
         onClose={() => setExportRequest(null)} onDownload={downloadReviewedExport} />}
       {svgError && <div className="project-error" role="alert">Could not import SVG: {svgError}</div>}
@@ -641,6 +647,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               onClick={() => requestFrame('selection')} title="Fit the selected visible shapes (F)">Frame selection</button>
             <button type="button" className="tool-button" disabled={!objects.some((object) => !object.hidden)}
               onClick={() => requestFrame('all')} title="Fit all visible shapes">Frame all</button>
+            <button type="button" className="tool-button" title="Keyboard and mouse shortcuts (?)" onClick={() => setShowShortcuts(true)}>Shortcuts</button>
             <div className="history-actions">
               <button type="button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl/Cmd+Z)">Undo</button>
               <button type="button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl/Cmd+Shift+Z or Ctrl+Y)">Redo</button>

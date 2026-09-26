@@ -221,3 +221,9 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 .export-scope select { max-width: 120px; padding: 7px; border: 1px solid #dfe6f0; border-radius: 6px; background: white; color: inherit; font: inherit; }
 .project-actions { flex-wrap: wrap; justify-content: flex-end; }
 .resize-tools select { width: 112px; }
+.shortcut-help { width: min(620px, calc(100vw - 32px)); }
+.shortcut-help h3 { margin: 20px 0 8px; font-size: 15px; }
+.shortcut-help table { width: 100%; border-collapse: collapse; }
+.shortcut-help th, .shortcut-help td { padding: 6px 0; text-align: left; font-weight: 400; vertical-align: top; border-bottom: 1px solid #e9eef5; }
+.shortcut-help td { padding-left: 16px; }
+.shortcut-help kbd { font-size: 12px; white-space: normal; }
