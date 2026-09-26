@@ -1,7 +1,7 @@
 import { BufferGeometry, Euler, Float32BufferAttribute, Matrix4, Quaternion, Uint32BufferAttribute, Vector3 } from 'three'
 import type { Manifold, ManifoldToplevel, Mat4 } from 'manifold-3d'
 import type { CadObject, SolidBody } from './cadModel'
-import { customProfile } from './customShapes'
+import { customGeometry, customProfile } from './customShapes'
 import { stlMeshManifold } from './stlMesh'
 import { basicShapeGeometry } from './basicShapeGeometry'
 
@@ -26,6 +26,15 @@ export function readSolidManifold<T>(body: SolidBody, runtime: ManifoldToplevel,
   function primitive(object: CadObject): Manifold {
     switch (object.type) {
       case 'custom': {
+        if (object.parameters.kind === 'rounded-box' && object.parameters.rounding === 'all' && object.parameters.radius > 0) {
+          const geometry = customGeometry(object.parameters)
+          try {
+            return track(runtime.Manifold.ofMesh(new runtime.Mesh({ numProp: 3,
+              vertProperties: new Float32Array(geometry.getAttribute('position').array),
+              triVerts: new Uint32Array(geometry.getIndex()!.array),
+            })))
+          } finally { geometry.dispose() }
+        }
         const { contours, depth, upright } = customProfile(object.parameters)
         const polygons = [contours.outline, ...contours.holes].map((contour) => contour.map((p): [number, number] => [p.x, p.y]))
         const section = new runtime.CrossSection(polygons, 'EvenOdd')

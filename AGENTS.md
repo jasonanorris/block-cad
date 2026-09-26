@@ -59,7 +59,7 @@ Browser-only storage regression helpers (run with Vite, from the browser console
 (await import('/tests/browser-library-transfer.mjs')).runTransferChecks()
 ```
 
-Both helpers remove the temporary entries they create. Project format 18 deduplicates STL payloads using a mesh table and reads formats 1–17. Resolve references and validate shared payloads before creating runtime objects. Custom-shape parameters were added in 17 and font IDs in 16. Custom geometry must agree between source meshes and Manifold. Surface tools share the finished-surface picker and must invalidate picks when the model changes. Library backup format 1 embeds validated project files and imports additively in one IndexedDB transaction.
+Both helpers remove the temporary entries they create. Project format 19 adds rounded-box rounding mode and reads formats 1–18; format 18 introduced deduplicated STL payloads in a mesh table. Older rounded boxes default to sides-only rounding. All-edge rounded boxes share a welded indexed mesh between source previews and Manifold. Resolve references and validate shared payloads before creating runtime objects. Custom-shape parameters were added in 17 and font IDs in 16. Custom geometry must agree between source meshes and Manifold. Surface tools share the finished-surface picker and must invalidate picks when the model changes. Library backup format 1 embeds validated project files and imports additively in one IndexedDB transaction.
 
 ## Deployment
 

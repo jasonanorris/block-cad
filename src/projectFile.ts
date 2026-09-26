@@ -5,7 +5,7 @@ import { customProfile, validateCustomParameters } from './customShapes'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 18
+const PROJECT_VERSION = 19
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -109,6 +109,7 @@ function objectFromFile(value: unknown, index: number, version: number, verified
     case 'custom': {
       if (version < 17) throw new Error(`${field} has an unsupported shape type.`)
       const parameters = validateCustomParameters(data.parameters)
+      if (version < 19 && parameters.kind === 'rounded-box' && parameters.rounding === 'all') throw new Error(`${field} requires project format 19 for all-edge rounding.`)
       const expected = customProfile(parameters).dimensions
       const actual = vector(dimensions, `${field}.dimensions`)
       if ((['x', 'y', 'z'] as const).some((axis) => expected[axis] !== actual[axis])) throw new Error(`${field}.dimensions do not match its custom parameters.`)

@@ -44,7 +44,7 @@ Reference origins and workplanes are workspace aids: changing them does not move
 
 Open **Create → Custom shapes** and choose Tube, Rounded box, or L bracket. Set the dimensions, wall thickness, or corner radius, then **Add custom shape**. The shape starts on the current workplane. Select it and use **Edit custom shape → Apply custom parameters** to revise it in one Undo step while retaining its center, rotation, scale, color, and links. Parameter dimensions describe the unscaled source; inspector resizing applies scale afterward.
 
-Tubes have a concentric opening. Rounded boxes round the four vertical corners, with flat tops and bottoms; this is not a general edge fillet tool. L brackets have a horizontal base and an upright leg with uniform wall thickness. Save a custom shape to **Parts library** for reuse; inserted copies retain editable parameters. Parameter dimensions accept 0.01–1,000 mm (corner radius can be zero). Wall thickness and radius must fit the shape.
+Tubes have a concentric opening. For Rounded box, choose **Round → Sides only (2D)** for rounded vertical corners with flat tops/bottoms, or **All edges (3D)** to round all twelve edges and eight corners. All-edge radius must be at most half the smallest width, depth, or height; sides-only radius is limited by width/depth. Radius 0 makes a plain box. Outside dimensions stay as entered. Existing boxes can switch modes in **Edit → Edit custom shape**; Undo restores the previous mode. This is not a general edge fillet tool. L brackets have a horizontal base and an upright leg with uniform wall thickness. Save a custom shape to **Parts library** for reuse; inserted copies retain editable parameters. Parameter dimensions accept 0.01–1,000 mm (corner radius can be zero). Wall thickness and radius must fit the shape.
 
 ## Drill hole patterns
 
@@ -91,7 +91,7 @@ Boolean previews calculate in a background worker. Unchanged bodies retain their
 
 Open **Library backup / transfer → Export library backup** to download all saved parts and snapshots in one file. Import it on another browser/site with **Import library backup**. Import validates the whole file, then adds every entry in one transaction using fresh storage IDs. Existing entries and the open model stay unchanged; repeated imports create duplicates. Names, dates, fonts, colors, assemblies, and empty snapshots are preserved. Limits are 50 MB, 250 saved items, and 10,000 source shapes per file. Failed imports add nothing. Library import is separate from model Undo.
 
-Project format 18 stores repeated STL meshes once while preserving each copy’s transform and properties. Older project files still load.
+Project format 19 records the rounding mode and retains the shared mesh table introduced in format 18, storing repeated STL meshes once while preserving each copy’s transform and properties. Older project files still load.
 
 Local parts, snapshots, and autosave do not synchronize automatically across browsers or addresses. Clearing browser storage removes them. Keep downloaded project files as backups.
 

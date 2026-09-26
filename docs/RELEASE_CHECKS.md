@@ -15,7 +15,7 @@ npm run preview -- --host 127.0.0.1 --port 4175
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 111 tests.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 113 tests.
 
 `npm run benchmark:large` verifies shared-mesh storage for 200 repeated sphere meshes and bounded object rows for 5,000 objects. Timings are informational; storage deduplication and the 50-row page limit are assertions.
 
@@ -47,14 +47,16 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 - Pick two surface points, check the line and signed X/Y/Z differences, then cancel with Escape. Measurement must leave Save output/Undo unchanged and clear after a model edit. Verify switching to workplane and box-selection modes.
 
 - Load more than 50 objects; navigate pages, search, filter assemblies, and use Show selected page. Verify selection survives paging.
-- Save/load repeated STL copies in format 18 and load an older inline-mesh file. Check independent transforms and a shared mesh table, including projects embedded in library backups.
+- Save/load repeated STL copies in format 19 and load an older inline-mesh file. Check independent transforms and a shared mesh table, including projects embedded in library backups.
 - Cancel and retry measurements/reference bounds and export checks. Cancel a split/export while pending; no partial model changes or downloads may occur. Complete a split and Undo/Redo it.
 - In production preview, verify the geometry-task worker and WASM load for measurement, split, export review, STL, and 3MF. Closing export review must cancel pending work.
 - Review a disconnected model, a body outside the print volume, and small walls/holes. Change volume/threshold, apply settings, and verify updated warnings. Zero threshold disables feature warnings; warnings do not block valid downloads.
 
+- Create a rounded box with All edges (3D), switch to Sides only (2D) in Edit, and Undo/Redo. Check unchanged outside dimensions, radius validation against height, maximum radius, Save/Load, and STL/3MF worker exports. Older projects must keep sides-only geometry.
+
 ## Known limits
 
-- Custom shapes are three built-in parameterized generators. Rounded boxes only round vertical corners; this is not general edge filleting.
+- Custom shapes are three built-in parameterized generators. Rounded boxes offer sides-only or all-edge rounding with a uniform source radius; this is not general edge filleting. Nonuniform scaling also scales the rounding.
 - Hole patterns generate separate cutters, with no persistent pattern constraint or automatic through-depth calculation.
 - Face alignment uses picked triangle normals and points, without collision checking or additional twist control.
 - Point measurement uses clicked surface points, without vertex snapping; it is not minimum body-to-body clearance.

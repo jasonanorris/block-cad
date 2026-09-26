@@ -1,9 +1,11 @@
 import { ExtrudeGeometry, Path, Shape, Vector2 } from 'three'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { CadObject, Point2, SvgContours, Vector3 } from './cadModel'
 
 export type CustomParameters =
   | { kind: 'tube'; diameter: number; wall: number; height: number }
-  | { kind: 'rounded-box'; width: number; depth: number; height: number; radius: number }
+  | { kind: 'rounded-box'; width: number; depth: number; height: number; radius: number; rounding?: 'sides' | 'all' }
   | { kind: 'bracket'; width: number; height: number; depth: number; wall: number }
 export const customDefaults: Record<CustomParameters['kind'], CustomParameters> = {
   tube: { kind: 'tube', diameter: 30, wall: 3, height: 25 },
@@ -29,8 +31,13 @@ export function validateCustomParameters(value: unknown): CustomParameters {
   }
   if (p.kind === 'rounded-box') {
     const width = number('width'), depth = number('depth'), height = number('height'), radius = number('radius', true)
-    if (radius > Math.min(width, depth) / 2) throw new Error('Corner radius cannot exceed half the smaller width/depth.')
-    return { kind: p.kind, width, depth, height, radius }
+    const rounding = p.rounding === undefined ? 'sides' : p.rounding
+    if (rounding !== 'sides' && rounding !== 'all') throw new Error('Choose sides only or all edges for rounding.')
+    const limit = Math.min(width, depth, rounding === 'all' ? height : Infinity) / 2
+    if (radius > limit) throw new Error(rounding === 'all'
+      ? 'Corner radius cannot exceed half the smallest width, depth, or height.'
+      : 'Corner radius cannot exceed half the smaller width/depth.')
+    return { kind: p.kind, width, depth, height, radius, rounding }
   }
   if (p.kind === 'bracket') {
     const width = number('width'), height = number('height'), depth = number('depth'), wall = number('wall')
@@ -71,7 +78,23 @@ export function customProfile(parameters: CustomParameters): { contours: SvgCont
 }
 
 export function customGeometry(parameters: CustomParameters) {
-  const profile = customProfile(parameters)
+  const p = validateCustomParameters(parameters)
+  if (p.kind === 'rounded-box' && p.rounding === 'all' && p.radius > 0) {
+    const source = new RoundedBoxGeometry(p.width, p.height, p.depth, 8, p.radius)
+    // Weld face boundaries so the same closed mesh can be used by Manifold.
+    source.deleteAttribute('normal'); source.deleteAttribute('uv')
+    const geometry = mergeVertices(source, 1e-7)
+    source.dispose()
+    const indices = geometry.getIndex()!, triangles: number[] = []
+    // At the maximum radius, flat strips collapse to lines or points.
+    for (let i = 0; i < indices.count; i += 3) {
+      const a = indices.getX(i), b = indices.getX(i + 1), c = indices.getX(i + 2)
+      if (a !== b && b !== c && c !== a) triangles.push(a, b, c)
+    }
+    geometry.setIndex(triangles); geometry.computeVertexNormals()
+    return geometry
+  }
+  const profile = customProfile(p)
   const shape = new Shape(profile.contours.outline.map((p) => new Vector2(p.x, p.y)))
   shape.holes = profile.contours.holes.map((hole) => new Path(hole.map((p) => new Vector2(p.x, p.y))))
   const geometry = new ExtrudeGeometry(shape, { depth: profile.depth, bevelEnabled: false, curveSegments: 1 })
