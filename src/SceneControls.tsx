@@ -1,3 +1,4 @@
+import { fullyClipped } from './sectionView'
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
 import { Box3, Matrix4, Mesh, OrthographicCamera, type PerspectiveCamera } from 'three'
@@ -140,7 +141,7 @@ export default function SceneControls({
       if (snapSettings.current.objectSnapEnabled && controls.mode === 'translate' && selectedIdRef.current) {
         const visible = new Set<string>()
         scene.traverseVisible((object) => {
-          if (object instanceof Mesh && typeof object.userData.cadObjectId === 'string') visible.add(object.userData.cadObjectId)
+          if (object instanceof Mesh && typeof object.userData.cadObjectId === 'string' && !fullyClipped(object)) visible.add(object.userData.cadObjectId)
         })
         try { snapSnapshot = createSnapSnapshot(snapSettings.current.objects, selectedIdRef.current, visible) }
         catch { onSnapHint('Object snap unavailable for this geometry') }

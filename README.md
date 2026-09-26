@@ -135,3 +135,7 @@ For repeatable storage checks, run Vite and execute `(await import('/tests/brows
 ### 61 — Text shapes
 
 Open **Text shape** under Shapes, enter wording (up to 80 characters), font size, and extrusion depth, then **Add text**. Helvetiker is bundled for offline use; unsupported characters show an error. Text lies flat on the workplane as one shape, including enclosed letter openings. Select it and use **Edit text → Apply text** to change wording or size while keeping its position, rotation, scale, color, and hole target. Use Hole to engrave another solid, or overlap and Join for raised lettering. Project format 15 stores wording, font size, and sampled outlines, so saved shapes remain portable. Font attribution is included at `public/licenses/helvetiker.txt`.
+
+### 62 — Section view
+
+Open **Section view**, enable it, choose X/Y/Z, and move the plane with **Position (mm)**. **Flip side** changes which side remains visible; **Section through active center** uses the active source's position. Back surfaces are visible for interior inspection. This is an open cutaway, not a capped or physically sliced solid. Clipped surfaces do not intercept clicks, and entirely clipped shapes are excluded from box selection and object-snap targets. Partly clipped box selection still uses conservative full-shape bounds. Measurements, saved projects, and exports remain whole. New and Load reset the view.

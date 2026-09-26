@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
-import type { BufferGeometry, Mesh } from 'three'
+import { DoubleSide, FrontSide, type BufferGeometry, type Mesh, type Plane } from 'three'
+import { clippedRaycast, sectionPlane, type SectionView } from './sectionView'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } from './cadModel'
 import SceneControls, { type CameraView } from './SceneControls'
@@ -19,6 +20,7 @@ function CadObjectMesh({
   onSelect,
   selectedMeshRef,
   cutGeometry,
+  clippingPlanes,
 }: {
   object: CadObject
   isSelected: boolean
@@ -26,6 +28,7 @@ function CadObjectMesh({
   hiddenInGroup: boolean
   onSelect: (id: string, additive: boolean) => void
   selectedMeshRef: RefObject<Mesh | null>
+  clippingPlanes: Plane[]
   cutGeometry?: BufferGeometry
 }) {
   const sourceGeometry = useMemo(() => createSourceGeometry(object), [object.type, object.dimensions,
@@ -41,6 +44,7 @@ function CadObjectMesh({
   return (
     <mesh
       userData={{ cadObjectId: object.id }}
+      raycast={clippedRaycast}
       ref={isActive ? selectedMeshRef : undefined}
       visible={!hiddenInGroup || isSelected}
       position={[position.x, position.y, position.z]}
@@ -54,6 +58,8 @@ function CadObjectMesh({
     >
       <primitive object={cutGeometry ?? sourceGeometry} attach="geometry" />
       <meshStandardMaterial
+        clippingPlanes={clippingPlanes}
+        side={clippingPlanes.length ? DoubleSide : FrontSide}
         color={isSelected ? '#f3a447' : object.color ?? DEFAULT_OBJECT_COLOR}
         emissive={isSelected ? '#5c2d00' : '#000000'}
         emissiveIntensity={isSelected ? 0.18 : 0}
@@ -92,8 +98,10 @@ function CadScene({
   onTransformEnd,
   gizmoInteractionRef,
   booleanGeometries,
+  section,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean>; onRectangle: (rectangle: ScreenRectangle | null) => void }) {
   const selectedMeshRef = useRef<Mesh | null>(null)
+  const clippingPlanes = useMemo(() => { const plane = sectionPlane(section); return plane ? [plane] : [] }, [section])
   const hiddenGroupedIds = new Set(getSolidBodies(objects).flatMap((body) => {
     if (!booleanGeometries.has(body.anchor.id)) return []
     return [
@@ -118,6 +126,7 @@ function CadScene({
           onSelect={(id, additive) => { if (!gizmoInteractionRef.current) onSelectObject(id, additive) }}
           selectedMeshRef={selectedMeshRef}
           cutGeometry={booleanGeometries.get(object.id)}
+          clippingPlanes={clippingPlanes}
         />
       ))}
       <SceneControls
@@ -145,6 +154,7 @@ function CadScene({
 }
 
 type WorkspaceProps = {
+  section: SectionView
   objects: CadObject[]
   selectedObjectId: string | null
   selectedObjectIds: string[]
@@ -174,6 +184,7 @@ export default function Workspace(props: WorkspaceProps) {
   return (
     <div className={`workspace-canvas${props.boxSelectEnabled ? ' box-select-mode' : ''}`} aria-label={`3D workspace with ${props.objects.length} ${props.objects.length === 1 ? 'object' : 'objects'} and grid`}>
       <Canvas
+        onCreated={({ gl }) => { gl.localClippingEnabled = true }}
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
         onPointerMissed={(event) => { if (!props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
       >

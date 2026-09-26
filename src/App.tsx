@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
+import SectionTools from './SectionTools'
+import { defaultSection, type SectionView } from './sectionView'
 import TextTools from './TextTools'
 import { createTextObject, changeText } from './textShapes'
 import ObjectList from './ObjectList'
@@ -64,6 +66,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const [autosaveEnabled, setAutosaveEnabled] = useState(initialAutosaveEnabled)
   const autosaveStatus = useAutosave(objects, autosaveEnabled)
   const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveryNotice)
+  const [section, setSection] = useState<SectionView>(defaultSection)
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [objectSnapEnabled, setObjectSnapEnabled] = useState(false)
   const [snapHint, setSnapHint] = useState('')
@@ -141,6 +144,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     setShowRecoveryNotice(false)
     setToolMode('translate')
     setWorkplane(0)
+    setSection(defaultSection)
     setProjectError(null)
     setExportRequest(null)
     setSvgError(null)
@@ -236,6 +240,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
       setShowRecoveryNotice(false)
       setToolMode('translate')
       setWorkplane(0)
+      setSection(defaultSection)
       setProjectError(null)
       setExportRequest(null)
       setSvgError(null)
@@ -681,6 +686,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           </div>
           <div className="workspace-frame">
             <Workspace
+              section={section}
               objects={objects}
               selectedObjectId={canTransformSelected ? selectedObjectId : null}
               selectedObjectIds={selectedObjectIds}
@@ -751,6 +757,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               onSave={savePart} onUse={useSavedPart} />
             <SavedProjectsPanel kind="snapshot" canSave={true} onSave={saveSnapshot} onUse={restoreSnapshot} />
           </div>
+          <div className="panel-section"><SectionTools section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
           <div className="panel-section workplane-section">
             <h3>Workplane</h3>
             <label className="workplane-height-field">Height (mm)

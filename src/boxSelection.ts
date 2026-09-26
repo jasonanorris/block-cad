@@ -1,3 +1,4 @@
+import { fullyClipped } from './sectionView'
 import { Camera, Matrix4, Mesh, Object3D, Vector4 } from 'three'
 
 export type ScreenRectangle = { left: number; top: number; right: number; bottom: number }
@@ -47,7 +48,7 @@ export function boxSelectedIds(scene: Object3D, camera: Camera, rectangle: Scree
   scene.updateMatrixWorld(true)
   camera.updateMatrixWorld()
   scene.traverseVisible((object) => {
-    if (!(object instanceof Mesh) || typeof object.userData.cadObjectId !== 'string') return
+    if (!(object instanceof Mesh) || typeof object.userData.cadObjectId !== 'string' || fullyClipped(object)) return
     const bounds = projectedMeshBounds(object, camera, width, height)
     if (bounds && bounds.left <= rectangle.right && bounds.right >= rectangle.left &&
       bounds.top <= rectangle.bottom && bounds.bottom >= rectangle.top) ids.add(object.userData.cadObjectId)
