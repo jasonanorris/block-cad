@@ -96,8 +96,8 @@ function encodeSolid(solid: Manifold, center = [0, 0, 0]) {
   return encodeStlMesh(positions)
 }
 
-// All edges in a feature are resolved against the same input. Reject meeting or
-// overlapping cuts instead of presenting a Boolean intersection as a corner blend.
+// Resolve each edge against the same input. Shared chamfers meet at sharp miters;
+// three perpendicular fillets receive a spherical corner patch.
 function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<ReturnType<typeof loadManifold>>): Manifold {
   if (!['fillet', 'chamfer'].includes(feature.operation) || !Number.isFinite(feature.size) || feature.size < .01 || feature.size > 10000) throw new Error('Enter a radius or distance from 0.01 to 10,000 mm.')
   if (!feature.edges.length || feature.edges.length > MAX_FEATURE_EDGES) throw new Error(`Select 1 to ${MAX_FEATURE_EDGES} edges.`)
@@ -109,9 +109,23 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
     if (feature.size > limit + tolerance) throw new Error(`Use a ${feature.operation === 'fillet' ? 'radius' : 'distance'} no larger than ${Number(limit.toFixed(4))} mm for these edges.`)
     return current
   })
+  const sharesCorner = (a: FeatureEdge, b: FeatureEdge) => [a.a, a.b].some((p) => [b.a, b.b].some((q) => v(p).distanceTo(v(q)) < tolerance))
   for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
-    if ([edges[i].a, edges[i].b].some((a) => [edges[j].a, edges[j].b].some((b) => v(a).distanceTo(v(b)) < tolerance))) {
-      throw new Error('Choose separate edges that do not meet. Shared corners need corner blending, which is not supported yet.')
+    if (sameEdge(edges[i], edges[j])) throw new Error('Select each edge only once.')
+  }
+  const corners: { origin: Vector3; axes: Vector3[] }[] = []
+  if (feature.operation === 'fillet') {
+    const vertices: Point[] = []
+    edges.forEach((edge) => [edge.a, edge.b].forEach((p) => { if (!vertices.some((q) => v(p).distanceTo(v(q)) < tolerance)) vertices.push(p) }))
+    for (const p of vertices) {
+      const incident = edges.filter((edge) => [edge.a, edge.b].some((q) => v(p).distanceTo(v(q)) < tolerance))
+      if (incident.length < 2) continue
+      const axes = incident.map((edge) => v(v(p).distanceTo(v(edge.a)) < tolerance ? edge.b : edge.a).sub(v(p)).normalize())
+      if (incident.length !== 3 || incident.some((edge) => Math.abs(edge.angle - 90) > 1e-4) ||
+        axes.some((axis, i) => axes.slice(i + 1).some((other) => Math.abs(axis.dot(other)) > 1e-6))) {
+        throw new Error('Fillets at a shared corner require all three perpendicular edges in the same feature. Other corner blends are not supported yet.')
+      }
+      corners.push({ origin: v(p), axes })
     }
   }
   const allocated: Manifold[] = [], removals: Manifold[] = []
@@ -146,12 +160,25 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
       cutter = track(cutter.translate([0, 0, -pad]))
       const transformed = track(cutter.transform(matrix.elements as Mat4))
       const removal = track(solid.intersect(transformed))
-      for (const previous of removals) {
-        const overlap = track(previous.intersect(removal))
+      for (let i = 0; i < removals.length; i++) {
+        if (sharesCorner(current, edges[i])) continue
+        const overlap = track(removals[i].intersect(removal))
         if (overlap.volume() > 1e-8) throw new Error('These edge cuts overlap. Use a smaller size or select separate edges.')
       }
       removals.push(removal)
       result = track(result.subtract(transformed))
+    }
+    for (const corner of corners) {
+      const radius = feature.size
+      // Replace the intersecting cylindrical corner with a sphere tangent to all
+      // three edge fillets. The cut is restricted to the corner's radius-sized cube.
+      const frame = new Matrix4().makeBasis(...corner.axes as [Vector3, Vector3, Vector3]).setPosition(corner.origin)
+      const cube = track(runtime.Manifold.cube([radius, radius, radius]))
+      const sphere = track(runtime.Manifold.sphere(radius, 128))
+      const centered = track(sphere.translate([radius, radius, radius]))
+      const patch = track(cube.subtract(centered))
+      const worldPatch = track(patch.transform(frame.elements as Mat4))
+      result = track(result.subtract(worldPatch))
     }
     if (result.status() !== 'NoError' || result.isEmpty() || result.volume() <= 0 || result.volume() >= solid.volume() - 1e-8) throw new Error('These edges could not be modified safely. Try a smaller size.')
     // Return ownership of the final result; release every intermediate.

@@ -107,8 +107,8 @@ test('multi-edge rejection and dependent-feature errors preserve the original mo
  const edges=await findFeatureEdges(objects,[shape.id]),edge=edges[0]
  const shared=edges.find(e=>e!==edge && [e.a,e.b].some(a=>[edge.a,edge.b].some(b=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z)<1e-5)))
  const original=serializeProject(objects)
- await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,shared],'fillet',2),/do not meet/)
- await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,edge],'chamfer',2),/do not meet/)
+ await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,shared],'fillet',2),/all three perpendicular/)
+ await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,edge],'chamfer',2),/only once/)
  await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[],'fillet',2),/Select 1/)
  assert.equal(serializeProject(objects),original)
  const first=await previewEdgeFeature(objects,[shape.id],edge,'fillet',1)
@@ -177,4 +177,54 @@ test('angled limits differ by operation and editable histories retain acute edge
  assert.ok((await findFeatureEdges([shallow],[shallow.id])).every(e=>e.angle>=15 && e.angle<=165))
  const fine={...box('fine'),type:'prism',sides:32,dimensions:{diameter:40,height:20}}
  await assert.rejects(()=>findFeatureEdges([fine],[fine.id]),/No supported edges/)
+})
+
+test('three-edge fillet corners form spherical patches and all box edges form a rounded solid',async()=>{
+ const {Vector3}=await import('three')
+ const {createSourceGeometry}=await import('../src/sourceGeometry.ts')
+ const shape={...box('corners'),dimensions:{x:20,y:20,z:20}},edges=await findFeatureEdges([shape],[shape.id])
+ const runtime=await loadManifold()
+ for(const radius of [2,5,10]) {
+  const {object}=await previewEdgeFeature([shape],[shape.id],edges,'fillet',radius)
+  const volume=readSolidManifold(getSolidBodies([object])[0],runtime,s=>{assert.equal(s.status(),'NoError');return s.volume()})
+  const inner=20-2*radius,expected=inner**3+6*radius*inner**2+3*Math.PI*radius**2*inner+4/3*Math.PI*radius**3
+  assert.ok(Math.abs(volume-expected)<Math.max(1,expected*.002),`${volume} vs ${expected}`)
+  const geometry=createSourceGeometry(object),p=geometry.getAttribute('position')
+  try {
+   // A full rounded box is the radius offset of its inner box. Intersecting
+   // cylinders alone leave protruding corners and fail this geometric check.
+   for(let i=0;i<p.count;i++) {
+    const position=new Vector3().fromBufferAttribute(p,i)
+    const distance=Math.hypot(...position.toArray().map(n=>Math.max(0,Math.abs(n)-inner/2)))
+    assert.ok(Math.abs(distance-radius)<radius*.003+1e-5,`surface radius ${distance} != ${radius}`)
+   }
+  } finally {geometry.dispose()}
+  assert.deepEqual(parseProject(serializeProject([object])),[object])
+ }
+ const corner=edges[0].a
+ const incident=edges.filter(e=>[e.a,e.b].some(p=>Math.hypot(p.x-corner.x,p.y-corner.y,p.z-corner.z)<1e-5))
+ assert.equal(incident.length,3)
+ const single=await previewEdgeFeature([shape],[shape.id],incident,'fillet',2)
+ assert.equal(single.object.edgeHistory.features[0].edges.length,3)
+ // Blended meshes retain editable history, but cannot yet accept new edge picks.
+ await assert.rejects(findFeatureEdges([single.object],[single.object.id]),/heavily faceted/)
+ assert.ok(readSolidManifold(getSolidBodies([single.object])[0],runtime,s=>s.volume())<8000)
+})
+
+test('meeting chamfers and corner feature edits stay closed, undoable data and transform-safe',async()=>{
+ const {editEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const shape={...box('corners'),dimensions:{x:20,y:20,z:20},rotation:{x:.3,y:.4,z:.2},scale:{x:-1,y:1,z:1}}
+ const edges=await findFeatureEdges([shape],[shape.id]),corner=edges[0].a
+ const incident=edges.filter(e=>[e.a,e.b].some(p=>Math.hypot(p.x-corner.x,p.y-corner.y,p.z-corner.z)<1e-5))
+ const runtime=await loadManifold()
+ const chamfer=await previewEdgeFeature([shape],[shape.id],incident.slice(0,2),'chamfer',2)
+ assert.equal(readSolidManifold(getSolidBodies([chamfer.object])[0],runtime,s=>s.status()),'NoError')
+ const all=await previewEdgeFeature([shape],[shape.id],edges,'chamfer',2)
+ const id=all.object.edgeHistory.features[0].id
+ const rounded=await editEdgeFeature([all.object],[all.object.id],id,{operation:'fillet',size:3})
+ assert.equal(rounded.object.edgeHistory.features[0].edges.length,12)
+ assert.equal(readSolidManifold(getSolidBodies([rounded.object])[0],runtime,s=>s.status()),'NoError')
+ assert.ok((await exportStl([rounded.object])).byteLength>84)
+ const removed=await editEdgeFeature([rounded.object],[rounded.object.id],id,null)
+ assert.ok(Math.abs(readSolidManifold(getSolidBodies([removed.object])[0],runtime,s=>s.volume())-8000)<.01)
 })

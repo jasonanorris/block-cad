@@ -4,7 +4,7 @@ import type { EdgeOperation } from './edgeFeatures'
 export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatureController; disabled: boolean }) {
   const picking = tools.edges.length > 0
   return <details className="repeat-tools edge-feature-tools"><summary>Fillet / chamfer edges</summary>
-    <p className="selection-hint">Select one solid, then click highlighted edges to toggle them on or off. Each feature applies one size to separate straight outside edges with 15°–165° interior angles and square ends. Meeting corners and overlapping cuts are not supported.</p>
+    <p className="selection-hint">Select one solid, then click highlighted edges to toggle them on or off. Each feature applies one size to straight outside edges with 15°–165° interior angles and square ends. Chamfers may meet at corners. A fillet corner needs all three perpendicular edges selected together; use Select all edges for a fully rounded box.</p>
     <button type="button" disabled={disabled || tools.busy} onClick={() => void tools.start()}>{picking ? 'Pick edges again' : 'Select edges'}</button>
     {tools.features.length > 0 && <ol className="edge-feature-list" aria-label="Edge feature history">
       {tools.features.map((feature, index) => <li key={feature.id}>
@@ -15,7 +15,8 @@ export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatu
     </ol>}
     {(picking || tools.editing) && <>
       {picking ? <>
-        <p role="status">{tools.selected.length ? `${tools.selected.length} edges selected (${tools.selected.map((index) => `${Number(tools.edges[index].angle.toFixed(1))}°`).join(', ')}). Maximum ${tools.operation === 'fillet' ? 'radius' : 'distance'} ${Number(Math.min(...tools.selected.map((index) => tools.operation === 'fillet' ? tools.edges[index].maxRadius : tools.edges[index].maxSize)).toFixed(4))} mm.` : `${tools.edges.length} eligible edges. Hover to highlight, then click to select.`}</p>
+        <p role="status">{tools.selected.length ? `${tools.selected.length} edges selected (${[...new Set(tools.selected.map((index) => `${Number(tools.edges[index].angle.toFixed(1))}°`))].join(', ')}). Maximum ${tools.operation === 'fillet' ? 'radius' : 'distance'} ${Number(Math.min(...tools.selected.map((index) => tools.operation === 'fillet' ? tools.edges[index].maxRadius : tools.edges[index].maxSize)).toFixed(4))} mm.` : `${tools.edges.length} eligible edges. Hover to highlight, then click to select.`}</p>
+        <button type="button" onClick={tools.selectAll} disabled={tools.busy}>Select all edges</button>
         <button type="button" onClick={tools.clearSelection} disabled={!tools.selected.length || tools.busy}>Clear edges</button>
       </> : <p role="status">{tools.removing ? 'Remove' : 'Edit'} feature {tools.features.findIndex((feature) => feature.id === tools.editing) + 1}. Preview to rebuild the remaining feature history.</p>}
       {!tools.removing && <>

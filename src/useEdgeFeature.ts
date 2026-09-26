@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CadObject } from './cadModel'
 import { GeometryJobs } from './GeometryJobs'
-import type { EdgeFeature } from './edgeFeatureData'
+import { MAX_FEATURE_EDGES, type EdgeFeature } from './edgeFeatureData'
 import type { EdgeOperation, FeatureEdge, previewEdgeFeature } from './edgeFeatures'
 
 type Preview = Awaited<ReturnType<typeof previewEdgeFeature>>
@@ -46,6 +46,7 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
   return { edges, selected, operation, size, preview, busy, error, features, editing, removing,
     active: edges.length > 0 || !!editing || busy, start, cancel, calculate, edit,
     pick: (index: number) => { invalidate(); setSelected((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index]) },
+    selectAll: () => { invalidate(); if (edges.length <= MAX_FEATURE_EDGES) setSelected(edges.map((_, index) => index)); else setError(`Select up to ${MAX_FEATURE_EDGES} edges per feature.`) },
     clearSelection: () => { invalidate(); setSelected([]) },
     setOperation: (value: EdgeOperation) => { invalidate(); setOperation(value) },
     setSize: (value: string) => { invalidate(); setSize(value) },
