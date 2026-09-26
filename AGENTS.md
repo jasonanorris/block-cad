@@ -37,6 +37,12 @@ npm run build
 
 # regression tests
 npm test
+
+# preview-cache benchmark
+npm run benchmark
+
+# regenerate bundled example projects
+npm run samples
 ```
 
 ## Deployment

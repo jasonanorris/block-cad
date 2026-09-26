@@ -1,0 +1,240 @@
+{
+  "format": "block-cad",
+  "version": 15,
+  "units": "mm",
+  "objects": [
+    {
+      "id": "flange-1",
+      "position": {
+        "x": 0,
+        "y": 3,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 80,
+        "height": 6
+      },
+      "name": "Eight-hole flange",
+      "color": "#6c9d69"
+    },
+    {
+      "id": "flange-2",
+      "position": {
+        "x": 28,
+        "y": 3,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 1",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    },
+    {
+      "id": "flange-3",
+      "position": {
+        "x": 19.79898987322333,
+        "y": 3,
+        "z": 19.798989873223327
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 2",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    },
+    {
+      "id": "flange-4",
+      "position": {
+        "x": 1.7145055188062944e-15,
+        "y": 3,
+        "z": 28
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 3",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    },
+    {
+      "id": "flange-5",
+      "position": {
+        "x": -19.798989873223327,
+        "y": 3,
+        "z": 19.79898987322333
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 4",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    },
+    {
+      "id": "flange-6",
+      "position": {
+        "x": -28,
+        "y": 3,
+        "z": 3.429011037612589e-15
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 5",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    },
+    {
+      "id": "flange-7",
+      "position": {
+        "x": -19.798989873223334,
+        "y": 3,
+        "z": -19.798989873223327
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 6",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    },
+    {
+      "id": "flange-8",
+      "position": {
+        "x": -5.143516556418883e-15,
+        "y": 3,
+        "z": -28
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 7",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    },
+    {
+      "id": "flange-9",
+      "position": {
+        "x": 19.798989873223327,
+        "y": 3,
+        "z": -19.798989873223334
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "cylinder",
+      "dimensions": {
+        "diameter": 8,
+        "height": 12
+      },
+      "name": "Bolt hole 8",
+      "cutTargetId": "flange-1",
+      "groupedWithTarget": true
+    }
+  ]
+}

@@ -8,6 +8,8 @@ import { readSolidManifold } from '../src/booleanGeometry.ts'
 import { loadManifold } from '../src/manifoldRuntime.ts'
 import { exportStl } from '../src/stlExport.ts'
 import { export3mf } from '../src/threeMfExport.ts'
+import { getObjectTopHeight } from '../src/workplane.ts'
+import { getPlacementBounds, getPlacementUnits } from '../src/placement.ts'
 import { box } from './fixtures.mjs'
 
 test('text creates one printable shape with enclosed openings and exports through both formats', async () => {
@@ -44,4 +46,10 @@ test('invalid text and unsupported project text payloads fail without silently r
   const data=JSON.parse(serializeProject([createTextObject('CAD',10,3)]))
   data.version=14;assert.throws(()=>parseProject(JSON.stringify(data)),/unsupported shape/)
   data.version=15;data.objects[0].contours=[];assert.throws(()=>parseProject(JSON.stringify(data)),/contours/)
+})
+
+test('selected-top workplane follows actual rotated text vertices', async () => {
+  const text={...createTextObject('T',20,3),rotation:{x:.7,y:.3,z:.2},scale:{x:-2,y:1,z:1}}
+  const bounds=await getPlacementBounds(getPlacementUnits([text],new Set([text.id]))[0])
+  assert.ok(Math.abs(getObjectTopHeight(text)-bounds.max.y)<1e-5)
 })

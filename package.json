@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "node --import ./tests/register.mjs tests/run.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "benchmark": "node --import ./tests/register.mjs scripts/benchmark-preview.mjs",
+    "samples": "node --import ./tests/register.mjs scripts/generate-samples.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.4.0",

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
+import ExampleProjects from './ExampleProjects'
 import SectionTools from './SectionTools'
 import { defaultSection, type SectionView } from './sectionView'
 import TextTools from './TextTools'
@@ -733,6 +734,16 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                 </button>
               ))}
             </div>
+            <ExampleProjects onLoad={(loaded) => {
+              if (sceneRef.current !== scene) throw new Error('The model or selection changed. Load the example again.')
+              commit((current) => current === scene ? { objects: loaded, selectedObjectIds: [], selectedObjectId: null } : current)
+              setSection(defaultSection)
+              setWorkplane(0)
+              setAutosaveEnabled(true)
+              setShowRecoveryNotice(false)
+              setExportRequest(null)
+              requestFrame('all')
+            }} />
             <TextTools onApply={addText} />
             <button className="cut-example-button" type="button" onClick={addCutExample}>Add cutout example</button>
             <p className="cut-example-hint">Adds an editable box and cylinder cutter.</p>

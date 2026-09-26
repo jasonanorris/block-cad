@@ -1,0 +1,60 @@
+{
+  "format": "block-cad",
+  "version": 15,
+  "units": "mm",
+  "objects": [
+    {
+      "id": "section-demo-1",
+      "position": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "box",
+      "dimensions": {
+        "x": 40,
+        "y": 30,
+        "z": 30
+      },
+      "name": "Section demo shell",
+      "color": "#d99842"
+    },
+    {
+      "id": "section-demo-2",
+      "position": {
+        "x": 0,
+        "y": 15,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "type": "box",
+      "dimensions": {
+        "x": 32,
+        "y": 18,
+        "z": 20
+      },
+      "name": "Enclosed cavity",
+      "cutTargetId": "section-demo-1",
+      "groupedWithTarget": true
+    }
+  ]
+}
