@@ -4,7 +4,11 @@ import type { selectionReference } from './referenceOrigin'
 import type { splitSelection } from './splitSelection'
 import type { ExportReport, PrintSettings } from './exportChecks'
 
+import type { FeatureEdge, EdgeOperation, previewEdgeFeature } from './edgeFeatures'
+
 export type GeometryTasks = {
+  edges: { input: { objects: CadObject[]; ids: string[] }; output: FeatureEdge[] }
+  edgePreview: { input: { objects: CadObject[]; ids: string[]; edge: FeatureEdge; operation: EdgeOperation; size: number }; output: Awaited<ReturnType<typeof previewEdgeFeature>> }
   measure: { input: { objects: CadObject[]; ids: string[]; activeId: string | null }; output: Awaited<ReturnType<typeof measureSelection>> }
   reference: { input: { objects: CadObject[]; ids: string[]; edge: 'min' | 'center' | 'max' }; output: Awaited<ReturnType<typeof selectionReference>> }
   inspect: { input: { objects: CadObject[]; settings: PrintSettings }; output: ExportReport }

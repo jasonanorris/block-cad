@@ -31,3 +31,5 @@ import './surfaceTools.test.mjs'
 import './geometryJobs.test.mjs'
 import './largeProjects.test.mjs'
 import './printChecks.test.mjs'
+
+import './edgeFeatures.test.mjs'

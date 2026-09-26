@@ -15,7 +15,7 @@ npm run preview -- --host 127.0.0.1 --port 4175
 
 Open the URL printed by Vite. For storage failure/validation checks, run `npm run dev`, then execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates and removes its own test records.
 
-`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 113 tests.
+`npm run benchmark` reports elapsed time and Boolean build counts for 100 cut bodies: initial build, metadata-only edits, and one cutter move. Expected rebuild counts are **100 / 0 / 1**. Timings depend on hardware and are not test gates. This benchmark measures the synchronous geometry builder/cache. Browser previews and geometry jobs use workers with separate scheduling/cancellation tests. The current regression suite contains 117 tests.
 
 `npm run benchmark:large` verifies shared-mesh storage for 200 repeated sphere meshes and bounded object rows for 5,000 objects. Timings are informational; storage deduplication and the 50-row page limit are assertions.
 
@@ -54,8 +54,12 @@ Open the URL printed by Vite. For storage failure/validation checks, run `npm ru
 
 - Create a rounded box with All edges (3D), switch to Sides only (2D) in Edit, and Undo/Redo. Check unchanged outside dimensions, radius validation against height, maximum radius, Save/Load, and STL/3MF worker exports. Older projects must keep sides-only geometry.
 
+- Select a box, open Edit → Fillet / chamfer edge, and physically hover/click an eligible edge. Check front/side views and hidden-edge rejection. Preview must change only the canvas, with Save/export retaining the committed model until Apply.
+- Check fillet and chamfer sizes, excessive size errors, Cancel/Escape, Apply, and one-step Undo/Redo. Changing the model/selection must discard pending work and previews. Unsupported concave/curved bodies must leave the model intact. Verify the worker operation in Vite production preview.
+
 ## Known limits
 
+- Selected-edge tools currently handle straight 90° outside edges with flat, square ends on convex bodies up to 5,000 triangles. Size limits are conservative. Apply bakes the whole body into a mesh; there is no persistent editable feature history or intersecting-corner blend solver.
 - Custom shapes are three built-in parameterized generators. Rounded boxes offer sides-only or all-edge rounding with a uniform source radius; this is not general edge filleting. Nonuniform scaling also scales the rounding.
 - Hole patterns generate separate cutters, with no persistent pattern constraint or automatic through-depth calculation.
 - Face alignment uses picked triangle normals and points, without collision checking or additional twist control.

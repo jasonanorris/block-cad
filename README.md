@@ -188,6 +188,10 @@ A dedicated worker now calculates Boolean previews and transfers mesh arrays bac
 
 Rounded boxes now include **Round → All edges (3D)** in both creation and editing. It rounds top/bottom edges and corners as well as the sides, preserving outside dimensions. Radius is limited to half the smallest dimension; 0 makes a plain box. Project format 19 stores this mode, reads formats 1–18, and defaults older rounded boxes to sides only.
 
+### Selected-edge fillet and chamfer
+
+**Edit → Fillet / chamfer edge** highlights eligible edges on one selected body. Pick an edge, enter a radius (fillet) or distance along each face (chamfer), Preview, then Apply or Cancel. Escape cancels; Apply is one Undo step. The initial scope is straight 90° convex outside edges with flat, square ends, on simple convex solids up to 5,000 triangles. Unsupported geometry and excessive sizes are rejected. Calculations use the background worker and obsolete previews cannot be applied. Applying bakes the finished body and linked shapes into a mesh solid; Undo restores editable sources. The result persists through projects, libraries, and exports using the existing mesh format. Curved/inside edges and intersecting corner blends are not supported.
+
 ### 74 — Hole patterns
 
 **Edit → Combine → Hole patterns** creates rows, grids, and bolt circles with diameter, depth, count, spacing, start angle, and plane offsets. Select a solid target; the tool includes its entire joined body. Without a face workplane, patterns are centered on its finished bounds and cut downward from its highest Y. With a face workplane, they start at the picked origin and cut inward along its normal. A 0.02 mm extension above the entry plane avoids coincident faces; the inward depth remains the requested value. Up to 200 ordinary grouped cylinder cutters are added in one Undo step and remain individually editable. Hidden/locked target members and invalid inputs are rejected. Cutters outside the target do not cut it. Choose enough depth for through holes; there is no automatic through-depth mode or persistent pattern constraint.

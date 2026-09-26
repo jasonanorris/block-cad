@@ -20,7 +20,7 @@ The right sidebar shows one tool tab at a time:
 | Tab | Tools |
 | --- | --- |
 | Create | Basic shapes, text, custom shapes, imports, examples |
-| Edit | Selected shape properties, duplicate/delete, copy/paste, Combine, hole patterns |
+| Edit | Selected shape properties, duplicate/delete, copy/paste, fillet/chamfer edges, Combine, hole patterns |
 | Objects | Object list, search, selection, hide/show, lock/unlock |
 | Place | Reference origin, workplanes, face alignment, dropping, Arrange (mirror, resize, arrays, align, distribute) |
 | Inspect | Section view/splitting, measurements, shortcut help |
@@ -45,6 +45,14 @@ Reference origins and workplanes are workspace aids: changing them does not move
 Open **Create → Custom shapes** and choose Tube, Rounded box, or L bracket. Set the dimensions, wall thickness, or corner radius, then **Add custom shape**. The shape starts on the current workplane. Select it and use **Edit custom shape → Apply custom parameters** to revise it in one Undo step while retaining its center, rotation, scale, color, and links. Parameter dimensions describe the unscaled source; inspector resizing applies scale afterward.
 
 Tubes have a concentric opening. For Rounded box, choose **Round → Sides only (2D)** for rounded vertical corners with flat tops/bottoms, or **All edges (3D)** to round all twelve edges and eight corners. All-edge radius must be at most half the smallest width, depth, or height; sides-only radius is limited by width/depth. Radius 0 makes a plain box. Outside dimensions stay as entered. Existing boxes can switch modes in **Edit → Edit custom shape**; Undo restores the previous mode. This is not a general edge fillet tool. L brackets have a horizontal base and an upright leg with uniform wall thickness. Save a custom shape to **Parts library** for reuse; inserted copies retain editable parameters. Parameter dimensions accept 0.01–1,000 mm (corner radius can be zero). Wall thickness and radius must fit the shape.
+
+## Fillet or chamfer an edge
+
+Select one solid body and open **Edit → Fillet / chamfer edge → Select edge**. Eligible edges appear blue; hover highlights an edge orange, and clicking selects it in green. Choose Fillet or Chamfer, enter a size in millimeters, and click **Preview edge**. Fillet size is the radius; chamfer size is the distance along each adjoining face. **Apply edge** commits the preview in one Undo step. **Cancel edge** or Escape restores the original. Changing the size clears the previous preview; changing the model or selection cancels the tool. Camera view buttons let you inspect other sides.
+
+This first version supports straight 90° outside edges on convex solids with flat, square ends, such as boxes. It excludes curved edges, inside corners, angled terminations, and intersecting corner blends. The tool reports a conservative maximum size for each edge and rejects unsupported bodies (including inputs over 5,000 triangles). Calculations run in a cancellable worker.
+
+Apply replaces the entire finished body—including joined sources and linked cutters—with a mesh solid. It preserves appearance and placement, and can be saved, exported, transformed, or cut again. Source parameters and the feature radius are baked into the mesh; Undo restores the original editable sources. Save and export use the committed model until you Apply.
 
 ## Drill hole patterns
 

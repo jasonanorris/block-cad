@@ -50,7 +50,7 @@ npm run samples
 
 ## Geometry and browser checks
 
-Boolean previews use `src/booleanPreview.worker.ts`, scheduled by `BackgroundPreview.ts`. Keep one request in flight, discard obsolete results, and dispose replaced meshes. Measurements, reference bounds, split, export review, and STL/3MF generation use `geometryTask.worker.ts` via `GeometryJobs.ts`. Cancellation terminates active workers; reject stale results and keep split commits atomic. These jobs have a 60-second timeout. Placement and import validation still run on the main thread. Production smoke checks must load the worker JS and Manifold WASM through Vite preview.
+Boolean previews use `src/booleanPreview.worker.ts`, scheduled by `BackgroundPreview.ts`. Keep one request in flight, discard obsolete results, and dispose replaced meshes. Edge discovery/fillet/chamfer previews, measurements, reference bounds, split, export review, and STL/3MF generation use `geometryTask.worker.ts` via `GeometryJobs.ts`. Cancellation terminates active workers; reject stale results and keep split commits atomic. These jobs have a 60-second timeout. Selected-edge features support a restricted convex, square-ended edge domain: validate it again in the worker, preserve source objects until Apply, and commit the mesh replacement atomically. Placement and import validation still run on the main thread. Production smoke checks must load the worker JS and Manifold WASM through Vite preview.
 
 Browser-only storage regression helpers (run with Vite, from the browser console):
 

@@ -11,6 +11,8 @@ import type { FrameRequest } from './frameCamera'
 import { expandAssemblyIds } from './selectionOperations'
 import BoxSelection from './BoxSelection'
 import FacePicker from './FacePicker'
+import EdgePicker from './EdgePicker'
+import type { FeatureEdge } from './edgeFeatures'
 import PointMeasurementOverlay from './PointMeasurementOverlay'
 import type { SurfacePick } from './surfaceTools'
 import type { WorkplaneFrame } from './workplane'
@@ -106,11 +108,12 @@ function CadScene({
   booleanGeometries,
   section,
   referenceOrigin,
+  featureEdges, selectedEdge, edgePreviewing, onPickEdge, onCancelEdge,
   measurementPoints, facePlane, pickFace, onPickFace, onExitFace, onFaceError,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean>; onRectangle: (rectangle: ScreenRectangle | null) => void }) {
   const onSelectMesh = useCallback((id: string, additive: boolean) => {
-    if (!pickFace && !gizmoInteractionRef.current) onSelectObject(id, additive)
-  }, [gizmoInteractionRef, onSelectObject, pickFace])
+    if (!pickFace && !featureEdges.length && !gizmoInteractionRef.current) onSelectObject(id, additive)
+  }, [gizmoInteractionRef, onSelectObject, pickFace, featureEdges.length])
   const selectedMeshRef = useRef<Mesh | null>(null)
   const clippingPlanes = useMemo(() => { const plane = sectionPlane(section); return plane ? [plane] : [] }, [section])
   const hiddenGroupedIds = new Set(getSolidBodies(objects).flatMap((body) => {
@@ -156,7 +159,7 @@ function CadScene({
         onSnapHint={onSnapHint}
         snapEnabled={snapEnabled}
         gridSize={gridSize}
-        boxSelectEnabled={boxSelectEnabled || pickFace}
+        boxSelectEnabled={boxSelectEnabled || pickFace || featureEdges.length > 0}
         cameraView={cameraView}
         frameRequest={frameRequest}
         frameSelectionIds={expandAssemblyIds(objects, new Set(selectedObjectIds), true)}
@@ -166,6 +169,7 @@ function CadScene({
         onTransformEnd={onTransformEnd}
       />
       <PointMeasurementOverlay points={measurementPoints} />
+      <EdgePicker edges={featureEdges} selected={selectedEdge} previewing={edgePreviewing} onPick={onPickEdge} onCancel={onCancelEdge} />
       <FacePicker enabled={pickFace} onPick={onPickFace} onExit={onExitFace} onError={onFaceError} />
       <BoxSelection enabled={boxSelectEnabled} onSelect={onSelectMany} onExit={onExitBoxSelect} onRectangle={onRectangle} />
     </>
@@ -173,6 +177,11 @@ function CadScene({
 }
 
 type WorkspaceProps = {
+  featureEdges: FeatureEdge[]
+  selectedEdge: number | null
+  edgePreviewing: boolean
+  onPickEdge: (index: number) => void
+  onCancelEdge: () => void
   measurementPoints: Vector3[]
   facePlane: WorkplaneFrame | null
   pickFace: boolean
@@ -213,7 +222,7 @@ export default function Workspace(props: WorkspaceProps) {
         frameloop="demand"
         onCreated={({ gl }) => { gl.localClippingEnabled = true }}
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
-        onPointerMissed={(event) => { if (!props.pickFace && !props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
+        onPointerMissed={(event) => { if (!props.featureEdges.length && !props.pickFace && !props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
       >
         <CadScene {...props} gizmoInteractionRef={gizmoInteractionRef} onRectangle={setRectangle} />
       </Canvas>

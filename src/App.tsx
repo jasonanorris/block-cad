@@ -6,6 +6,8 @@ import { dropOntoBody } from './dropOntoBody'
 import { positionFromReference } from './referenceOrigin'
 import ToolGroup from './ToolGroup'
 import ToolSidebar from './ToolSidebar'
+import EdgeFeatureTools from './EdgeFeatureTools'
+import { useEdgeFeature } from './useEdgeFeature'
 import ExampleProjects from './ExampleProjects'
 import SectionTools from './SectionTools'
 import { GeometryJobs } from './GeometryJobs'
@@ -110,6 +112,18 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     setAlignmentSource(null); setAlignmentTarget(null)
     setPickMode((mode) => mode === 'align-source' || mode === 'align-target' ? null : mode)
   }, [objects, selectedObjectIds])
+  const edgeTools = useEdgeFeature(objects, selectedObjectIds, () => {
+    setPickMode(null); setBoxSelectEnabled(false); setSection((current) => ({ ...current, enabled: false }))
+  }, (preview) => {
+    const replaced = new Set(preview.replacedIds)
+    commit((current) => current.objects === objects && current.selectedObjectIds === selectedObjectIds
+      ? { objects: [...current.objects.filter((object) => !replaced.has(object.id)), preview.object],
+          selectedObjectIds: [preview.object.id], selectedObjectId: preview.object.id } : current)
+  })
+  useEffect(() => { if (pickMode || boxSelectEnabled || section.enabled) edgeTools.cancel() }, [pickMode, boxSelectEnabled, section.enabled])
+  const edgeActive = edgeTools.edges.length > 0
+  const displayObjects = edgeTools.preview
+    ? [...objects.filter((object) => !edgeTools.preview!.replacedIds.includes(object.id)), edgeTools.preview.object] : objects
   const [referenceOrigin, setReferenceOrigin] = useState<Vector3>({ x: 0, y: 0, z: 0 })
   const [workplaneHeight, setWorkplaneHeight] = useState(0)
   const [workplaneDraft, setWorkplaneDraft] = useState('0')
@@ -777,9 +791,9 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="workspace-frame">
-            <Workspace measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
+            <Workspace featureEdges={edgeTools.edges} selectedEdge={edgeTools.selected} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
               section={section}
-              objects={objects}
+              objects={displayObjects}
               selectedObjectId={canTransformSelected ? selectedObjectId : null}
               selectedObjectIds={selectedObjectIds}
               toolMode={toolMode}
@@ -801,7 +815,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               onTransformEnd={end}
             />
             <ViewCube cameraView={cameraView} orientation={cameraOrientation} onChange={setCameraView} />
-            <div className="workspace-hint">{pickMode ? `${pickMode === 'workplane' ? 'Pick a workplane face' : pickMode === 'align-source' ? 'Pick the selected body’s moving face' : pickMode === 'align-target' ? 'Pick another body’s target face' : pickMode === 'measure-first' ? 'Pick the first measurement point' : 'Pick the second measurement point'} · Escape cancels` : snapHint || (boxSelectEnabled ? 'Drag a selection rectangle · Shift adds · Esc returns to camera controls'
+            <div className="workspace-hint">{edgeActive ? (edgeTools.preview ? 'Edge preview · Apply or Cancel · Escape cancels' : 'Hover and click a highlighted edge · Escape cancels') : pickMode ? `${pickMode === 'workplane' ? 'Pick a workplane face' : pickMode === 'align-source' ? 'Pick the selected body’s moving face' : pickMode === 'align-target' ? 'Pick another body’s target face' : pickMode === 'measure-first' ? 'Pick the first measurement point' : 'Pick the second measurement point'} · Escape cancels` : snapHint || (boxSelectEnabled ? 'Drag a selection rectangle · Shift adds · Esc returns to camera controls'
               : `${cameraView === 'perspective' ? 'Drag to orbit · ' : ''}Scroll to zoom · Right drag to pan`)}</div>
             <div className="axis-label">{facePlane ? 'Face workplane' : `Workplane Y ${workplaneHeight} ${MODEL_UNIT}`} <span>·</span> X / Y / Z</div>
           </div>
@@ -874,6 +888,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               <button type="button" disabled={selectedObjectIds.length === 0} onClick={copySelected} title="Copy selected shapes and assemblies (Ctrl/Cmd+C)">Copy</button>
               <button type="button" disabled={!hasCopiedObjects} onClick={pasteCopied} title="Paste copies with a 25 mm offset (Ctrl/Cmd+V)">Paste</button>
             </div>
+            <EdgeFeatureTools tools={edgeTools} disabled={!canEditSelection || positioning} />
             <ToolGroup id="tools-combine" title="Combine">
             <HolePatternTools busy={positioning} disabled={!canEditActive || !selectedObject || isHoleObject(selectedObject) || !!selectedObject.hidden}
               facePlane={!!facePlane} onApply={addHolePattern} />
