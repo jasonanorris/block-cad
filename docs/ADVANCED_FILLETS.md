@@ -14,7 +14,7 @@ The staged OpenCascade integration was approved and implemented. Advanced CAD is
 
 `occtRuntime.ts` loads pinned `opencascade.js@2.0.0-beta.b5ff984` on demand inside the geometry worker. The bundled WASM identifies OCCT 7.6. `analyticKernel.ts` manages scoped WASM objects, primitive construction, Boolean operations, edge sampling, fillets/chamfers, BREP serialization, and tessellation. `analyticFeatures.ts` integrates selection and feature replay. `analyticData.ts` validates persistent analytic histories.
 
-Analytic starting bodies are constructed from native boxes, wedges, prisms, and cylinders, including supported joins/intersections/linked cuts. Format 21 retains an OCCT BREP starting body and ordered feature descriptions alongside the cached display mesh. Existing formats 1–20 still load. Each geometric edge reference contains five sampled model-local curve points; it is independent of mesh triangle indices and normalizes reversed traversal. Replay requires a unique geometric match. Missing or ambiguous matches reject the whole edit; changing an earlier radius can require removing a dependent later feature.
+Analytic starting bodies are constructed from native boxes, wedges, prisms, cylinders, cones, spheres, tubes, rounded boxes, and L-brackets, including supported joins/intersections/linked cuts. Format 21 retains an OCCT BREP starting body and ordered feature descriptions alongside the cached display mesh. Existing formats 1–20 still load. Each geometric edge reference contains five sampled model-local curve points; it is independent of mesh triangle indices and normalizes reversed traversal. Replay requires a unique geometric match. Missing or ambiguous matches reject the whole edit; changing an earlier radius can require removing a dependent later feature.
 
 Curved edges use sampled polylines for rendering and picking. The analytic curve remains in the kernel. Only Preview changes the displayed geometry; Apply commits once. Cancellation terminates the worker, and stale replies cannot replace a newer model. Production workers use ES modules to support dynamic loading. Analytic results are checked for valid topology and the presence of a solid before tessellation.
 
@@ -40,7 +40,7 @@ Production Firefox checks cover physical edge selection, per-edge radius fields,
 
 ## Limits
 
-This is a first analytic-body integration. Unsupported source types (including arbitrary imported STL, old baked meshes, text/SVG, and custom-shape generators) do not automatically gain analytic surfaces. Recreate an applicable body using the supported native sources to use Advanced CAD. Legacy mesh tools remain available for their supported cases.
+This is a first analytic-body integration. Unsupported source types (including arbitrary imported STL, old baked meshes, and text/SVG) do not automatically gain analytic surfaces. Recreate an applicable body using the supported native sources to use Advanced CAD. Legacy mesh tools remain available for their supported cases.
 
 Not every combination of corner topology and radii can be built. Preview reports failures and preserves the committed model. Per-edge radius overrides are supported; a radius varying along one individual edge is outside this implementation. Dense edge sets and repeated operations can reach existing resource limits. The app remains local; publishing is deferred.
 
@@ -55,3 +55,9 @@ Not every combination of corner topology and radii can be built. Preview reports
 Selected rows label straight/curved geometry and inside/outside/transition material boundaries. Boundary labels sample the solid around the curve midpoint at two distances and fall back to transition when ambiguous; they are hints, not eligibility guarantees. Outside edges are blue, inside edges purple, transitions gray, and selected edges green. Hovering or focusing a size field highlights its edge orange. Reopening a feature replays the preceding history to locate its input edges in stored order.
 
 Failed fillet contours are mapped to selected edge references and entered sizes. These references survive the worker boundary, mark the corresponding fields invalid, and color the edges red. When the kernel supplies no contour diagnosis, feedback explicitly describes a failed combination without blaming a particular edge. Changing settings clears stale failure highlights; Cancel and model/selection changes clear all temporary references. No project format change is needed.
+
+## Expanded native sources
+
+Cones point along +Y, spheres remain centered, and custom sources use their validated parameters. Tubes use concentric analytic cylinders; L-brackets extrude the original L profile. Rounded boxes preserve sides-only and all-edge modes. They are assembled from exact boxes, cylinders, and spheres, including maximum-radius cases where the rectangular core loses one or more dimensions. Radius zero produces a box. This avoids requiring a fillet builder to solve a degenerate maximum-radius box.
+
+Surface seams on cones, spheres, and cylinders are excluded from new selections. A smooth sphere alone reports that it has no sharp edges; joins and cuts can create selectable intersections. Existing saved edge references still replay through the original edge enumeration. Source parameters are baked into the analytic starting body on first Apply, consistent with the existing advanced workflow; Undo restores the editable sources.

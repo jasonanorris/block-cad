@@ -119,3 +119,64 @@ test('advanced edge labels, saved-feature locations, and failure references agre
   return true
  })
 })
+
+test('new analytic primitives preserve custom dimensions, volumes, and maximum rounding radii',async()=>{
+ const {kernelPrimitive,kernelMesh,validateKernelShape}=await import('../src/analyticKernel.ts')
+ const {createCustomShape}=await import('../src/customShapes.ts')
+ const oc=await loadCadKernel()
+ const fixtures=[
+  [{...shape(),type:'sphere',dimensions:{diameter:20}},4/3*Math.PI*1000,[20,20,20]],
+  [{...shape(),type:'cone',dimensions:{diameter:20,height:30}},Math.PI*100*30/3,[20,30,20]],
+  [createCustomShape({kind:'tube',diameter:30,height:25,wall:3}),Math.PI*(15**2-12**2)*25,[30,25,30]],
+  [createCustomShape({kind:'bracket',width:40,height:30,depth:20,wall:4}),(40*4+26*4)*20,[40,30,20]],
+ ]
+ for(const rounding of ['sides','all']) for(const [width,height,depth,radius] of [[40,15,30,0],[40,15,30,5],[20,20,20,10],[20,30,20,10],[20,20,30,10]]) {
+  const core=[width,height,depth].map(d=>d-2*radius),[a,b,c]=core
+  const expected=rounding==='sides'?(width*depth-(4-Math.PI)*radius**2)*height:a*b*c+2*radius*(a*b+a*c+b*c)+Math.PI*radius**2*(a+b+c)+4/3*Math.PI*radius**3
+  fixtures.push([createCustomShape({kind:'rounded-box',width,height,depth,radius,rounding}),expected,[width,height,depth]])
+ }
+ for(const [source,expected,dimensions] of fixtures) {
+  const scope=new KernelScope()
+  try {
+   const solid=kernelPrimitive(oc,scope,source);validateKernelShape(oc,scope,solid)
+   const data=kernelMesh(oc,scope,solid),object={...shape(),type:'stl',...data}
+   const measured=await volume(object)
+   assert.ok(Math.abs(measured-expected)<expected*.005,`${source.type}/${source.parameters?.rounding}: ${measured} vs ${expected}`)
+   Object.values(data.dimensions).forEach((d,i)=>assert.ok(Math.abs(d-dimensions[i])<.05))
+  } finally {scope.dispose()}
+ }
+})
+
+test('cones, tubes, brackets, rounded boxes, and sphere cuts support editable analytic edges',async()=>{
+ const {createCustomShape}=await import('../src/customShapes.ts')
+ const sources=[
+  {...shape(),type:'cone',dimensions:{diameter:20,height:30}},
+  {...createCustomShape({kind:'tube',diameter:30,height:25,wall:3}),position:{x:0,y:0,z:0}},
+  {...createCustomShape({kind:'bracket',width:40,height:30,depth:20,wall:4}),position:{x:0,y:0,z:0}},
+  {...createCustomShape({kind:'rounded-box',width:40,height:20,depth:30,radius:5,rounding:'sides'}),position:{x:0,y:0,z:0}},
+ ]
+ for(const source of sources) {
+  const edges=await findAnalyticEdges([source],[source.id])
+  const selected=source.type==='cone'?edges.filter(e=>e.curveType==='curved'):edges.filter(e=>source.parameters?.kind==='bracket'?e.edgeType==='inside':e.edgeType!=='transition').slice(0,1)
+  assert.ok(selected.length)
+  const first=(await previewAnalyticFeature([source],[source.id],selected,'fillet',.5)).object
+  const restored=parseProject(serializeProject([first]))[0],id=restored.analyticHistory.features[0].id
+  const edited=(await editAnalyticFeature([restored],[restored.id],id,{operation:'fillet',size:.3})).object
+  assert.ok((await exportStl([edited])).byteLength>84)
+  assert.ok((await export3mf([edited])).byteLength>100)
+ }
+ const sphere={...shape(),type:'sphere',dimensions:{diameter:30}}
+ await assert.rejects(findAnalyticEdges([sphere],[sphere.id]),/no sharp edges/)
+ const cut={...shape('cut'),dimensions:{x:40,y:20,z:40},position:{x:0,y:15,z:0},cutTargetId:sphere.id}
+ const edges=await findAnalyticEdges([sphere,cut],[sphere.id])
+ const rim=edges.filter(e=>e.path.every(p=>close(p.y,5)))
+ assert.equal(rim.length,1)
+ const first=(await previewAnalyticFeature([sphere,cut],[sphere.id],rim,'fillet',.5)).object
+ assert.ok((await exportStl([first])).byteLength>84)
+ const rounded={...createCustomShape({kind:'rounded-box',width:40,height:20,depth:30,radius:5,rounding:'all'}),position:{x:0,y:0,z:0}}
+ const hole={...shape('hole'),type:'cylinder',dimensions:{diameter:6,height:40},cutTargetId:rounded.id}
+ const rims=(await findAnalyticEdges([rounded,hole],[rounded.id])).filter(e=>e.edgeType!=='transition'&&e.path.every(p=>close(p.y,10)))
+ assert.ok(rims.length)
+ const result=(await previewAnalyticFeature([rounded,hole],[rounded.id],[rims[0]],'fillet',.5)).object
+ assert.ok((await exportStl([result])).byteLength>84)
+})

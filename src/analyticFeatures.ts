@@ -10,7 +10,7 @@ import type { AnalyticHistory } from './analyticData'
 import { MAX_BREP_BYTES } from './analyticData'
 import { MAX_EDGE_FEATURES, MAX_FEATURE_EDGES, validateEdgeFeatures, type EdgeFeature, type EdgeOperation } from './edgeFeatureData'
 import type { FeatureEdge } from './edgeFeatures'
-import { KernelScope, describeKernelEdge, kernelBoolean, kernelEdges, kernelFeature, kernelMesh, kernelPrimitive, kernelTransform, readBrep, validateKernelShape, writeBrep } from './analyticKernel'
+import { KernelScope, isKernelSeam, describeKernelEdge, kernelBoolean, kernelEdges, kernelFeature, kernelMesh, kernelPrimitive, kernelTransform, readBrep, validateKernelShape, writeBrep } from './analyticKernel'
 
 function replay(oc: CadKernel, scope: KernelScope, history: AnalyticHistory) {
   let shape = readBrep(oc, scope, history.baseBrep)
@@ -55,8 +55,9 @@ export async function findAnalyticEdges(objects: CadObject[], ids: string[], fea
     if (featureId && featureIndex < 0) throw new Error('Separate later joins/cuts before locating this feature.')
     const shape = featureId ? replay(oc, scope, { ...c.history, features: c.history.features.slice(0, featureIndex) }) : c.shape
     const available = kernelEdges(oc, scope, shape)
-    const listed = featureId ? c.history.features[featureIndex].edges.map(stored => available.find(edge => edge.key === stored.key)).filter(edge => !!edge) : available
+    const listed = featureId ? c.history.features[featureIndex].edges.map(stored => available.find(edge => edge.key === stored.key)).filter(edge => !!edge) : available.filter(edge => !isKernelSeam(oc, scope, shape, edge.edge))
     if (featureId && listed.length !== c.history.features[featureIndex].edges.length) throw new Error('An edge could not be located for this feature.')
+    if (!listed.length) throw new Error('This body has no sharp edges to select. A smooth sphere has none; joins or cuts can create edges.')
     return listed.map(edge => {
       const path = edge.path.map(p => { const v = new Vector3(p.x, p.y, p.z).applyMatrix4(c.matrix); return { x: v.x, y: v.y, z: v.z } })
       return { ...describeKernelEdge(oc, scope, shape, edge), a: path[0], b: path.at(-1)!, path, key: edge.key, normalA: { x: 0, y: 0, z: 0 }, normalB: { x: 0, y: 0, z: 0 }, angle: 0, maxSize: 10000, maxRadius: 10000 }
