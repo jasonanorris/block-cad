@@ -2,10 +2,11 @@ import { isHoleObject, MODEL_UNIT, type CadObject, type Point2, type SvgContours
 import { validObjectColor } from './objectColor'
 import { isTextFont } from './textFonts'
 import { customProfile, validateCustomParameters } from './customShapes'
+import { validateEdgeHistory } from './edgeFeatureData'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 19
+const PROJECT_VERSION = 20
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -102,6 +103,7 @@ function objectFromFile(value: unknown, index: number, version: number, verified
     ...(version >= 6 && data.joinGroupId ? { joinGroupId: data.joinGroupId as string } : {}),
     ...(version >= 12 && data.joinMode === 'intersection' ? { joinMode: 'intersection' as const } : {}),
   }
+  if (data.edgeHistory !== undefined && (version < 20 || data.type !== 'stl')) throw new Error(`${field}.edgeHistory requires a format-20 mesh object.`)
   const dimensions = record(data.dimensions)
   if (!dimensions) throw new Error(`${field}.dimensions is missing.`)
 
@@ -208,6 +210,7 @@ function objectFromFile(value: unknown, index: number, version: number, verified
         y: positiveNumber(dimensions.y, `${field}.dimensions.y`),
         z: positiveNumber(dimensions.z, `${field}.dimensions.z`),
       }, meshData: data.meshData,
+      ...(data.edgeHistory !== undefined ? { edgeHistory: validateEdgeHistory(data.edgeHistory, verifiedMeshes) } : {}),
       ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
     }
     default:
@@ -217,13 +220,19 @@ function objectFromFile(value: unknown, index: number, version: number, verified
 
 export function serializeProject(objects: CadObject[]): string {
   const meshes: string[] = [], meshIds = new Map<string, number>()
+  const meshReference = (data: string) => {
+    let id = meshIds.get(data)
+    if (id === undefined) { id = meshes.length; meshIds.set(data, id); meshes.push(data) }
+    return id
+  }
   const normalized = objects.map((object) => {
     const base = { ...object, name: object.name?.trim() || undefined }
     if (base.type !== 'stl') return base
-    let meshRef = meshIds.get(base.meshData)
-    if (meshRef === undefined) { meshRef = meshes.length; meshIds.set(base.meshData, meshRef); meshes.push(base.meshData) }
-    const { meshData: _meshData, ...metadata } = base
-    return { ...metadata, meshRef }
+    const meshRef = meshReference(base.meshData)
+    const { meshData: _meshData, edgeHistory, ...metadata } = base
+    return { ...metadata, meshRef, ...(edgeHistory ? { edgeHistory: {
+      baseMeshRef: meshReference(edgeHistory.baseMeshData), features: edgeHistory.features,
+    } } : {}) }
   })
   return JSON.stringify({ format: PROJECT_FORMAT, version: PROJECT_VERSION, units: MODEL_UNIT,
     ...(meshes.length ? { meshes } : {}), objects: normalized }, null, 2) + '\n'
@@ -248,13 +257,20 @@ export function parseProject(text: string): CadObject[] {
   const verifiedMeshes = new Set<string>()
   if (project.version >= 18 && project.meshes !== undefined && (!Array.isArray(project.meshes) || !project.meshes.every((mesh) => typeof mesh === 'string'))) throw new Error('Project meshes must be a list of encoded mesh strings.')
   const objects = project.objects.map((object, index) => {
-    const data = record(object)
+    let data = record(object)
+    if (data?.edgeHistory !== undefined && (project.version as number) >= 20) {
+      const history = record(data.edgeHistory)
+      if (history?.baseMeshRef !== undefined) {
+        if (history.baseMeshData !== undefined || !Number.isInteger(history.baseMeshRef) || (history.baseMeshRef as number) < 0 || !Array.isArray(project.meshes) || (history.baseMeshRef as number) >= project.meshes.length) throw new Error(`objects[${index}].edgeHistory.baseMeshRef is invalid.`)
+        data = { ...data, edgeHistory: { ...history, baseMeshData: project.meshes[history.baseMeshRef as number] } }
+      }
+    }
     if ((project.version as number) >= 18 && data?.meshRef !== undefined) {
       if (data.type !== 'stl' || data.meshData !== undefined || !Number.isInteger(data.meshRef) || (data.meshRef as number) < 0 ||
         !Array.isArray(project.meshes) || (data.meshRef as number) >= project.meshes.length) throw new Error(`objects[${index}].meshRef is invalid.`)
       return objectFromFile({ ...data, meshData: project.meshes[data.meshRef as number] }, index, project.version as number, verifiedMeshes)
     }
-    return objectFromFile(object, index, project.version as number, verifiedMeshes)
+    return objectFromFile(data ?? object, index, project.version as number, verifiedMeshes)
   })
   const ids = new Set(objects.map((object) => object.id))
   if (ids.size !== objects.length) throw new Error('The project contains duplicate object IDs.')

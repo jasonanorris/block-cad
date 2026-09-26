@@ -121,7 +121,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           selectedObjectIds: [preview.object.id], selectedObjectId: preview.object.id } : current)
   })
   useEffect(() => { if (pickMode || boxSelectEnabled || section.enabled) edgeTools.cancel() }, [pickMode, boxSelectEnabled, section.enabled])
-  const edgeActive = edgeTools.edges.length > 0
+  const edgeActive = edgeTools.active
   const displayObjects = edgeTools.preview
     ? [...objects.filter((object) => !edgeTools.preview!.replacedIds.includes(object.id)), edgeTools.preview.object] : objects
   const [referenceOrigin, setReferenceOrigin] = useState<Vector3>({ x: 0, y: 0, z: 0 })
@@ -791,7 +791,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="workspace-frame">
-            <Workspace featureEdges={edgeTools.edges} selectedEdge={edgeTools.selected} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
+            <Workspace edgeSession={edgeActive} featureEdges={edgeTools.edges} selectedEdge={edgeTools.selected} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
               section={section}
               objects={displayObjects}
               selectedObjectId={canTransformSelected ? selectedObjectId : null}

@@ -304,3 +304,7 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
 @media (max-width: 800px) {
   .tool-tab-panel { max-height: 65dvh; }
 }
+
+.edge-feature-list { padding: 0; list-style: none; margin: 12px 0; }
+.edge-feature-list li { padding: 8px 0; border-bottom: 1px solid #e3e9f1; font-size: 12px; }
+.edge-feature-list li > div { display: flex; gap: 6px; margin-top: 6px; }

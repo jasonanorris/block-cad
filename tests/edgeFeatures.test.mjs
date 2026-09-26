@@ -28,8 +28,10 @@ test('edge tools use world dimensions for rotated reflected shapes and reject st
  const edges=await findFeatureEdges([shape],[shape.id]);assert.equal(edges.length,12)
  const result=await previewEdgeFeature([shape],[shape.id],edges[0],'chamfer',1)
  const runtime=await loadManifold();assert.ok(readSolidManifold(getSolidBodies([result.object])[0],runtime,s=>s.volume())<8000)
+ const bounds=readSolidManifold(getSolidBodies([result.object])[0],runtime,s=>s.boundingBox())
+ for(const [index,axis] of ['x','y','z'].entries())assert.ok(Math.abs(result.object.dimensions[axis]-(bounds.max[index]-bounds.min[index]))<1e-4)
  await assert.rejects(()=>previewEdgeFeature([shape],[shape.id],edges[0],'fillet',100),/no larger/)
- await assert.rejects(()=>previewEdgeFeature([shape],[shape.id],edges[0],'fillet',NaN),/at least/)
+ await assert.rejects(()=>previewEdgeFeature([shape],[shape.id],edges[0],'fillet',NaN),/0.01/)
  await assert.rejects(()=>previewEdgeFeature([shape],[shape.id],{...edges[0],a:{x:999,y:0,z:0}},'fillet',1),/changed/)
  await assert.rejects(()=>findFeatureEdges([{...shape,locked:true}],[shape.id]),/unlocked/)
  const hole={...box('hole'),dimensions:{x:5,y:40,z:5},cutTargetId:shape.id,position:shape.position}
@@ -64,4 +66,77 @@ test('a separate parallel edge remains editable after the first fillet',async()=
  const runtime=await loadManifold()
  const volume=o=>readSolidManifold(getSolidBodies([o])[0],runtime,s=>s.volume())
  assert.ok(volume(next.object)<volume(first.object))
+})
+
+test('multi-edge features rebuild from a retained base and survive projects and library reuse',async()=>{
+ const {editEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const {preparePart,insertPart}=await import('../src/partsLibrary.ts')
+ const shape={...box('multi'),dimensions:{x:20,y:20,z:20}}
+ const edges=await findFeatureEdges([shape],[shape.id])
+ const parallel=edges.filter(e=>Math.abs(e.b.y-e.a.y)>19)
+ assert.equal(parallel.length,4)
+ const first=await previewEdgeFeature([shape],[shape.id],parallel,'fillet',2)
+ assert.equal(first.object.edgeHistory.features[0].edges.length,4)
+ const runtime=await loadManifold(),volume=o=>readSolidManifold(getSolidBodies([o])[0],runtime,s=>s.volume())
+ assert.ok(Math.abs(volume(first.object)-(8000-4*20*4*(1-Math.PI/4)))<.5)
+ const moved={...first.object,position:{x:45,y:40,z:-20},rotation:{x:.2,y:.6,z:.1},scale:{x:-2,y:1,z:.5}}
+ const restored=parseProject(serializeProject([moved]))[0]
+ const id=restored.edgeHistory.features[0].id
+ const edited=await editEdgeFeature([restored],[restored.id],id,{operation:'chamfer',size:3})
+ assert.equal(edited.object.id,restored.id);assert.deepEqual(edited.object.position,restored.position)
+ assert.deepEqual(edited.object.rotation,restored.rotation);assert.deepEqual(edited.object.scale,restored.scale)
+ assert.ok(Math.abs(volume(edited.object)-(8000-4*20*9/2))<.01)
+ const removed=await editEdgeFeature([edited.object],[edited.object.id],id,null)
+ assert.equal(removed.object.edgeHistory.features.length,0);assert.ok(Math.abs(volume(removed.object)-8000)<.01)
+ const part=await preparePart([restored],new Set([restored.id])),copy=insertPart(part,0)[0]
+ assert.deepEqual(copy.edgeHistory,restored.edgeHistory);assert.notEqual(copy.id,restored.id)
+ const copiedEdit=await editEdgeFeature([copy],[copy.id],id,{operation:'fillet',size:1})
+ assert.equal(copiedEdit.object.edgeHistory.features[0].size,1)
+ assert.equal(restored.edgeHistory.features[0].size,2)
+ const available=await findFeatureEdges([removed.object],[removed.object.id])
+ const added=await previewEdgeFeature([removed.object],[removed.object.id],available[0],'fillet',1)
+ assert.deepEqual(added.object.rotation,removed.object.rotation);assert.deepEqual(added.object.scale,removed.object.scale)
+ assert.equal(added.object.edgeHistory.baseMeshData,removed.object.edgeHistory.baseMeshData)
+ const joined=[{...shape,id:'anchor',joinGroupId:'g'},{...restored,joinGroupId:'g'}]
+ await assert.rejects(()=>findFeatureEdges(joined,['anchor']),/Separate this body/)
+})
+
+test('multi-edge rejection and dependent-feature errors preserve the original model',async()=>{
+ const {editEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const shape={...box('multi'),dimensions:{x:20,y:20,z:20}},objects=[shape]
+ const edges=await findFeatureEdges(objects,[shape.id]),edge=edges[0]
+ const shared=edges.find(e=>e!==edge && [e.a,e.b].some(a=>[edge.a,edge.b].some(b=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z)<1e-5)))
+ const original=serializeProject(objects)
+ await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,shared],'fillet',2),/do not meet/)
+ await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,edge],'chamfer',2),/do not meet/)
+ await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[],'fillet',2),/Select 1/)
+ assert.equal(serializeProject(objects),original)
+ const first=await previewEdgeFeature(objects,[shape.id],edge,'fillet',1)
+ const remaining=await findFeatureEdges([first.object],[first.object.id])
+ const direction=e=>[e.b.x-e.a.x,e.b.y-e.a.y,e.b.z-e.a.z]
+ const a=direction(edge),length=Math.hypot(...a)
+ const parallel=remaining.find(e=>{const b=direction(e);return Math.abs(a.reduce((s,n,i)=>s+n*b[i],0))/(length*Math.hypot(...b))>.999 && e.maxSize<10 && e.maxSize>=9})
+ assert.ok(parallel)
+ const second=await previewEdgeFeature([first.object],[first.object.id],parallel,'fillet',9)
+ const before=serializeProject([second.object]),features=second.object.edgeHistory.features
+ await assert.rejects(()=>editEdgeFeature([second.object],[second.object.id],features[0].id,{operation:'fillet',size:8}),/Feature 2/)
+ assert.equal(serializeProject([second.object]),before)
+ const removed=await editEdgeFeature([second.object],[second.object.id],features[0].id,null)
+ assert.equal(removed.object.edgeHistory.features.length,1);assert.equal(removed.object.edgeHistory.features[0].id,features[1].id)
+})
+
+test('format 20 validates edge history and shares both base and resulting meshes',async()=>{
+ const shape={...box('history'),dimensions:{x:20,y:20,z:20}}
+ const [edge]=await findFeatureEdges([shape],[shape.id])
+ const {object}=await previewEdgeFeature([shape],[shape.id],edge,'chamfer',2)
+ const file=JSON.parse(serializeProject([object,{...object,id:'copy'}]))
+ assert.equal(file.version,20);assert.equal(file.meshes.length,2)
+ assert.equal(file.objects[0].edgeHistory.baseMeshRef,file.objects[1].edgeHistory.baseMeshRef)
+ assert.deepEqual(parseProject(JSON.stringify(file)),[object,{...object,id:'copy'}])
+ for(const mutate of [f=>f.version=19,f=>f.objects[0].edgeHistory.baseMeshRef=999,
+  f=>f.objects[0].edgeHistory.features[0].size=-1,f=>f.objects[0].edgeHistory.features[0].edges=[],
+  f=>f.objects[0].edgeHistory.features.push(f.objects[0].edgeHistory.features[0]),
+  f=>f.objects[0].edgeHistory.features[0].operation='unknown']) {
+  const malformed=structuredClone(file);mutate(malformed);assert.throws(()=>parseProject(JSON.stringify(malformed)))
+ }
 })

@@ -1,4 +1,4 @@
-import { findFeatureEdges, previewEdgeFeature } from './edgeFeatures'
+import { findFeatureEdges, previewEdgeFeature, editEdgeFeature } from './edgeFeatures'
 import { measureSelection } from './measurements'
 import { selectionReference } from './referenceOrigin'
 import { inspectExport } from './exportChecks'
@@ -14,7 +14,8 @@ worker.onmessage = async ({ data }) => {
     let result: GeometryResponse['result']
     switch (data.kind) {
       case 'edges': result = await findFeatureEdges(data.input.objects, data.input.ids); break
-      case 'edgePreview': result = await previewEdgeFeature(data.input.objects, data.input.ids, data.input.edge, data.input.operation, data.input.size); break
+      case 'edgePreview': result = await previewEdgeFeature(data.input.objects, data.input.ids, data.input.edges, data.input.operation, data.input.size); break
+      case 'edgeEdit': result = await editEdgeFeature(data.input.objects, data.input.ids, data.input.featureId, data.input.change); break
       case 'measure': result = await measureSelection(data.input.objects, data.input.ids, data.input.activeId); break
       case 'reference': result = await selectionReference(data.input.objects, new Set(data.input.ids), data.input.edge); break
       case 'inspect': result = await inspectExport(data.input.objects, data.input.settings); break

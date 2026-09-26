@@ -4,10 +4,11 @@ import { type CadObject, type Vector3 as Point, isHoleObject } from './cadModel'
 import { canPositionUnits, getPlacementUnits } from './placement'
 import { objectMatrix, readSolidManifold } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
-import { encodeStlMesh, MAX_STL_TRIANGLES } from './stlMesh'
+import { encodeStlMesh, stlMeshManifold, MAX_STL_TRIANGLES } from './stlMesh'
 
 export type FeatureEdge = { a: Point; b: Point; normalA: Point; normalB: Point; maxSize: number }
-export type EdgeOperation = 'fillet' | 'chamfer'
+import { MAX_EDGE_FEATURES, MAX_FEATURE_EDGES, type EdgeHistory, type EdgeFeature, type StoredEdge, type EdgeOperation } from './edgeFeatureData'
+export type { EdgeOperation } from './edgeFeatureData'
 const v = (p: Point) => new Vector3(p.x, p.y, p.z)
 const point = (p: Vector3): Point => ({ x: p.x, y: p.y, z: p.z })
 const tolerance = 1e-5
@@ -62,27 +63,59 @@ function solidEdges(solid: Manifold): FeatureEdge[] {
   return edges
 }
 
+function historyObject(objects: CadObject[], ids: string[]) {
+  const unit = selectedUnit(objects, ids), object = unit.body.anchor
+  if (unit.body.members.some((member) => member.type === 'stl' && member.edgeHistory) && (unit.body.members.length !== 1 || unit.body.holes.length)) throw new Error('Separate this body and remove its later linked cuts before editing or adding edge features. Its existing history is preserved.')
+  if (object.type !== 'stl' || !object.edgeHistory) return null
+  return object
+}
+const sameEdge = (a: StoredEdge, b: StoredEdge) =>
+  (v(a.a).distanceTo(v(b.a)) < tolerance && v(a.b).distanceTo(v(b.b)) < tolerance) ||
+  (v(a.a).distanceTo(v(b.b)) < tolerance && v(a.b).distanceTo(v(b.a)) < tolerance)
+const transformEdge = (edge: StoredEdge, matrix: Matrix4): StoredEdge => ({ a: point(v(edge.a).applyMatrix4(matrix)), b: point(v(edge.b).applyMatrix4(matrix)) })
+
 export async function findFeatureEdges(objects: CadObject[], ids: string[]) {
+  const editable = historyObject(objects, ids)
   const unit = selectedUnit(objects, ids), runtime = await loadManifold()
   return readSolidManifold(unit.body, runtime, (solid) => {
+    if (editable) return solidEdges(solid).map((edge) => ({ ...edge, ...transformEdge(edge, objectMatrix(editable)) }))
     const world = solid.transform(objectMatrix(unit.body.anchor).elements as Mat4)
     try { return solidEdges(world) } finally { world.delete() }
   })
 }
 
-export async function previewEdgeFeature(objects: CadObject[], ids: string[], edge: FeatureEdge, operation: EdgeOperation, size: number) {
-  if (!['fillet', 'chamfer'].includes(operation) || !Number.isFinite(size) || size < .01) throw new Error('Enter a radius or distance of at least 0.01 mm.')
-  const unit = selectedUnit(objects, ids), runtime = await loadManifold()
-  return readSolidManifold(unit.body, runtime, (solid) => {
-    const allocated: Manifold[] = []
-    const track = (s: Manifold) => { allocated.push(s); return s }
-    try {
-      const world = track(solid.transform(objectMatrix(unit.body.anchor).elements as Mat4))
-      const current = solidEdges(world).find((e) => v(e.a).distanceTo(v(edge.a)) < tolerance && v(e.b).distanceTo(v(edge.b)) < tolerance)
-      if (!current) throw new Error('The edge changed. Pick it again.')
-      if (size > current.maxSize + tolerance) throw new Error(`Use a size no larger than ${Number(current.maxSize.toFixed(4))} mm for this edge.`)
+function encodeSolid(solid: Manifold, center = [0, 0, 0]) {
+  const mesh = solid.getMesh()
+  if (mesh.numTri > MAX_STL_TRIANGLES) throw new Error('The result exceeds the mesh triangle limit.')
+  const positions = new Float32Array(mesh.triVerts.length * 3)
+  for (let i = 0; i < mesh.triVerts.length; i++) for (let j = 0; j < 3; j++) positions[i * 3 + j] = mesh.vertProperties[mesh.triVerts[i] * mesh.numProp + j] - center[j]
+  return encodeStlMesh(positions)
+}
+
+// All edges in a feature are resolved against the same input. Reject meeting or
+// overlapping cuts instead of presenting a Boolean intersection as a corner blend.
+function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<ReturnType<typeof loadManifold>>): Manifold {
+  if (!['fillet', 'chamfer'].includes(feature.operation) || !Number.isFinite(feature.size) || feature.size < .01 || feature.size > 10000) throw new Error('Enter a radius or distance from 0.01 to 10,000 mm.')
+  if (!feature.edges.length || feature.edges.length > MAX_FEATURE_EDGES) throw new Error(`Select 1 to ${MAX_FEATURE_EDGES} edges.`)
+  const available = solidEdges(solid)
+  const edges = feature.edges.map((edge) => {
+    const current = available.find((candidate) => sameEdge(candidate, edge))
+    if (!current) throw new Error('An edge changed or is unavailable. Remove dependent later features first, or pick edges again.')
+    if (feature.size > current.maxSize + tolerance) throw new Error(`Use a size no larger than ${Number(current.maxSize.toFixed(4))} mm for these edges.`)
+    return current
+  })
+  for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
+    if ([edges[i].a, edges[i].b].some((a) => [edges[j].a, edges[j].b].some((b) => v(a).distanceTo(v(b)) < tolerance))) {
+      throw new Error('Choose separate edges that do not meet. Shared corners need corner blending, which is not supported yet.')
+    }
+  }
+  const allocated: Manifold[] = [], removals: Manifold[] = []
+  const track = (s: Manifold) => { allocated.push(s); return s }
+  try {
+    let result = solid
+    for (const current of edges) {
+      const { size, operation } = feature
       const origin = v(current.a), u = v(current.normalA).negate(), w = v(current.b).sub(origin).normalize(), y = w.clone().cross(u)
-      // a→b follows normalA × normalB, so this basis points inward on both faces.
       const length = v(current.b).distanceTo(origin), pad = Math.max(1, length * .01)
       const matrix = new Matrix4().makeBasis(u, y, w).setPosition(origin)
       let cutter: Manifold
@@ -98,18 +131,68 @@ export async function previewEdgeFeature(objects: CadObject[], ids: string[], ed
         cutter = track(shifted.subtract(round))
       }
       const transformed = track(cutter.transform(matrix.elements as Mat4))
-      const result = track(world.subtract(transformed))
-      if (result.status() !== 'NoError' || result.isEmpty() || result.volume() <= 0 || result.volume() >= world.volume() - 1e-8) throw new Error('This edge could not be modified safely. Try a smaller size.')
-      const mesh = result.getMesh()
-      if (mesh.numTri > MAX_STL_TRIANGLES) throw new Error('The result exceeds the mesh triangle limit.')
-      const bounds = result.boundingBox(), center = bounds.min.map((n, i) => (n + bounds.max[i]) / 2)
-      const positions = new Float32Array(mesh.triVerts.length * 3)
-      for (let i = 0; i < mesh.triVerts.length; i++) for (let j = 0; j < 3; j++) positions[i * 3 + j] = mesh.vertProperties[mesh.triVerts[i] * mesh.numProp + j] - center[j]
-      const object: CadObject = { id: crypto.randomUUID(), type: 'stl', name: `${(unit.body.anchor.name || unit.body.anchor.type).slice(0, 60)} · ${operation}`,
-        ...(unit.body.anchor.color ? { color: unit.body.anchor.color } : {}), meshData: encodeStlMesh(positions),
-        dimensions: { x: bounds.max[0] - bounds.min[0], y: bounds.max[1] - bounds.min[1], z: bounds.max[2] - bounds.min[2] },
-        position: { x: center[0], y: center[1], z: center[2] }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } }
-      return { object, replacedIds: [...unit.ids] }
-    } finally { allocated.reverse().forEach((s) => s.delete()) }
-  })
+      const removal = track(solid.intersect(transformed))
+      for (const previous of removals) {
+        const overlap = track(previous.intersect(removal))
+        if (overlap.volume() > 1e-8) throw new Error('These edge cuts overlap. Use a smaller size or select separate edges.')
+      }
+      removals.push(removal)
+      result = track(result.subtract(transformed))
+    }
+    if (result.status() !== 'NoError' || result.isEmpty() || result.volume() <= 0 || result.volume() >= solid.volume() - 1e-8) throw new Error('These edges could not be modified safely. Try a smaller size.')
+    // Return ownership of the final result; release every intermediate.
+    allocated.splice(allocated.indexOf(result), 1)
+    return result
+  } finally { allocated.reverse().forEach((s) => s.delete()) }
+}
+
+async function rebuild(object: Extract<CadObject, { type: 'stl' }>, history: EdgeHistory) {
+  const runtime = await loadManifold()
+  let result = stlMeshManifold(history.baseMeshData, runtime)
+  try {
+    for (let i = 0; i < history.features.length; i++) {
+      let next: Manifold
+      try { next = applyFeature(result, history.features[i], runtime) }
+      catch (error) { throw new Error(`Feature ${i + 1}: ${error instanceof Error ? error.message : 'Could not rebuild.'}`) }
+      result.delete(); result = next
+    }
+    const bounds = result.boundingBox()
+    return { ...object, meshData: encodeSolid(result), edgeHistory: history,
+      dimensions: { x: bounds.max[0] - bounds.min[0], y: bounds.max[1] - bounds.min[1], z: bounds.max[2] - bounds.min[2] } }
+  } finally { result.delete() }
+}
+
+export async function previewEdgeFeature(objects: CadObject[], ids: string[], picked: FeatureEdge | FeatureEdge[], operation: EdgeOperation, size: number) {
+  const edges = Array.isArray(picked) ? picked : [picked]
+  const editable = historyObject(objects, ids), unit = selectedUnit(objects, ids)
+  let object: Extract<CadObject, { type: 'stl' }>, history: EdgeHistory, localEdges: StoredEdge[]
+  if (editable) {
+    object = editable; history = editable.edgeHistory!
+    localEdges = edges.map((edge) => transformEdge(edge, objectMatrix(editable).invert()))
+  } else {
+    const runtime = await loadManifold()
+    object = readSolidManifold(unit.body, runtime, (solid) => {
+      const world = solid.transform(objectMatrix(unit.body.anchor).elements as Mat4)
+      try {
+        const bounds = world.boundingBox(), center = bounds.min.map((n, i) => (n + bounds.max[i]) / 2)
+        return { id: crypto.randomUUID(), type: 'stl', name: `${(unit.body.anchor.name || unit.body.anchor.type).slice(0, 60)} · ${operation}`,
+          ...(unit.body.anchor.color ? { color: unit.body.anchor.color } : {}), meshData: encodeSolid(world, center),
+          dimensions: { x: bounds.max[0] - bounds.min[0], y: bounds.max[1] - bounds.min[1], z: bounds.max[2] - bounds.min[2] },
+          position: { x: center[0], y: center[1], z: center[2] }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } }
+      } finally { world.delete() }
+    })
+    history = { baseMeshData: object.meshData, features: [] }
+    localEdges = edges.map((edge) => transformEdge(edge, objectMatrix(object).invert()))
+  }
+  if (history.features.length >= MAX_EDGE_FEATURES) throw new Error(`A body supports up to ${MAX_EDGE_FEATURES} edge features.`)
+  const feature: EdgeFeature = { id: crypto.randomUUID(), operation, size, edges: localEdges }
+  return { object: await rebuild(object, { ...history, features: [...history.features, feature] }), replacedIds: [...unit.ids] }
+}
+
+export async function editEdgeFeature(objects: CadObject[], ids: string[], featureId: string, change: { operation: EdgeOperation; size: number } | null) {
+  const object = historyObject(objects, ids)
+  if (!object) throw new Error('Select a body with editable edge features.')
+  if (!object.edgeHistory!.features.some((feature) => feature.id === featureId)) throw new Error('This feature no longer exists.')
+  const features = object.edgeHistory!.features.flatMap((feature) => feature.id !== featureId ? [feature] : change ? [{ ...feature, ...change }] : [])
+  return { object: await rebuild(object, { ...object.edgeHistory!, features }), replacedIds: [object.id] }
 }

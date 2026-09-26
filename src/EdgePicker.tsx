@@ -3,15 +3,15 @@ import { useThree } from '@react-three/fiber'
 import { BufferGeometry, Mesh, Raycaster, Vector2, Vector3 } from 'three'
 import type { FeatureEdge } from './edgeFeatures'
 
-export default function EdgePicker({ edges, selected, previewing, onPick, onCancel }: {
-  edges: FeatureEdge[]; selected: number | null; previewing: boolean; onPick: (index: number) => void; onCancel: () => void
+export default function EdgePicker({ enabled, edges, selected, previewing, onPick, onCancel }: {
+  enabled: boolean; edges: FeatureEdge[]; selected: number[]; previewing: boolean; onPick: (index: number) => void; onCancel: () => void
 }) {
   const { camera, scene, gl, invalidate } = useThree()
   const [hover, setHover] = useState<number | null>(null)
   const geometries = useMemo(() => edges.map((edge) => new BufferGeometry().setFromPoints([edge.a, edge.b].map((p) => new Vector3(p.x, p.y, p.z)))), [edges])
   useEffect(() => { setHover(null); return () => geometries.forEach((geometry) => geometry.dispose()) }, [geometries])
   useEffect(() => {
-    if (!edges.length) return
+    if (!enabled) return
     const canvas = gl.domElement
     const stop = (e: Event) => { e.preventDefault(); e.stopImmediatePropagation() }
     const nearest = (event: MouseEvent) => {
@@ -48,9 +48,9 @@ export default function EdgePicker({ edges, selected, previewing, onPick, onCanc
       canvas.removeEventListener('pointermove', move); canvas.removeEventListener('pointerleave', leave); canvas.removeEventListener('click', click, true)
       window.removeEventListener('keydown', key, true)
     }
-  }, [edges, previewing, camera, scene, gl, invalidate, onPick, onCancel])
+  }, [enabled, edges, previewing, camera, scene, gl, invalidate, onPick, onCancel])
   if (previewing) return null
   return <group>{geometries.map((geometry, index) => <lineSegments key={index} geometry={geometry} renderOrder={10}>
-    <lineBasicMaterial color={index === hover ? '#e84f12' : index === selected ? '#059669' : '#2879ca'} depthTest depthWrite={false} />
+    <lineBasicMaterial color={index === hover ? '#e84f12' : selected.includes(index) ? '#059669' : '#2879ca'} depthTest depthWrite={false} />
   </lineSegments>)}</group>
 }

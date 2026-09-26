@@ -190,7 +190,11 @@ Rounded boxes now include **Round → All edges (3D)** in both creation and edit
 
 ### Selected-edge fillet and chamfer
 
-**Edit → Fillet / chamfer edge** highlights eligible edges on one selected body. Pick an edge, enter a radius (fillet) or distance along each face (chamfer), Preview, then Apply or Cancel. Escape cancels; Apply is one Undo step. The initial scope is straight 90° convex outside edges with flat, square ends, on simple convex solids up to 5,000 triangles. Unsupported geometry and excessive sizes are rejected. Calculations use the background worker and obsolete previews cannot be applied. Applying bakes the finished body and linked shapes into a mesh solid; Undo restores editable sources. The result persists through projects, libraries, and exports using the existing mesh format. Curved/inside edges and intersecting corner blends are not supported.
+**Edit → Fillet / chamfer edges** supports selecting several separate edges and applying one radius (fillet) or face distance (chamfer). Click edges to toggle selection, Preview, then Apply or Cancel. All edges in a feature apply atomically with one Undo. The current scope remains straight 90° convex outside edges with flat, square ends on simple convex solids up to 5,000 triangles. Meeting corners and overlapping cuts are rejected.
+
+New features retain a starting mesh and ordered feature history. Use the history's **Edit** or **Remove** action, preview the rebuilt result, then apply it. Size/operation changes and removal survive project files, duplicates, arrays, and library reuse. If a later feature becomes invalid, the change is rejected atomically. Moves, rotations, and scaling preserve history; sizes are in the unscaled mesh's coordinates. Up to 32 features with 24 edges each are supported. Project format 20 shares starting/result meshes and reads formats 1–19.
+
+The initial feature still bakes primitive parameters, joins, and holes into the starting mesh. Removing all features restores that mesh; Undo restores original source objects. Later joins/linked cuts must be separated/removed before editing this body's history. Split pieces and STL/3MF exports are baked geometry. Older baked edge operations cannot be retroactively edited.
 
 ### 74 — Hole patterns
 
