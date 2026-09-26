@@ -4,7 +4,7 @@ import type { EdgeOperation } from './edgeFeatures'
 export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatureController; disabled: boolean }) {
   const picking = tools.edges.length > 0
   return <details className="repeat-tools edge-feature-tools"><summary>Fillet / chamfer edges</summary>
-    <p className="selection-hint">Select one solid, then click highlighted edges to toggle them on or off. Each feature applies one size to straight outside edges with 15°–165° interior angles and square ends. Chamfers may meet at corners. A fillet corner needs all three perpendicular edges selected together; use Select all edges for a fully rounded box.</p>
+    <p className="selection-hint">Select one solid, then click highlighted edges to toggle them on or off. Each feature applies one size to straight outside edges with 15°–165° interior angles and square ends. Chamfers may meet at corners. A fillet corner needs all three perpendicular edges selected together; use Select all edges for a fully rounded box. After Apply, select edges again to work on remaining straight edges.</p>
     <button type="button" disabled={disabled || tools.busy} onClick={() => void tools.start()}>{picking ? 'Pick edges again' : 'Select edges'}</button>
     {tools.features.length > 0 && <ol className="edge-feature-list" aria-label="Edge feature history">
       {tools.features.map((feature, index) => <li key={feature.id}>

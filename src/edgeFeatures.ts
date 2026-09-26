@@ -22,25 +22,37 @@ function selectedUnit(objects: CadObject[], ids: string[]) {
 }
 
 // Recover planar faces from a closed finished mesh, omitting triangulation diagonals.
-function solidEdges(solid: Manifold): FeatureEdge[] {
+function solidEdges(solid: Manifold, blended = false): FeatureEdge[] {
   const mesh = solid.getMesh()
   if (mesh.numTri > 5000) throw new Error('Edge tools currently support simple solids up to 5,000 triangles.')
   const vertices = Array.from({ length: mesh.numVert }, (_, i) => new Vector3(...Array.from({ length: 3 }, (_, j) => mesh.vertProperties[i * mesh.numProp + j]) as [number, number, number]))
-  const faces: { normal: Vector3; offset: number; vertices: Set<number> }[] = []
+  const faces: { id: number; normal: Vector3; offset: number; vertices: Set<number> }[] = []
+  const triangleEdges = new Map<string, number>(), adjacent = new Set<string>()
   for (let i = 0; i < mesh.triVerts.length; i += 3) {
     const ids = Array.from(mesh.triVerts.slice(i, i + 3))
     const [a, b, c] = ids.map((id) => vertices[id])
     const normal = b.clone().sub(a).cross(c.clone().sub(a)).normalize(), offset = normal.dot(a)
     if (!normal.lengthSq()) continue
     let face = faces.find((f) => f.normal.dot(normal) > 1 - 1e-8 && Math.abs(f.offset - offset) < tolerance)
-    if (!face) { face = { normal, offset, vertices: new Set() }; faces.push(face) }
+    if (!face) { face = { id: faces.length, normal, offset, vertices: new Set() }; faces.push(face) }
     ids.forEach((id) => face!.vertices.add(id))
+    for (let j = 0; j < 3; j++) {
+      const a = ids[j], b = ids[(j + 1) % 3], key = `${Math.min(a, b)},${Math.max(a, b)}`
+      const other = triangleEdges.get(key)
+      if (other === undefined) triangleEdges.set(key, face.id)
+      else if (other !== face.id) adjacent.add(`${Math.min(other, face.id)},${Math.max(other, face.id)}`)
+    }
   }
-  if (faces.length > 64 || faces.some((f) => vertices.some((p) => f.normal.dot(p) > f.offset + tolerance))) {
+  const supporting = faces.map((f) => !vertices.some((p) => f.normal.dot(p) > f.offset + tolerance))
+  if (!blended && (faces.length > 64 || supporting.some((supported) => !supported))) {
     throw new Error('This version supports convex solids with flat faces. Inside corners, curved edges, and concave or heavily faceted bodies are not supported.')
   }
   const edges: FeatureEdge[] = []
-  for (let i = 0; i < faces.length; i++) for (let j = i + 1; j < faces.length; j++) {
+  // Only actual neighboring faces can form a selectable edge. Rounded patches
+  // may contain many facets and tiny nonconvex seams from tessellation.
+  const pairs = [...adjacent].map((key) => key.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  for (const [i, j] of pairs) {
+    if (!supporting[i] || !supporting[j]) continue
     const f = faces[i], g = faces[j]
     // Interior dihedral angle. Exclude nearly flat facets and needle-like corners.
     const angle = Math.acos(Math.max(-1, Math.min(1, -f.normal.dot(g.normal))))
@@ -82,7 +94,7 @@ export async function findFeatureEdges(objects: CadObject[], ids: string[]) {
   const editable = historyObject(objects, ids)
   const unit = selectedUnit(objects, ids), runtime = await loadManifold()
   return readSolidManifold(unit.body, runtime, (solid) => {
-    if (editable) return solidEdges(solid).map((edge) => ({ ...edge, ...transformEdge(edge, objectMatrix(editable)) }))
+    if (editable) return solidEdges(solid, true).map((edge) => ({ ...edge, ...transformEdge(edge, objectMatrix(editable)) }))
     const world = solid.transform(objectMatrix(unit.body.anchor).elements as Mat4)
     try { return solidEdges(world) } finally { world.delete() }
   })
@@ -98,10 +110,10 @@ function encodeSolid(solid: Manifold, center = [0, 0, 0]) {
 
 // Resolve each edge against the same input. Shared chamfers meet at sharp miters;
 // three perpendicular fillets receive a spherical corner patch.
-function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<ReturnType<typeof loadManifold>>): Manifold {
+function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<ReturnType<typeof loadManifold>>, blended = false): Manifold {
   if (!['fillet', 'chamfer'].includes(feature.operation) || !Number.isFinite(feature.size) || feature.size < .01 || feature.size > 10000) throw new Error('Enter a radius or distance from 0.01 to 10,000 mm.')
   if (!feature.edges.length || feature.edges.length > MAX_FEATURE_EDGES) throw new Error(`Select 1 to ${MAX_FEATURE_EDGES} edges.`)
-  const available = solidEdges(solid)
+  const available = solidEdges(solid, blended)
   const edges = feature.edges.map((edge) => {
     const current = available.find((candidate) => sameEdge(candidate, edge))
     if (!current) throw new Error('An edge changed or is unavailable. Remove dependent later features first, or pick edges again.')
@@ -201,7 +213,7 @@ async function rebuild(object: Extract<CadObject, { type: 'stl' }>, history: Edg
   try {
     for (let i = 0; i < history.features.length; i++) {
       let next: Manifold
-      try { next = applyFeature(result, history.features[i], runtime) }
+      try { next = applyFeature(result, history.features[i], runtime, i > 0) }
       catch (error) { throw new Error(`Feature ${i + 1}: ${error instanceof Error ? error.message : 'Could not rebuild.'}`) }
       result.delete(); result = next
     }

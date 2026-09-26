@@ -206,8 +206,10 @@ test('three-edge fillet corners form spherical patches and all box edges form a 
  assert.equal(incident.length,3)
  const single=await previewEdgeFeature([shape],[shape.id],incident,'fillet',2)
  assert.equal(single.object.edgeHistory.features[0].edges.length,3)
- // Blended meshes retain editable history, but cannot yet accept new edge picks.
- await assert.rejects(findFeatureEdges([single.object],[single.object.id]),/heavily faceted/)
+ const remaining=await findFeatureEdges([single.object],[single.object.id])
+ assert.ok(remaining.length>0)
+ const next=await previewEdgeFeature([single.object],[single.object.id],remaining[0],'chamfer',1)
+ assert.equal(next.object.edgeHistory.features.length,2)
  assert.ok(readSolidManifold(getSolidBodies([single.object])[0],runtime,s=>s.volume())<8000)
 })
 
@@ -250,4 +252,30 @@ test('prism chamfers remove every vertex beyond the cut plane without face slive
    assert.equal(readSolidManifold(getSolidBodies([object])[0],runtime,s=>s.status()),'NoError')
   }
  }
+})
+
+test('remaining edges after spherical blends support transformed sequential features and history replay',async()=>{
+ const {editEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const shape={...box('continue'),dimensions:{x:20,y:20,z:20}}
+ const edges=await findFeatureEdges([shape],[shape.id]),corner=edges[0].a
+ const incident=edges.filter(e=>[e.a,e.b].some(p=>Math.hypot(p.x-corner.x,p.y-corner.y,p.z-corner.z)<1e-5))
+ const first=(await previewEdgeFeature([shape],[shape.id],incident,'fillet',2)).object
+ const moved={...first,position:{x:40,y:30,z:-20},rotation:{x:.2,y:.4,z:.1},scale:{x:-2,y:1,z:.5}}
+ const original=serializeProject([moved]),restored=parseProject(original)[0]
+ const available=await findFeatureEdges([restored],[restored.id])
+ assert.ok(available.length>0 && available.length<12)
+ // No tessellation seams or curved boundaries should be offered as box edges.
+ assert.ok(available.every(e=>Math.abs(e.angle-90)<1e-4))
+ for(const operation of ['fillet','chamfer']) {
+  const added=(await previewEdgeFeature([restored],[restored.id],available[0],operation,.5)).object
+  assert.equal(added.edgeHistory.features.length,2)
+  assert.deepEqual(added.rotation,moved.rotation);assert.deepEqual(added.scale,moved.scale)
+  const loaded=parseProject(serializeProject([added]))[0]
+  const updated=(await editEdgeFeature([loaded],[loaded.id],loaded.edgeHistory.features[0].id,{operation:'fillet',size:1})).object
+  assert.equal(updated.edgeHistory.features.length,2)
+  const removed=(await editEdgeFeature([loaded],[loaded.id],loaded.edgeHistory.features[1].id,null)).object
+  assert.equal(removed.meshData,first.meshData)
+  assert.ok((await exportStl([updated])).byteLength>84)
+ }
+ assert.deepEqual(restored,parseProject(original)[0])
 })
