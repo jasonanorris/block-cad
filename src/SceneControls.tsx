@@ -50,7 +50,7 @@ export default function SceneControls({
   onTransformStart,
   onTransformEnd,
 }: SceneControlsProps) {
-  const { camera, gl, scene, size, get, set } = useThree()
+  const { camera, gl, scene, size, get, set, invalidate } = useThree()
   const perspectiveCamera = useRef(camera as PerspectiveCamera)
   const orthographicCamera = useMemo(() => new OrthographicCamera(-120, 120, 60, -60, 0.1, 1000), [])
   const orbitRef = useRef<OrbitControls | null>(null)
@@ -120,7 +120,7 @@ export default function SceneControls({
     orbit.minZoom = 0.25
     orbit.maxZoom = 8
     orbit.enableRotate = camera === perspectiveCamera.current
-    orbit.addEventListener('change', () => updateViewCube(camera))
+    orbit.addEventListener('change', () => { updateViewCube(camera); invalidate() })
     orbit.update()
 
     const controls = new TransformControls(camera, gl.domElement)
@@ -171,6 +171,8 @@ export default function SceneControls({
       })
     }
 
+    controls.addEventListener('change', () => invalidate())
+    invalidate()
     controls.addEventListener('dragging-changed', onDraggingChanged)
     controls.addEventListener('mouseDown', onMouseDown)
     controls.addEventListener('mouseUp', onMouseUp)
@@ -187,7 +189,7 @@ export default function SceneControls({
       orbitRef.current = null
       transformRef.current = null
     }
-  }, [camera, gl, scene, gizmoInteractionRef, onTransformObject, onTransformStart, onTransformEnd, onSnapHint, updateViewCube])
+  }, [camera, gl, scene, gizmoInteractionRef, onTransformObject, onTransformStart, onTransformEnd, onSnapHint, updateViewCube, invalidate])
 
   useEffect(() => {
     if (!frameRequest || lastFrameRequest.current === frameRequest) return

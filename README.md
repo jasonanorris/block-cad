@@ -139,3 +139,7 @@ Open **Text shape** under Shapes, enter wording (up to 80 characters), font size
 ### 62 — Section view
 
 Open **Section view**, enable it, choose X/Y/Z, and move the plane with **Position (mm)**. **Flip side** changes which side remains visible; **Section through active center** uses the active source's position. Back surfaces are visible for interior inspection. This is an open cutaway, not a capped or physically sliced solid. Clipped surfaces do not intercept clicks, and entirely clipped shapes are excluded from box selection and object-snap targets. Partly clipped box selection still uses conservative full-shape bounds. Measurements, saved projects, and exports remain whole. New and Load reset the view.
+
+### 63 — Geometry reuse and idle rendering
+
+Boolean previews now reuse unchanged bodies. Editing a cutter rebuilds its affected body; names, colors, visibility, and locking do not trigger Boolean rebuilds. Replaced/removed geometries are disposed, and errors in one body no longer remove unrelated valid previews. Finished measurement/placement bounds share a bounded 128-entry cache with independent result boxes. Object rows and meshes skip unrelated React updates. The canvas renders on demand, with explicit camera/gizmo invalidation, so it stops drawing when idle. Geometry calculations still run on the main thread; complex individual Boolean operations can still pause editing.

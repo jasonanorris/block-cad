@@ -2,6 +2,7 @@ import { Box3, Euler, Matrix4, Quaternion, Vector3 as ThreeVector3 } from 'three
 import { getSolidBodies, isHoleObject, type CadObject, type SolidBody, type Vector3 } from './cadModel'
 import { createSourceGeometry } from './sourceGeometry'
 import { buildSolidGeometry } from './booleanGeometry'
+import { sameBodyGeometry } from './geometryInputs'
 import { loadManifold } from './manifoldRuntime'
 
 export type AlignmentEdge = 'min' | 'center' | 'max'
@@ -32,7 +33,25 @@ export function canPositionUnits(objects: CadObject[], units: PlacementUnit[]): 
     !unit.ids.has(object.id) || (!object.hidden && !object.locked)))
 }
 
-export async function getPlacementBounds(unit: PlacementUnit): Promise<Box3> {
+const boundsCache = new Map<string, { body: SolidBody; promise: Promise<Box3> }>()
+
+export function getPlacementBounds(unit: PlacementUnit): Promise<Box3> {
+  const id = unit.body.anchor.id
+  let entry = boundsCache.get(id)
+  if (!entry || !sameBodyGeometry(entry.body, unit.body)) {
+    const promise = calculatePlacementBounds(unit)
+    entry = { body: unit.body, promise }
+    boundsCache.delete(id)
+    boundsCache.set(id, entry)
+    // Bound retained scene references even after repeated New/Load operations.
+    if (boundsCache.size > 128) boundsCache.delete(boundsCache.keys().next().value!)
+    const added = entry
+    void promise.catch(() => { if (boundsCache.get(id) === added) boundsCache.delete(id) })
+  }
+  return entry.promise.then((bounds) => bounds.clone())
+}
+
+async function calculatePlacementBounds(unit: PlacementUnit): Promise<Box3> {
   const { body } = unit
   const derived = body.members.length > 1 || body.holes.length > 0
   const geometry = derived ? buildSolidGeometry(body, await loadManifold()) : createSourceGeometry(body.anchor)

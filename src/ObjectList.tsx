@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import type { CadObject } from './cadModel'
 import { DEFAULT_OBJECT_COLOR } from './objectColor'
 import { objectLabel } from './objectLabels'
 import { objectListRows, type ObjectFilter } from './objectList'
 
-export default function ObjectList({ objects, selectedIds, onSelect }: {
+export default memo(function ObjectList({ objects, selectedIds, onSelect }: {
   objects: CadObject[]
   selectedIds: string[]
   onSelect: (id: string, additive?: boolean) => void
@@ -46,4 +46,4 @@ export default function ObjectList({ objects, selectedIds, onSelect }: {
       {!rows.length && <p className="selection-hint">{objects.length ? 'No matching objects.' : 'Add a shape to begin.'}</p>}
     </div>
   </div>
-}
+})

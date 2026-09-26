@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import type { CadObject } from './cadModel'
 import { measureSelection } from './measurements'
 
 const format = (value: number) => `${Number(value.toFixed(2))} mm`
 type Readout = Awaited<ReturnType<typeof measureSelection>>
 
-export default function MeasurementPanel({ objects, selectedObjectIds, activeObjectId }: {
+export default memo(function MeasurementPanel({ objects, selectedObjectIds, activeObjectId }: {
   objects: CadObject[]
   selectedObjectIds: string[]
   activeObjectId: string | null
@@ -35,4 +35,4 @@ export default function MeasurementPanel({ objects, selectedObjectIds, activeObj
       </>}
     </div>
   )
-}
+})

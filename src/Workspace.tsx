@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { DoubleSide, FrontSide, type BufferGeometry, type Mesh, type Plane } from 'three'
 import { clippedRaycast, sectionPlane, type SectionView } from './sectionView'
@@ -12,7 +12,7 @@ import { expandAssemblyIds } from './selectionOperations'
 import BoxSelection from './BoxSelection'
 import type { ScreenRectangle } from './boxSelection'
 
-function CadObjectMesh({
+const CadObjectMesh = memo(function CadObjectMesh({
   object,
   isSelected,
   isActive,
@@ -73,7 +73,7 @@ function CadObjectMesh({
       />
     </mesh>
   )
-}
+})
 
 function CadScene({
   objects,
@@ -100,6 +100,9 @@ function CadScene({
   booleanGeometries,
   section,
 }: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean>; onRectangle: (rectangle: ScreenRectangle | null) => void }) {
+  const onSelectMesh = useCallback((id: string, additive: boolean) => {
+    if (!gizmoInteractionRef.current) onSelectObject(id, additive)
+  }, [gizmoInteractionRef, onSelectObject])
   const selectedMeshRef = useRef<Mesh | null>(null)
   const clippingPlanes = useMemo(() => { const plane = sectionPlane(section); return plane ? [plane] : [] }, [section])
   const hiddenGroupedIds = new Set(getSolidBodies(objects).flatMap((body) => {
@@ -123,7 +126,7 @@ function CadScene({
           isSelected={selectedObjectIds.includes(object.id)}
           isActive={object.id === selectedObjectId}
           hiddenInGroup={hiddenGroupedIds.has(object.id)}
-          onSelect={(id, additive) => { if (!gizmoInteractionRef.current) onSelectObject(id, additive) }}
+          onSelect={onSelectMesh}
           selectedMeshRef={selectedMeshRef}
           cutGeometry={booleanGeometries.get(object.id)}
           clippingPlanes={clippingPlanes}
@@ -184,6 +187,7 @@ export default function Workspace(props: WorkspaceProps) {
   return (
     <div className={`workspace-canvas${props.boxSelectEnabled ? ' box-select-mode' : ''}`} aria-label={`3D workspace with ${props.objects.length} ${props.objects.length === 1 ? 'object' : 'objects'} and grid`}>
       <Canvas
+        frameloop="demand"
         onCreated={({ gl }) => { gl.localClippingEnabled = true }}
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
         onPointerMissed={(event) => { if (!props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
