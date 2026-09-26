@@ -17,6 +17,7 @@ import ViewCube from './ViewCube'
 import { getObjectTopHeight } from './workplane'
 import { importSvg } from './svgImport'
 import { importStl } from './stlImport'
+import type { FrameRequest } from './frameCamera'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -54,6 +55,10 @@ export default function App() {
   const [workplaneHeight, setWorkplaneHeight] = useState(0)
   const [workplaneDraft, setWorkplaneDraft] = useState('0')
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
+  const [frameRequest, setFrameRequest] = useState<FrameRequest | null>(null)
+  const requestFrame = useCallback((scope: FrameRequest['scope']) => {
+    setFrameRequest((previous) => ({ sequence: (previous?.sequence ?? 0) + 1, scope }))
+  }, [])
   const [cameraOrientation, setCameraOrientation] = useState('rotateX(-25deg) rotateY(-35deg)')
   const [projectError, setProjectError] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -466,6 +471,9 @@ export default function App() {
         if (!event.repeat) redo()
       } else if (event.key === 'Escape') {
         select(null)
+      } else if (!modifier && key === 'f' && selectedObjectIds.length > 0) {
+        event.preventDefault()
+        if (!event.repeat) requestFrame('selection')
       } else if (selectedObjectIds.length > 0 && modifier && key === 'c') {
         event.preventDefault()
         if (!event.repeat) copySelected()
@@ -506,7 +514,7 @@ export default function App() {
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [selectedObjectIds.length, canEditSelection, canNudge, gridSize, snapEnabled, hasCopiedObjects, copySelected, pasteCopied, duplicateSelected, deleteSelected, nudgeSelection, begin, end, select, undo, redo])
+  }, [selectedObjectIds.length, canEditSelection, canNudge, gridSize, snapEnabled, hasCopiedObjects, copySelected, pasteCopied, duplicateSelected, deleteSelected, nudgeSelection, begin, end, select, undo, redo, requestFrame])
 
   return (
     <div className="app-shell">
@@ -569,6 +577,10 @@ export default function App() {
               </select>
             </label>
             {!selectedObject && <span className="toolbar-hint">Select a shape to use these tools</span>}
+            <button type="button" className="tool-button" disabled={!selectedObjects.some((object) => !object.hidden)}
+              onClick={() => requestFrame('selection')} title="Fit the selected visible shapes (F)">Frame selection</button>
+            <button type="button" className="tool-button" disabled={!objects.some((object) => !object.hidden)}
+              onClick={() => requestFrame('all')} title="Fit all visible shapes">Frame all</button>
             <div className="history-actions">
               <button type="button" disabled={!canUndo} onClick={undo} title="Undo (Ctrl/Cmd+Z)">Undo</button>
               <button type="button" disabled={!canRedo} onClick={redo} title="Redo (Ctrl/Cmd+Shift+Z or Ctrl+Y)">Redo</button>
@@ -584,6 +596,7 @@ export default function App() {
               gridSize={gridSize}
               workplaneHeight={workplaneHeight}
               cameraView={cameraView}
+              frameRequest={frameRequest}
               onCameraOrientation={setCameraOrientation}
               booleanGeometries={booleanGeometries}
               onSelectObject={select}

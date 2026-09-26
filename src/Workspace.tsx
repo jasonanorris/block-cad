@@ -6,6 +6,8 @@ import { getSolidBodies, isHoleObject, type CadObject, type ObjectTransform } fr
 import SceneControls, { type CameraView } from './SceneControls'
 import { svgGeometry } from './svgGeometry'
 import { stlMeshGeometry } from './stlMesh'
+import type { FrameRequest } from './frameCamera'
+import { expandAssemblyIds } from './selectionOperations'
 
 function CadObjectMesh({
   object,
@@ -36,6 +38,7 @@ function CadObjectMesh({
 
   return (
     <mesh
+      userData={{ cadObjectId: object.id }}
       ref={isActive ? selectedMeshRef : undefined}
       visible={!hiddenInGroup || isSelected}
       position={[position.x, position.y, position.z]}
@@ -86,6 +89,7 @@ function CadScene({
   gridSize,
   workplaneHeight,
   cameraView,
+  frameRequest,
   onCameraOrientation,
   onTransformObject,
   onTransformStart,
@@ -128,6 +132,8 @@ function CadScene({
         snapEnabled={snapEnabled}
         gridSize={gridSize}
         cameraView={cameraView}
+        frameRequest={frameRequest}
+        frameSelectionIds={expandAssemblyIds(objects, new Set(selectedObjectIds), true)}
         onCameraOrientation={onCameraOrientation}
         onTransformObject={onTransformObject}
         onTransformStart={onTransformStart}
@@ -146,6 +152,7 @@ type WorkspaceProps = {
   gridSize: number
   workplaneHeight: number
   cameraView: CameraView
+  frameRequest: FrameRequest | null
   onCameraOrientation: (transform: string) => void
   booleanGeometries: Map<string, BufferGeometry>
   onSelectObject: (id: string | null, additive?: boolean) => void

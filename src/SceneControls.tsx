@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useThree } from '@react-three/fiber'
-import { Matrix4, OrthographicCamera, type Mesh, type PerspectiveCamera } from 'three'
+import { Box3, Matrix4, Mesh, OrthographicCamera, type PerspectiveCamera } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { TransformControls, type TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import type { ObjectTransform } from './cadModel'
+import { frameCamera, type FrameRequest } from './frameCamera'
 
 export type CameraView = 'perspective' | 'top' | 'front' | 'right' | 'bottom' | 'back' | 'left'
 
@@ -15,6 +16,8 @@ type SceneControlsProps = {
   snapEnabled: boolean
   gridSize: number
   cameraView: CameraView
+  frameRequest: FrameRequest | null
+  frameSelectionIds: Set<string>
   onCameraOrientation: (transform: string) => void
   onTransformObject: (id: string, transform: ObjectTransform) => void
   onTransformStart: () => void
@@ -29,6 +32,8 @@ export default function SceneControls({
   snapEnabled,
   gridSize,
   cameraView,
+  frameRequest,
+  frameSelectionIds,
   onCameraOrientation,
   onTransformObject,
   onTransformStart,
@@ -40,6 +45,7 @@ export default function SceneControls({
   const orbitRef = useRef<OrbitControls | null>(null)
   const transformRef = useRef<TransformControls | null>(null)
   const selectedIdRef = useRef(selectedObjectId)
+  const lastFrameRequest = useRef<FrameRequest | null>(null)
   selectedIdRef.current = selectedObjectId
 
   const updateViewCube = useMemo(() => {
@@ -76,6 +82,9 @@ export default function SceneControls({
       left: [-150, 8, 0],
     }
     nextCamera.position.set(...positions[cameraView])
+    nextCamera.zoom = 1
+    nextCamera.near = 0.1
+    nextCamera.far = 1000
     nextCamera.up.set(0, cameraView === 'top' || cameraView === 'bottom' ? 0 : 1, cameraView === 'top' ? -1 : cameraView === 'bottom' ? 1 : 0)
     nextCamera.lookAt(...target)
     nextCamera.updateProjectionMatrix()
@@ -147,6 +156,34 @@ export default function SceneControls({
       transformRef.current = null
     }
   }, [camera, gl, scene, gizmoInteractionRef, onTransformObject, onTransformStart, onTransformEnd, updateViewCube])
+
+  useEffect(() => {
+    if (!frameRequest || lastFrameRequest.current === frameRequest) return
+    lastFrameRequest.current = frameRequest
+    const orbit = orbitRef.current
+    if (!orbit || gizmoInteractionRef.current) return
+    const bounds = new Box3()
+    const meshBounds = new Box3()
+    scene.updateMatrixWorld(true)
+    scene.traverseVisible((object) => {
+      if (!(object instanceof Mesh) || typeof object.userData.cadObjectId !== 'string') return
+      if (frameRequest.scope === 'selection' && !frameSelectionIds.has(object.userData.cadObjectId)) return
+      object.geometry.computeBoundingBox()
+      if (object.geometry.boundingBox) {
+        meshBounds.copy(object.geometry.boundingBox).applyMatrix4(object.matrixWorld)
+        bounds.union(meshBounds)
+      }
+    })
+    const target = frameCamera(camera as PerspectiveCamera | OrthographicCamera, bounds)
+    if (!target) return
+    orbit.target.copy(target)
+    const distance = camera.position.distanceTo(target)
+    orbit.minDistance = Math.min(25, distance / 100)
+    orbit.maxDistance = Math.max(400, distance * 10)
+    orbit.minZoom = Math.min(0.25, camera.zoom / 100)
+    orbit.maxZoom = Math.max(8, camera.zoom * 100)
+    orbit.update()
+  }, [camera, scene, frameRequest, frameSelectionIds, gizmoInteractionRef])
 
   useEffect(() => {
     const controls = transformRef.current
