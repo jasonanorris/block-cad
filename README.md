@@ -81,3 +81,7 @@ The Snap toggle controls Three.js `TransformControls` during drag operations. Th
 ### 49 — Box selection
 
 Turn on **Box select**, then drag a rectangle across the workspace. Visible shapes whose projected bounds touch the rectangle are selected, including shapes behind other shapes. Shift adds to the selection; an empty rectangle clears it. Escape cancels the drag and returns to camera controls. Hidden shapes, the grid, and transform handles are excluded. Selection does not create an Undo step.
+
+### 50 — Finished-body measurements
+
+The Measurements panel shows the active finished body's world X/Y/Z dimensions, the combined selection bounds, and per-axis gaps to other selected bodies. Joined members count as one body. Rotations, scales, intersections, and cuts are included. Gaps are distances between axis-aligned bounding boxes, not exact distances between surfaces; zero on an axis means their projections touch or overlap. A separately selected hole is measured as a source shape. Empty or invalid results show an error instead of stale measurements.
