@@ -85,3 +85,7 @@ Turn on **Box select**, then drag a rectangle across the workspace. Visible shap
 ### 50 — Finished-body measurements
 
 The Measurements panel shows the active finished body's world X/Y/Z dimensions, the combined selection bounds, and per-axis gaps to other selected bodies. Joined members count as one body. Rotations, scales, intersections, and cuts are included. Gaps are distances between axis-aligned bounding boxes, not exact distances between surfaces; zero on an axis means their projections touch or overlap. A separately selected hole is measured as a source shape. Empty or invalid results show an error instead of stale measurements.
+
+### 51 — Object snapping
+
+Turn on **Object snap** and drag a Move handle to match the active source shape's world-bound edges or center to another visible source shape within 2 mm. Only the dragged axes snap; the workspace hint names the axis and target. Move farther away to release. Locked shapes can be references; hidden shapes and members/cutters of the moving assembly are excluded. A hole can snap to its target solid. Snapping uses source bounds (before joins and cuts), preserving normal group movement: grouped holes travel with their solid, ungrouped holes stay put. Source geometry and target bounds are captured at drag start. Object snapping takes precedence when within range of a target even if grid Snap is enabled. Rotation, scaling, and numeric edits are unaffected; one drag is one Undo step.

@@ -74,6 +74,8 @@ function CadScene({
   selectedObjectIds,
   onSelectObject,
   toolMode,
+  objectSnapEnabled,
+  onSnapHint,
   snapEnabled,
   gridSize,
   boxSelectEnabled,
@@ -122,6 +124,9 @@ function CadScene({
         gizmoInteractionRef={gizmoInteractionRef}
         selectedObjectId={selectedObjectId}
         toolMode={toolMode}
+        objects={objects}
+        objectSnapEnabled={objectSnapEnabled}
+        onSnapHint={onSnapHint}
         snapEnabled={snapEnabled}
         gridSize={gridSize}
         boxSelectEnabled={boxSelectEnabled}
@@ -143,6 +148,8 @@ type WorkspaceProps = {
   selectedObjectId: string | null
   selectedObjectIds: string[]
   toolMode: TransformControlsMode
+  objectSnapEnabled: boolean
+  onSnapHint: (hint: string) => void
   snapEnabled: boolean
   gridSize: number
   boxSelectEnabled: boolean

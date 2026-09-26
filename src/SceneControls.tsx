@@ -3,8 +3,10 @@ import { useThree } from '@react-three/fiber'
 import { Box3, Matrix4, Mesh, OrthographicCamera, type PerspectiveCamera } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { TransformControls, type TransformControlsMode } from 'three/addons/controls/TransformControls.js'
-import type { ObjectTransform } from './cadModel'
+import type { CadObject, ObjectTransform } from './cadModel'
 import { frameCamera, type FrameRequest } from './frameCamera'
+
+import { createSnapSnapshot, snapTranslation } from './objectSnapping'
 
 export type CameraView = 'perspective' | 'top' | 'front' | 'right' | 'bottom' | 'back' | 'left'
 
@@ -13,6 +15,9 @@ type SceneControlsProps = {
   gizmoInteractionRef: RefObject<boolean>
   selectedObjectId: string | null
   toolMode: TransformControlsMode
+  objects: CadObject[]
+  objectSnapEnabled: boolean
+  onSnapHint: (hint: string) => void
   snapEnabled: boolean
   gridSize: number
   boxSelectEnabled: boolean
@@ -30,6 +35,9 @@ export default function SceneControls({
   gizmoInteractionRef,
   selectedObjectId,
   toolMode,
+  objects,
+  objectSnapEnabled,
+  onSnapHint,
   snapEnabled,
   gridSize,
   boxSelectEnabled,
@@ -49,6 +57,8 @@ export default function SceneControls({
   const selectedIdRef = useRef(selectedObjectId)
   const lastFrameRequest = useRef<FrameRequest | null>(null)
   selectedIdRef.current = selectedObjectId
+  const snapSettings = useRef({ objects, objectSnapEnabled })
+  snapSettings.current = { objects, objectSnapEnabled }
 
   const updateViewCube = useMemo(() => {
     const rotation = new Matrix4()
@@ -117,6 +127,7 @@ export default function SceneControls({
     scene.add(helper)
     transformRef.current = controls
     let clearInteraction: number | undefined
+    let snapSnapshot: ReturnType<typeof createSnapSnapshot> = null
 
     const onDraggingChanged = (event: { value: unknown }) => {
       orbit.enabled = event.value !== true
@@ -125,16 +136,33 @@ export default function SceneControls({
       window.clearTimeout(clearInteraction)
       gizmoInteractionRef.current = true
       onTransformStart()
+      snapSnapshot = null
+      if (snapSettings.current.objectSnapEnabled && controls.mode === 'translate' && selectedIdRef.current) {
+        const visible = new Set<string>()
+        scene.traverseVisible((object) => {
+          if (object instanceof Mesh && typeof object.userData.cadObjectId === 'string') visible.add(object.userData.cadObjectId)
+        })
+        try { snapSnapshot = createSnapSnapshot(snapSettings.current.objects, selectedIdRef.current, visible) }
+        catch { onSnapHint('Object snap unavailable for this geometry') }
+      }
     }
     const onMouseUp = () => {
       // A click follows pointer-up; keep the gizmo from counting as empty workspace.
       clearInteraction = window.setTimeout(() => { gizmoInteractionRef.current = false }, 0)
+      snapSnapshot = null
+      onSnapHint('')
       onTransformEnd()
     }
     const onObjectChange = () => {
       const mesh = controls.object
       const id = selectedIdRef.current
       if (!mesh || !id) return
+      if (snapSnapshot && controls.dragging && controls.mode === 'translate' && snapSettings.current.objectSnapEnabled) {
+        const result = snapTranslation(snapSnapshot.bounds, snapSnapshot.targets,
+          mesh.position.clone().sub(snapSnapshot.origin), controls.axis ?? '')
+        mesh.position.copy(snapSnapshot.origin).add(result.offset)
+        onSnapHint(result.matches.map((match) => `${match.axis} → ${match.target}`).join(' · '))
+      }
       onTransformObject(id, {
         position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
         rotation: { x: mesh.rotation.x, y: mesh.rotation.y, z: mesh.rotation.z },
@@ -150,6 +178,7 @@ export default function SceneControls({
     return () => {
       window.clearTimeout(clearInteraction)
       gizmoInteractionRef.current = false
+      onSnapHint('')
       controls.detach()
       scene.remove(helper)
       controls.dispose()
@@ -157,7 +186,7 @@ export default function SceneControls({
       orbitRef.current = null
       transformRef.current = null
     }
-  }, [camera, gl, scene, gizmoInteractionRef, onTransformObject, onTransformStart, onTransformEnd, updateViewCube])
+  }, [camera, gl, scene, gizmoInteractionRef, onTransformObject, onTransformStart, onTransformEnd, onSnapHint, updateViewCube])
 
   useEffect(() => {
     if (!frameRequest || lastFrameRequest.current === frameRequest) return

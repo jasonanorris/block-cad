@@ -69,6 +69,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const autosaveStatus = useAutosave(objects, autosaveEnabled)
   const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveryNotice)
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
+  const [objectSnapEnabled, setObjectSnapEnabled] = useState(false)
+  const [snapHint, setSnapHint] = useState('')
   const [snapEnabled, setSnapEnabled] = useState(false)
   const [boxSelectEnabled, setBoxSelectEnabled] = useState(false)
   const exitBoxSelect = useCallback(() => setBoxSelectEnabled(false), [])
@@ -613,6 +615,9 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             >
               Snap <span>{gridSize} mm · 15°</span>
             </button>
+            <button type="button" className={`tool-button${objectSnapEnabled ? ' is-active' : ''}`}
+              aria-pressed={objectSnapEnabled} title="Snap the active source shape's world edges and center to visible source shapes within 2 mm"
+              onClick={() => { setObjectSnapEnabled((enabled) => !enabled); setSnapHint('') }}>Object snap</button>
             <label className="grid-size-control">Grid
               <select aria-label="Grid spacing" value={gridSize} onChange={(event) => setGridSize(Number(event.target.value))}>
                 {gridSizes.map((size) => <option key={size} value={size}>{size} mm</option>)}
@@ -634,6 +639,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               selectedObjectId={canTransformSelected ? selectedObjectId : null}
               selectedObjectIds={selectedObjectIds}
               toolMode={toolMode}
+              objectSnapEnabled={objectSnapEnabled}
+              onSnapHint={setSnapHint}
               snapEnabled={snapEnabled}
               gridSize={gridSize}
               boxSelectEnabled={boxSelectEnabled}
@@ -650,8 +657,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               onTransformEnd={end}
             />
             <ViewCube cameraView={cameraView} orientation={cameraOrientation} onChange={setCameraView} />
-            <div className="workspace-hint">{boxSelectEnabled ? 'Drag a selection rectangle · Shift adds · Esc returns to camera controls'
-              : `${cameraView === 'perspective' ? 'Drag to orbit · ' : ''}Scroll to zoom · Right drag to pan`}</div>
+            <div className="workspace-hint">{snapHint || (boxSelectEnabled ? 'Drag a selection rectangle · Shift adds · Esc returns to camera controls'
+              : `${cameraView === 'perspective' ? 'Drag to orbit · ' : ''}Scroll to zoom · Right drag to pan`)}</div>
             <div className="axis-label">Workplane Y {workplaneHeight} {MODEL_UNIT} <span>·</span> X / Y / Z</div>
           </div>
         </section>
