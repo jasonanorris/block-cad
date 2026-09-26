@@ -23,6 +23,8 @@ import { alignByBounds, canPositionUnits, dropToWorkplane, getPlacementUnits, ty
 import { mirrorSelection } from './mirrorSelection'
 import { repeatSelection } from './repeatSelection'
 import RepeatTools from './RepeatTools'
+import RadialArrayTools from './RadialArrayTools'
+import { radialArray } from './radialArray'
 import ExportReview, { type ExportFormat } from './ExportReview'
 
 const shapeLabels: Record<CadObjectType, string> = {
@@ -391,9 +393,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     void positionSelection((current, ids) => alignByBounds(current, ids, selectedObjectId, axis, alignmentEdge))
   }
 
-  function repeatSelected(axis: keyof Vector3, count: number, spacing: number) {
+  function insertArray({ copies, lastCopiedIds }: ReturnType<typeof repeatSelection>) {
     const snapshot = scene
-    const { copies, lastCopiedIds } = repeatSelection(objects, new Set(selectedObjectIds), axis, count, spacing)
     if (!copies.length) return
     commit((current) => current === snapshot ? {
       objects: [...current.objects, ...copies],
@@ -768,7 +769,9 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               ))}
             </div>
             <p className="selection-hint">Mirror flips the arrangement around its shared center on a world axis, including linked holes.</p>
-            <RepeatTools disabled={!selectedObjectIds.length || positioning} onRepeat={repeatSelected} />
+            <RadialArrayTools disabled={!selectedObjectIds.length || positioning}
+              onRepeat={(axis, count, angle, center) => insertArray(radialArray(objects, new Set(selectedObjectIds), axis, count, angle, center))} />
+            <RepeatTools disabled={!selectedObjectIds.length || positioning} onRepeat={(axis, count, spacing) => insertArray(repeatSelection(objects, new Set(selectedObjectIds), axis, count, spacing))} />
             <label className="alignment-mode">Align by
               <select value={alignmentEdge} onChange={(event) => setAlignmentEdge(event.target.value as AlignmentEdge)}>
                 <option value="min">Minimum edge</option>
