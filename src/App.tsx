@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
+import TextTools from './TextTools'
+import { createTextObject, changeText } from './textShapes'
 import ObjectList from './ObjectList'
 import { colorObjects } from './objectColor'
 import { objectLabel, shapeLabels } from './objectLabels'
@@ -421,6 +423,11 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     setExportRequest(null)
   }
 
+  function addText(text: string, size: number, height: number) {
+    const object = createTextObject(text, size, height, workplaneHeight)
+    commit((current) => ({ objects: [...current.objects, object], selectedObjectId: object.id, selectedObjectIds: [object.id] }))
+  }
+
   function insertArray({ copies, lastCopiedIds }: ReturnType<typeof repeatSelection>) {
     const snapshot = scene
     if (!copies.length) return
@@ -720,6 +727,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                 </button>
               ))}
             </div>
+            <TextTools onApply={addText} />
             <button className="cut-example-button" type="button" onClick={addCutExample}>Add cutout example</button>
             <p className="cut-example-hint">Adds an editable box and cylinder cutter.</p>
             <button className="cut-example-button" type="button" onClick={() => svgInput.current?.click()}>Import SVG</button>
@@ -836,6 +844,13 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             {positioning && <p className="selection-hint" role="status">Calculating placement…</p>}
             {positionError && <p className="position-error" role="alert">{positionError}</p>}
             {selectedObject && !canEditActive && <p className="selection-hint">Unlock this shape to edit its properties.</p>}
+            {selectedObject?.type === 'text' && <TextTools
+              key={`${selectedObject.id}:${selectedObject.text}:${selectedObject.fontSize}:${selectedObject.dimensions.y}`}
+              initialText={selectedObject.text} initialSize={selectedObject.fontSize} initialHeight={selectedObject.dimensions.y}
+              action="Apply text" disabled={!canEditActive} onApply={(text, size, height) => {
+                const updated = changeText(selectedObject, text, size, height)
+                commit((current) => ({ ...current, objects: current.objects.map((object) => object.id === updated.id ? updated : object) }))
+              }} />}
             {selectedObject && (
               <ObjectInspector
                 key={selectedObject.id}

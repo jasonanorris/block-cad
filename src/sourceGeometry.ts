@@ -12,6 +12,7 @@ export function createSourceGeometry(object: CadObject): BufferGeometry {
     case 'cone':
     case 'wedge':
     case 'prism': return basicShapeGeometry(object)
+    case 'text':
     case 'svg': return svgGeometry(object.contours, object.dimensions)
     case 'stl': return stlMeshGeometry(object.meshData)
   }

@@ -49,8 +49,10 @@ export function readSolidManifold<T>(body: SolidBody, runtime: ManifoldToplevel,
           })))
         } finally { geometry.dispose() }
       }
+      case 'text':
       case 'svg': {
-        const polygons = [object.contours.outline, ...object.contours.holes]
+        const contours = object.type === 'text' ? object.contours : [object.contours]
+        const polygons = contours.flatMap((contour) => [contour.outline, ...contour.holes])
           .map((contour) => contour.map((point): [number, number] => [point.x, point.y]))
         const section = new runtime.CrossSection(polygons, 'EvenOdd')
         try {

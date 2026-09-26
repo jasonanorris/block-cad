@@ -11,7 +11,7 @@ test('colors apply to whole joined solids, preserve cutters, and survive project
   assert.equal(result[2],source[2]);assert.equal(source[0].color,undefined)
   assert.deepEqual(parseProject(serializeProject(result)),JSON.parse(JSON.stringify(result)))
   assert.equal(copyCadObjects(result,25,[]).copies[0].color,'#aabbcc')
-  assert.equal(JSON.parse(serializeProject(result)).version,14)
+  assert.equal(JSON.parse(serializeProject(result)).version,15)
 })
 
 test('color validation rejects unsafe formats and old projects retain the default', () => {

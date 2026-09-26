@@ -1,0 +1,47 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { createTextObject, changeText } from '../src/textShapes.ts'
+import { createSourceGeometry } from '../src/sourceGeometry.ts'
+import { parseProject, serializeProject } from '../src/projectFile.ts'
+import { getSolidBodies } from '../src/cadModel.ts'
+import { readSolidManifold } from '../src/booleanGeometry.ts'
+import { loadManifold } from '../src/manifoldRuntime.ts'
+import { exportStl } from '../src/stlExport.ts'
+import { export3mf } from '../src/threeMfExport.ts'
+import { box } from './fixtures.mjs'
+
+test('text creates one printable shape with enclosed openings and exports through both formats', async () => {
+  const text=createTextObject('BO 8',10,3,25)
+  assert.equal(text.type,'text');assert.equal(text.position.y,26.5)
+  assert.ok(text.contours.some(c=>c.holes.length===2))
+  const geometry=createSourceGeometry(text);geometry.computeBoundingBox()
+  assert.ok(Math.abs(geometry.boundingBox.max.x-geometry.boundingBox.min.x-text.dimensions.x)<1e-4)
+  geometry.dispose()
+  const runtime=await loadManifold()
+  const volume=readSolidManifold(getSolidBodies([text])[0],runtime,s=>s.volume())
+  assert.ok(volume>0 && volume<text.dimensions.x*text.dimensions.y*text.dimensions.z)
+  assert.ok((await exportStl([text])).byteLength>84)
+  assert.ok((await export3mf([text])).byteLength>100)
+  assert.deepEqual(parseProject(serializeProject([text])),[text])
+})
+
+test('text is a single hole that cuts every letter and can be edited without losing placement or links', async () => {
+  const plate={...box('plate'),dimensions:{x:80,y:10,z:40}}
+  const text={...createTextObject('CAD',10,20),cutTargetId:'plate',color:'#ff0000',position:{x:0,y:10,z:0}}
+  const runtime=await loadManifold()
+  const cut=readSolidManifold(getSolidBodies([plate,text])[0],runtime,s=>s.volume())
+  assert.ok(cut>0 && cut<32000)
+  const edited=changeText(text,'AB\n12',12,5)
+  assert.equal(edited.id,text.id);assert.deepEqual(edited.position,text.position)
+  assert.equal(edited.cutTargetId,'plate');assert.equal(edited.color,'#ff0000')
+  assert.equal(edited.text,'AB\n12');assert.equal(edited.dimensions.y,5)
+})
+
+test('invalid text and unsupported project text payloads fail without silently replacing glyphs', () => {
+  for(const text of ['', '   ', 'x'.repeat(81), '🙂']) assert.throws(()=>createTextObject(text,10,3))
+  for(const size of [0,201,NaN]) assert.throws(()=>createTextObject('A',size,3))
+  for(const height of [0,-1,Infinity]) assert.throws(()=>createTextObject('A',10,height))
+  const data=JSON.parse(serializeProject([createTextObject('CAD',10,3)]))
+  data.version=14;assert.throws(()=>parseProject(JSON.stringify(data)),/unsupported shape/)
+  data.version=15;data.objects[0].contours=[];assert.throws(()=>parseProject(JSON.stringify(data)),/contours/)
+})

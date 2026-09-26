@@ -3,7 +3,7 @@ import { validObjectColor } from './objectColor'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 14
+const PROJECT_VERSION = 15
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -154,6 +154,18 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
       return { ...base, type: 'sphere', dimensions: {
         diameter: positiveNumber(dimensions.diameter, `${field}.dimensions.diameter`),
       }, ...(version >= 5 && data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
+    }
+    case 'text': {
+      if (version < 15) throw new Error(`${field} has an unsupported shape type.`)
+      if (typeof data.text !== 'string' || !data.text.trim() || data.text.length > 80) throw new Error(`${field}.text must contain 1 to 80 characters.`)
+      if (typeof data.fontSize !== 'number' || !Number.isFinite(data.fontSize) || data.fontSize < 1 || data.fontSize > 200) throw new Error(`${field}.fontSize must be between 1 and 200 mm.`)
+      if (!Array.isArray(data.contours) || !data.contours.length || data.contours.length > 160) throw new Error(`${field}.contours must contain 1 to 160 filled outlines.`)
+      const contours = data.contours.map((value, i) => svgContours(value, `${field}.contours[${i}]`))
+      if (contours.reduce((n, c) => n + c.outline.length + c.holes.reduce((m, h) => m + h.length, 0), 0) > 40000) throw new Error(`${field}.contours has too many points.`)
+      if (data.cutTargetId !== undefined && (typeof data.cutTargetId !== 'string' || !data.cutTargetId.trim())) throw new Error(`${field}.cutTargetId must be a nonempty ID.`)
+      return { ...base, type: 'text', text: data.text, fontSize: data.fontSize, contours,
+        dimensions: { x: positiveNumber(dimensions.x, `${field}.dimensions.x`), y: positiveNumber(dimensions.y, `${field}.dimensions.y`), z: positiveNumber(dimensions.z, `${field}.dimensions.z`) },
+        ...(data.cutTargetId ? { cutTargetId: data.cutTargetId as string } : {}) }
     }
     case 'svg': {
       if (version < 10) throw new Error(`${field} has an unsupported shape type.`)

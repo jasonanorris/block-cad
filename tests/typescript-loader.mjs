@@ -20,6 +20,7 @@ export async function resolve(specifier, context, nextResolve) {
 export async function load(url, context, nextLoad) {
   if (url.endsWith('?url')) return { format: 'module', shortCircuit: true,
     source: `export default ${JSON.stringify(fileURLToPath(url.slice(0, -4)))}` }
+  if (url.endsWith('.json')) return { format: 'module', shortCircuit: true, source: `export default ${await readFile(new URL(url), 'utf8')}` }
   if (!/\.tsx?$/.test(url)) return nextLoad(url, context)
   const source = await readFile(new URL(url), 'utf8')
   return { format: 'module', shortCircuit: true, source: ts.transpileModule(source, {

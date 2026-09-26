@@ -8,6 +8,7 @@ export const shapeLabels: Record<CadObjectType, string> = {
   wedge: 'Wedge',
   prism: 'Prism',
   svg: 'SVG',
+  text: 'Text',
   stl: 'STL',
 }
 

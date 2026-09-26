@@ -131,3 +131,7 @@ Open **Project snapshots**, enter a name, and choose **Save snapshot** to keep t
 Snapshots share the local library database but remain separate from parts and autosave. They survive New, Load, and reloads at the same site address. They contain model data only, not camera/workplane preferences or Undo history. Snapshot deletion requires confirmation and cannot be undone; it does not change the open model. Use project Save for portable backups.
 
 For repeatable storage checks, run Vite and execute `(await import('/tests/browser-library.mjs')).runLibraryChecks()` in the browser console. It creates temporary entries, tests persistence, kind isolation, atomic write failures, and damaged data rejection, then deletes its test entries.
+
+### 61 — Text shapes
+
+Open **Text shape** under Shapes, enter wording (up to 80 characters), font size, and extrusion depth, then **Add text**. Helvetiker is bundled for offline use; unsupported characters show an error. Text lies flat on the workplane as one shape, including enclosed letter openings. Select it and use **Edit text → Apply text** to change wording or size while keeping its position, rotation, scale, color, and hole target. Use Hole to engrave another solid, or overlap and Join for raised lettering. Project format 15 stores wording, font size, and sampled outlines, so saved shapes remain portable. Font attribution is included at `public/licenses/helvetiker.txt`.

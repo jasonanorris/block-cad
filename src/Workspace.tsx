@@ -29,7 +29,7 @@ function CadObjectMesh({
   cutGeometry?: BufferGeometry
 }) {
   const sourceGeometry = useMemo(() => createSourceGeometry(object), [object.type, object.dimensions,
-    object.type === 'svg' ? object.contours : null, object.type === 'stl' ? object.meshData : null,
+    object.type === 'svg' || object.type === 'text' ? object.contours : null, object.type === 'stl' ? object.meshData : null,
     object.type === 'prism' ? object.sides : null])
   useEffect(() => () => sourceGeometry.dispose(), [sourceGeometry])
   if (object.hidden) return null
