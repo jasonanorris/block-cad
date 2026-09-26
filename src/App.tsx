@@ -20,6 +20,7 @@ import { importStl } from './stlImport'
 import type { FrameRequest } from './frameCamera'
 import { useAutosave } from './useAutosave'
 import { alignByBounds, canPositionUnits, dropToWorkplane, getPlacementUnits, type AlignmentEdge } from './placement'
+import { mirrorSelection } from './mirrorSelection'
 
 const shapeLabels: Record<CadObjectType, string> = {
   box: 'Box',
@@ -745,6 +746,13 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
                 <option value="max">Maximum edge</option>
               </select>
             </label>
+            <div className="align-actions" role="group" aria-label="Mirror selection">
+              {(['x', 'y', 'z'] as const).map((axis) => (
+                <button key={axis} type="button" disabled={!canPosition}
+                  onClick={() => void positionSelection((current, ids) => mirrorSelection(current, ids, axis))}>Mirror {axis.toUpperCase()}</button>
+              ))}
+            </div>
+            <p className="selection-hint">Mirror flips the arrangement around its shared center on a world axis, including linked holes.</p>
             <div className="align-actions" role="group" aria-label="Align selected bounds to active shape">
               {(['x', 'y', 'z'] as const).map((axis) => (
                 <button key={axis} type="button" disabled={!canAlign} onClick={() => alignSelected(axis)} title={`Align the ${alignmentEdge} on world ${axis.toUpperCase()} to the active shape`}>Align {axis.toUpperCase()}</button>

@@ -4,6 +4,8 @@ A simple browser-based 3D modeling project. You can add, select, move, rotate, s
 
 ## Local development
 
+**Mirror X/Y/Z** reflects the selected arrangement around the center of its combined finished bounds on a world axis. Solids carry all linked holes, and joined assemblies stay editable. Mirroring changes the originals, supports Undo, and refuses hidden, locked, empty, or zero-scale selections. Duplicate first if you want to keep both versions.
+
 The app autosaves the current project locally after a short pause in editing and restores it on launch. **Saved locally** means the browser has completed the save; recovery does not restore selection or Undo history. New and Load replace the local draft, including an empty New project. Use **Save** for a portable JSON backup. Recovery belongs to this browser and URL (including the port), can be cleared by browser storage settings, and uses the most recently saved tab if several tabs are open. Changes made immediately before a crash may not have reached storage. Storage failures are shown in the status bar and do not stop editing or downloading projects.
 
 If the existing draft cannot be read or validated, autosave pauses and leaves it untouched. **New** or a successful **Load** explicitly starts a fresh local draft. A failed save retains the last successfully stored draft.
