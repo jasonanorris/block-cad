@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import type { BufferGeometry, Mesh } from 'three'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
@@ -7,6 +7,8 @@ import SceneControls, { type CameraView } from './SceneControls'
 import { createSourceGeometry } from './sourceGeometry'
 import type { FrameRequest } from './frameCamera'
 import { expandAssemblyIds } from './selectionOperations'
+import BoxSelection from './BoxSelection'
+import type { ScreenRectangle } from './boxSelection'
 
 function CadObjectMesh({
   object,
@@ -74,6 +76,10 @@ function CadScene({
   toolMode,
   snapEnabled,
   gridSize,
+  boxSelectEnabled,
+  onSelectMany,
+  onExitBoxSelect,
+  onRectangle,
   workplaneHeight,
   cameraView,
   frameRequest,
@@ -83,7 +89,7 @@ function CadScene({
   onTransformEnd,
   gizmoInteractionRef,
   booleanGeometries,
-}: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean> }) {
+}: WorkspaceProps & { gizmoInteractionRef: RefObject<boolean>; onRectangle: (rectangle: ScreenRectangle | null) => void }) {
   const selectedMeshRef = useRef<Mesh | null>(null)
   const hiddenGroupedIds = new Set(getSolidBodies(objects).flatMap((body) => {
     if (!booleanGeometries.has(body.anchor.id)) return []
@@ -118,6 +124,7 @@ function CadScene({
         toolMode={toolMode}
         snapEnabled={snapEnabled}
         gridSize={gridSize}
+        boxSelectEnabled={boxSelectEnabled}
         cameraView={cameraView}
         frameRequest={frameRequest}
         frameSelectionIds={expandAssemblyIds(objects, new Set(selectedObjectIds), true)}
@@ -126,6 +133,7 @@ function CadScene({
         onTransformStart={onTransformStart}
         onTransformEnd={onTransformEnd}
       />
+      <BoxSelection enabled={boxSelectEnabled} onSelect={onSelectMany} onExit={onExitBoxSelect} onRectangle={onRectangle} />
     </>
   )
 }
@@ -137,6 +145,9 @@ type WorkspaceProps = {
   toolMode: TransformControlsMode
   snapEnabled: boolean
   gridSize: number
+  boxSelectEnabled: boolean
+  onSelectMany: (ids: string[], additive: boolean) => void
+  onExitBoxSelect: () => void
   workplaneHeight: number
   cameraView: CameraView
   frameRequest: FrameRequest | null
@@ -150,15 +161,18 @@ type WorkspaceProps = {
 
 export default function Workspace(props: WorkspaceProps) {
   const gizmoInteractionRef = useRef(false)
+  const [rectangle, setRectangle] = useState<ScreenRectangle | null>(null)
 
   return (
-    <div className="workspace-canvas" aria-label={`3D workspace with ${props.objects.length} ${props.objects.length === 1 ? 'object' : 'objects'} and grid`}>
+    <div className={`workspace-canvas${props.boxSelectEnabled ? ' box-select-mode' : ''}`} aria-label={`3D workspace with ${props.objects.length} ${props.objects.length === 1 ? 'object' : 'objects'} and grid`}>
       <Canvas
         camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
-        onPointerMissed={(event) => { if (!gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
+        onPointerMissed={(event) => { if (!props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
       >
-        <CadScene {...props} gizmoInteractionRef={gizmoInteractionRef} />
+        <CadScene {...props} gizmoInteractionRef={gizmoInteractionRef} onRectangle={setRectangle} />
       </Canvas>
+      {rectangle && <div className="selection-rectangle" style={{ left: rectangle.left, top: rectangle.top,
+        width: rectangle.right - rectangle.left, height: rectangle.bottom - rectangle.top }} />}
     </div>
   )
 }

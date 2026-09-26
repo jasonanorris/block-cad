@@ -15,6 +15,7 @@ type SceneControlsProps = {
   toolMode: TransformControlsMode
   snapEnabled: boolean
   gridSize: number
+  boxSelectEnabled: boolean
   cameraView: CameraView
   frameRequest: FrameRequest | null
   frameSelectionIds: Set<string>
@@ -31,6 +32,7 @@ export default function SceneControls({
   toolMode,
   snapEnabled,
   gridSize,
+  boxSelectEnabled,
   cameraView,
   frameRequest,
   frameSelectionIds,
@@ -202,6 +204,14 @@ export default function SceneControls({
     controls.setTranslationSnap(snapEnabled ? gridSize : null)
     controls.setRotationSnap(snapEnabled ? Math.PI / 12 : null)
   }, [camera, snapEnabled, gridSize])
+
+  useEffect(() => {
+    if (orbitRef.current) orbitRef.current.enabled = !boxSelectEnabled
+    if (transformRef.current) {
+      transformRef.current.enabled = !boxSelectEnabled
+      transformRef.current.getHelper().visible = !boxSelectEnabled
+    }
+  }, [camera, boxSelectEnabled, selectedObjectId])
 
   return null
 }

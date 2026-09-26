@@ -19,6 +19,7 @@ export type CadHistoryState = {
 export type CadHistoryAction =
   | { type: 'commit' | 'edit'; change: SceneChange }
   | { type: 'select'; id: string | null; additive: boolean }
+  | { type: 'selectMany'; ids: string[]; additive: boolean }
   | { type: 'reset'; objects: CadObject[] }
   | { type: 'begin' | 'end' | 'undo' | 'redo' }
 
@@ -52,6 +53,13 @@ export function cadHistoryReducer(state: CadHistoryState, action: CadHistoryActi
   switch (action.type) {
     case 'reset':
       return createInitialHistory(action.objects)
+    case 'selectMany': {
+      const valid = new Set(state.present.objects.map((object) => object.id))
+      const incoming = [...new Set(action.ids)].filter((id) => valid.has(id))
+      const selectedObjectIds = [...new Set([...(action.additive ? state.present.selectedObjectIds : []), ...incoming])]
+      return { ...state, present: { ...state.present, selectedObjectIds,
+        selectedObjectId: incoming.at(-1) ?? (action.additive ? state.present.selectedObjectId : null) } }
+    }
     case 'select': {
       if (!action.id) {
         return { ...state, present: { ...state.present, selectedObjectId: null, selectedObjectIds: [] } }
@@ -126,6 +134,7 @@ export function useCadHistory(createObjects: () => CadObject[]) {
     dispatch({ type: 'edit', change: (scene) => ({ ...scene, objects: update(scene.objects) }) })
   }, [])
   const select = useCallback((id: string | null, additive = false) => dispatch({ type: 'select', id, additive }), [])
+  const selectMany = useCallback((ids: string[], additive = false) => dispatch({ type: 'selectMany', ids, additive }), [])
   const begin = useCallback(() => dispatch({ type: 'begin' }), [])
   const end = useCallback(() => dispatch({ type: 'end' }), [])
   const undo = useCallback(() => dispatch({ type: 'undo' }), [])
@@ -139,6 +148,7 @@ export function useCadHistory(createObjects: () => CadObject[]) {
     commit,
     editObjects,
     select,
+    selectMany,
     begin,
     end,
     undo,

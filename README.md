@@ -77,3 +77,7 @@ React holds CAD objects as application data in `src/cadModel.ts`. React Three Fi
 The Snap toggle controls Three.js `TransformControls` during drag operations. The Grid selector sets the grid spacing and translation snap interval. The workplane height moves the displayed grid and sets the height for new shapes. These are editing preferences, not part of the project file; changing them does not move existing objects. `src/workplane.ts` calculates a source shape's top height from its dimensions and rotation.
 
 `src/SceneControls.tsx` switches the active camera between perspective and six orthographic views. The orthographic camera adjusts its aspect ratio with the workspace size. `src/ViewCube.tsx` displays the camera orientation and selects views. `src/MeasurementPanel.tsx` derives its readouts from CAD object data. Camera view is an editing preference, not part of the project file or undo history.
+
+### 49 — Box selection
+
+Turn on **Box select**, then drag a rectangle across the workspace. Visible shapes whose projected bounds touch the rectangle are selected, including shapes behind other shapes. Shift adds to the selection; an empty rectangle clears it. Escape cancels the drag and returns to camera controls. Hidden shapes, the grid, and transform handles are excluded. Selection does not create an Undo step.

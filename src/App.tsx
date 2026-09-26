@@ -58,7 +58,7 @@ const gridSizes = [1, 5, 10, 20]
 export default function App({ initialObjects, recoveryNotice = '', initialAutosaveEnabled = true }: {
   initialObjects: CadObject[]; recoveryNotice?: string; initialAutosaveEnabled?: boolean
 }) {
-  const { scene, canUndo, canRedo, commit, editObjects, select, begin, end, undo, redo, reset } = useCadHistory(() => initialObjects)
+  const { scene, canUndo, canRedo, commit, editObjects, select, selectMany, begin, end, undo, redo, reset } = useCadHistory(() => initialObjects)
   const { objects, selectedObjectId, selectedObjectIds } = scene
   const sceneRef = useRef(scene)
   sceneRef.current = scene
@@ -70,6 +70,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const [showRecoveryNotice, setShowRecoveryNotice] = useState(!!recoveryNotice)
   const [toolMode, setToolMode] = useState<TransformControlsMode>('translate')
   const [snapEnabled, setSnapEnabled] = useState(false)
+  const [boxSelectEnabled, setBoxSelectEnabled] = useState(false)
+  const exitBoxSelect = useCallback(() => setBoxSelectEnabled(false), [])
   const [gridSize, setGridSize] = useState(5)
   const [workplaneHeight, setWorkplaneHeight] = useState(0)
   const [workplaneDraft, setWorkplaneDraft] = useState('0')
@@ -584,6 +586,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="workspace-toolbar" aria-label="Transform tools">
+            <button type="button" className={`tool-button${boxSelectEnabled ? ' is-active' : ''}`}
+              aria-pressed={boxSelectEnabled} onClick={() => setBoxSelectEnabled((enabled) => !enabled)}>Box select</button>
             {([
               ['translate', 'Move'],
               ['rotate', 'Rotate'],
@@ -632,6 +636,9 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               toolMode={toolMode}
               snapEnabled={snapEnabled}
               gridSize={gridSize}
+              boxSelectEnabled={boxSelectEnabled}
+              onSelectMany={selectMany}
+              onExitBoxSelect={exitBoxSelect}
               workplaneHeight={workplaneHeight}
               cameraView={cameraView}
               frameRequest={frameRequest}
@@ -643,7 +650,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               onTransformEnd={end}
             />
             <ViewCube cameraView={cameraView} orientation={cameraOrientation} onChange={setCameraView} />
-            <div className="workspace-hint">{cameraView === 'perspective' && 'Drag to orbit · '}Scroll to zoom · Right drag to pan</div>
+            <div className="workspace-hint">{boxSelectEnabled ? 'Drag a selection rectangle · Shift adds · Esc returns to camera controls'
+              : `${cameraView === 'perspective' ? 'Drag to orbit · ' : ''}Scroll to zoom · Right drag to pan`}</div>
             <div className="axis-label">Workplane Y {workplaneHeight} {MODEL_UNIT} <span>·</span> X / Y / Z</div>
           </div>
         </section>
