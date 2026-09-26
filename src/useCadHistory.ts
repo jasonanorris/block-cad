@@ -1,4 +1,5 @@
 import { useCallback, useReducer } from 'react'
+import { equalModelData } from './modelEquality'
 import type { CadObject } from './cadModel'
 
 type SceneSnapshot = {
@@ -36,7 +37,7 @@ export function createInitialHistory(objects: CadObject[]): CadHistoryState {
 
 function sameObjects(a: SceneSnapshot, b: SceneSnapshot) {
   if (a.objects === b.objects) return true
-  return JSON.stringify(a.objects) === JSON.stringify(b.objects)
+  return equalModelData(a.objects, b.objects)
 }
 
 function recordChange(state: CadHistoryState, before: SceneSnapshot, after: SceneSnapshot): CadHistoryState {

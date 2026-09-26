@@ -1,15 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CadObject, Vector3 } from './cadModel'
 import type { AlignmentEdge } from './placement'
-import { selectionReference } from './referenceOrigin'
+import { GeometryJobs } from './GeometryJobs'
 
 const axes = ['x', 'y', 'z'] as const
 export default function ReferenceTools({ objects, selectedIds, origin, onOrigin, disabled, onPosition }: {
   objects: CadObject[]; selectedIds: string[]; origin: Vector3; onOrigin: (point: Vector3) => void; disabled: boolean
   onPosition: (edge: AlignmentEdge, offset: Vector3) => void
 }) {
+  const jobs = useMemo(() => new GeometryJobs(), [])
+  useEffect(() => () => jobs.dispose(), [jobs])
   const [originDraft, setOriginDraft] = useState({ x: String(origin.x), y: String(origin.y), z: String(origin.z) })
   useEffect(() => { setOriginDraft({ x: String(origin.x), y: String(origin.y), z: String(origin.z) }) }, [origin])
+  const [retry, setRetry] = useState(0)
   const [edge, setEdge] = useState<AlignmentEdge>('min')
   const [point, setPoint] = useState<Vector3 | null>(null)
   const [offset, setOffset] = useState({ x: '0', y: '0', z: '0' })
@@ -17,13 +20,13 @@ export default function ReferenceTools({ objects, selectedIds, origin, onOrigin,
   useEffect(() => {
     let live = true
     setPoint(null); setError('')
-    if (selectedIds.length) void selectionReference(objects, new Set(selectedIds), edge).then((value) => {
+    if (selectedIds.length) void jobs.run('reference', { objects, ids: selectedIds, edge }).then((value) => {
       if (!live) return
       setPoint(value)
       setOffset({ x: String(Number((value.x - origin.x).toFixed(3))), y: String(Number((value.y - origin.y).toFixed(3))), z: String(Number((value.z - origin.z).toFixed(3))) })
     }).catch((reason: Error) => { if (live) setError(reason.message) })
-    return () => { live = false }
-  }, [objects, selectedIds, edge, origin])
+    return () => { live = false; jobs.cancel() }
+  }, [objects, selectedIds, edge, origin, jobs, retry])
   return <details className="reference-tools"><summary>Ruler / reference origin</summary>
     <p className="selection-hint">Coordinates in world axes, relative to the origin below. Minimum, center, and maximum use the finished selection bounds.</p>
     <div className="coordinate-fields">{axes.map((axis) => <label key={axis}>Origin {axis.toUpperCase()}
@@ -45,7 +48,8 @@ export default function ReferenceTools({ objects, selectedIds, origin, onOrigin,
     </label>)}</div>
     <button type="button" disabled={disabled || !point || Object.values(offset).some((value) => !value.trim() || !Number.isFinite(Number(value)))}
       onClick={() => onPosition(edge, { x: Number(offset.x), y: Number(offset.y), z: Number(offset.z) })}>Apply reference position</button>
-    {error && <p role="alert">{error}</p>}
+    {selectedIds.length > 0 && !point && !error && <button type="button" onClick={() => jobs.cancel()}>Cancel reference measurement</button>}
+    {error && <p role="alert">{error} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry reference measurement</button></p>}
     <p className="selection-hint">Apply moves the selection together, including linked holes. The reference origin is a workspace aid and is not exported.</p>
   </details>
 }

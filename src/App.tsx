@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
 import ReferenceTools from './ReferenceTools'
@@ -7,7 +7,7 @@ import { positionFromReference } from './referenceOrigin'
 import ToolGroup, { jumpToTools } from './ToolGroup'
 import ExampleProjects from './ExampleProjects'
 import SectionTools from './SectionTools'
-import { splitSelection } from './splitSelection'
+import { GeometryJobs } from './GeometryJobs'
 import { defaultSection, type SectionView } from './sectionView'
 import TextTools from './TextTools'
 import CustomShapeTools from './CustomShapeTools'
@@ -26,8 +26,6 @@ import ObjectInspector from './ObjectInspector'
 import { createCadObject, createCutExample, getSolidBodies, isHoleObject, MODEL_UNIT, normalizeJoinGroups, type CadObject, type ObjectTransform, type PrimitiveType, type Vector3 } from './cadModel'
 import { useCadHistory } from './useCadHistory'
 import { parseProject, serializeProject } from './projectFile'
-import { exportStl } from './stlExport'
-import { export3mf } from './threeMfExport'
 import type { CameraView } from './SceneControls'
 import { useBooleanPreview } from './useBooleanPreview'
 import { updateObjectWithGroups } from './groupTransforms'
@@ -77,6 +75,11 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   sceneRef.current = scene
   const [libraryRevision, setLibraryRevision] = useState(0)
   const [dropTarget, setDropTarget] = useState('')
+  const splitJobs = useMemo(() => new GeometryJobs(), [])
+  const exportJobs = useMemo(() => new GeometryJobs(), [])
+  const [splitting, setSplitting] = useState(false)
+  useEffect(() => () => { splitJobs.dispose(); exportJobs.dispose() }, [splitJobs, exportJobs])
+  useEffect(() => { splitJobs.cancel() }, [objects, selectedObjectIds, splitJobs])
   const [positioning, setPositioning] = useState(false)
   const [positionError, setPositionError] = useState<string | null>(null)
   const [alignmentEdge, setAlignmentEdge] = useState<AlignmentEdge>('center')
@@ -218,10 +221,11 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
-  async function downloadReviewedExport() {
+  async function downloadReviewedExport(signal: AbortSignal) {
     if (!exportRequest || sceneRef.current.objects !== exportRequest.objects) throw new Error('The model changed. Please export again.')
     const { objects: snapshot, exportObjects: sources, format, scope } = exportRequest
-    const data = format === 'stl' ? await exportStl(sources) : await export3mf(sources)
+    const data = await exportJobs.run('export', { objects: sources, format }, signal)
+    if (signal.aborted) throw new DOMException('Export cancelled.', 'AbortError')
     if (sceneRef.current.objects !== snapshot) throw new Error('The model changed. Please export again.')
     download(new Blob([data], { type: format === 'stl' ? 'model/stl' : 'model/3mf' }),
       `block-cad-${scope === 'selection' ? 'selection' : 'model'}.${format === 'stl' ? 'stl' : 'model.3mf'}`)
@@ -469,15 +473,15 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   async function splitSelected() {
     if (positioning) return
     const snapshot = scene
-    setPositioning(true); setPositionError(null)
+    setPositioning(true); setSplitting(true); setPositionError(null)
     try {
-      const result = await splitSelection(snapshot.objects, new Set(snapshot.selectedObjectIds), section.axis, section.position)
+      const result = await splitJobs.run('split', { objects: snapshot.objects, ids: snapshot.selectedObjectIds, axis: section.axis, position: section.position })
       if (sceneRef.current !== snapshot) throw new Error('The model or selection changed. Try splitting again.')
       commit((current) => current === snapshot ? { objects: result.objects, selectedObjectIds: result.selectedIds,
         selectedObjectId: result.selectedIds[0] ?? null } : current)
       setSection((current) => ({ ...current, enabled: false }))
     } catch (error) { setPositionError(error instanceof Error ? error.message : 'Could not split these bodies.') }
-    finally { setPositioning(false) }
+    finally { setPositioning(false); setSplitting(false) }
   }
 
   function alignSelected(axis: keyof Vector3) {
@@ -865,7 +869,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             <SavedProjectsPanel revision={libraryRevision} kind="snapshot" canSave={true} onSave={saveSnapshot} onUse={restoreSnapshot} />
             <LibraryTransfer onImported={() => setLibraryRevision((value) => value + 1)} />
           </div>
-          <div className="panel-section"><SectionTools error={positionError} busy={positioning} onSplit={() => void splitSelected()} canSplit={canPosition && placementUnits.every((unit) => !isHoleObject(unit.body.anchor))} section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
+          <div className="panel-section">{splitting && <button type="button" onClick={() => splitJobs.cancel()}>Cancel split</button>}<SectionTools error={positionError} busy={positioning} onSplit={() => void splitSelected()} canSplit={canPosition && placementUnits.every((unit) => !isHoleObject(unit.body.anchor))} section={section} onChange={setSection} activePosition={selectedObject?.position} /></div>
           <div className="panel-section workplane-section">
             <ToolGroup id="tools-place" title="Place">
             <ReferenceTools objects={objects} selectedIds={selectedObjectIds} origin={referenceOrigin} onOrigin={setReferenceOrigin}

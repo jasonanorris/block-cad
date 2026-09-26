@@ -5,7 +5,7 @@ import { customProfile, validateCustomParameters } from './customShapes'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 17
+const PROJECT_VERSION = 18
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -60,7 +60,7 @@ function svgContours(value: unknown, field: string): SvgContours {
   return { outline, holes }
 }
 
-function objectFromFile(value: unknown, index: number, version: number): CadObject {
+function objectFromFile(value: unknown, index: number, version: number, verifiedMeshes: Set<string>): CadObject {
   const data = record(value)
   const field = `objects[${index}]`
   if (!data || typeof data.id !== 'string' || !data.id.trim()) {
@@ -198,7 +198,7 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
       }
       if (typeof data.meshData !== 'string') throw new Error(`${field}.meshData must contain STL triangles.`)
       try {
-        decodeStlMesh(data.meshData)
+        if (!verifiedMeshes.has(data.meshData)) { decodeStlMesh(data.meshData); verifiedMeshes.add(data.meshData) }
       } catch (error) {
         throw new Error(`${field}.meshData: ${error instanceof Error ? error.message : 'Invalid STL data.'}`)
       }
@@ -215,8 +215,17 @@ function objectFromFile(value: unknown, index: number, version: number): CadObje
 }
 
 export function serializeProject(objects: CadObject[]): string {
-  const normalized = objects.map((object) => ({ ...object, name: object.name?.trim() || undefined }))
-  return JSON.stringify({ format: PROJECT_FORMAT, version: PROJECT_VERSION, units: MODEL_UNIT, objects: normalized }, null, 2) + '\n'
+  const meshes: string[] = [], meshIds = new Map<string, number>()
+  const normalized = objects.map((object) => {
+    const base = { ...object, name: object.name?.trim() || undefined }
+    if (base.type !== 'stl') return base
+    let meshRef = meshIds.get(base.meshData)
+    if (meshRef === undefined) { meshRef = meshes.length; meshIds.set(base.meshData, meshRef); meshes.push(base.meshData) }
+    const { meshData: _meshData, ...metadata } = base
+    return { ...metadata, meshRef }
+  })
+  return JSON.stringify({ format: PROJECT_FORMAT, version: PROJECT_VERSION, units: MODEL_UNIT,
+    ...(meshes.length ? { meshes } : {}), objects: normalized }, null, 2) + '\n'
 }
 
 export function parseProject(text: string): CadObject[] {
@@ -235,7 +244,17 @@ export function parseProject(text: string): CadObject[] {
   if (project.units !== MODEL_UNIT) throw new Error(`Unsupported project units: ${String(project.units)}.`)
   if (!Array.isArray(project.objects)) throw new Error('The project objects must be a list.')
 
-  const objects = project.objects.map((object, index) => objectFromFile(object, index, project.version as number))
+  const verifiedMeshes = new Set<string>()
+  if (project.version >= 18 && project.meshes !== undefined && (!Array.isArray(project.meshes) || !project.meshes.every((mesh) => typeof mesh === 'string'))) throw new Error('Project meshes must be a list of encoded mesh strings.')
+  const objects = project.objects.map((object, index) => {
+    const data = record(object)
+    if ((project.version as number) >= 18 && data?.meshRef !== undefined) {
+      if (data.type !== 'stl' || data.meshData !== undefined || !Number.isInteger(data.meshRef) || (data.meshRef as number) < 0 ||
+        !Array.isArray(project.meshes) || (data.meshRef as number) >= project.meshes.length) throw new Error(`objects[${index}].meshRef is invalid.`)
+      return objectFromFile({ ...data, meshData: project.meshes[data.meshRef as number] }, index, project.version as number, verifiedMeshes)
+    }
+    return objectFromFile(object, index, project.version as number, verifiedMeshes)
+  })
   const ids = new Set(objects.map((object) => object.id))
   if (ids.size !== objects.length) throw new Error('The project contains duplicate object IDs.')
   for (const object of objects) {

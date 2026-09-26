@@ -1,6 +1,7 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import type { CadObject } from './cadModel'
-import { measureSelection } from './measurements'
+import { GeometryJobs } from './GeometryJobs'
+import type { measureSelection } from './measurements'
 
 const format = (value: number) => `${Number(value.toFixed(2))} mm`
 type Readout = Awaited<ReturnType<typeof measureSelection>>
@@ -10,24 +11,27 @@ export default memo(function MeasurementPanel({ objects, selectedObjectIds, acti
   selectedObjectIds: string[]
   activeObjectId: string | null
 }) {
+  const jobs = useMemo(() => new GeometryJobs(), [])
+  const [retry, setRetry] = useState(0)
+  useEffect(() => () => jobs.dispose(), [jobs])
   const [result, setResult] = useState<{ objects: CadObject[]; ids: string[]; activeId: string | null; data?: Readout; error?: string } | null>(null)
   useEffect(() => {
     let cancelled = false
-    void measureSelection(objects, selectedObjectIds, activeObjectId).then(
+    void jobs.run('measure', { objects, ids: selectedObjectIds, activeId: activeObjectId }).then(
       (data) => { if (!cancelled) setResult({ objects, ids: selectedObjectIds, activeId: activeObjectId, data }) },
       (error) => { if (!cancelled) setResult({ objects, ids: selectedObjectIds, activeId: activeObjectId,
         error: error instanceof Error ? error.message : 'Could not measure the selection.' }) },
     )
-    return () => { cancelled = true }
-  }, [objects, selectedObjectIds, activeObjectId])
+    return () => { cancelled = true; jobs.cancel() }
+  }, [objects, selectedObjectIds, activeObjectId, jobs, retry])
   const current = result?.objects === objects && result.ids === selectedObjectIds && result.activeId === activeObjectId ? result : null
   const data = current?.data
   return (
     <div className="measurement-panel" aria-live="polite">
       <h3>Measurements</h3>
       {!selectedObjectIds.length ? <p className="selection-hint">Select a shape to see its finished size.</p> : <>
-        {!current && <p className="selection-hint">Measuring…</p>}
-        {current?.error && <p className="position-error">{current.error}</p>}
+        {!current && <p className="selection-hint">Measuring… <button type="button" onClick={() => jobs.cancel()}>Cancel measurement</button></p>}
+        {current?.error && <p className="position-error">{current.error} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry measurement</button></p>}
         {data?.size && <div className="measurement-row"><span>Finished size X / Y / Z</span><strong>{data.size.map(format).join(' × ')}</strong></div>}
         {data?.span && <div className="measurement-row"><span>Selection size X / Y / Z</span><strong>{data.span.map(format).join(' × ')}</strong></div>}
         {data?.gaps.map((gap) => <div className="measurement-row" key={gap.id}><span>Gap to {gap.name} X / Y / Z</span><strong>{gap.axes.map(format).join(' / ')}</strong></div>)}
