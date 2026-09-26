@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ExportScope } from './exportSelection'
 import type { CadObject } from './cadModel'
 import { inspectExport, type ExportReport } from './exportChecks'
 
 export type ExportFormat = 'stl' | '3mf'
 
-export default function ExportReview({ objects, currentObjects, format, onClose, onDownload }: {
+export default function ExportReview({ objects, stale, scope, format, onClose, onDownload }: {
   objects: CadObject[]
-  currentObjects: CadObject[]
+  stale: boolean
+  scope: ExportScope
   format: ExportFormat
   onClose: () => void
   onDownload: () => Promise<void>
@@ -15,7 +17,6 @@ export default function ExportReview({ objects, currentObjects, format, onClose,
   const [report, setReport] = useState<ExportReport | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
-  const stale = currentObjects !== objects
   useEffect(() => {
     dialog.current?.showModal()
     let cancelled = false
@@ -28,6 +29,7 @@ export default function ExportReview({ objects, currentObjects, format, onClose,
     <dialog ref={dialog} className="export-review" aria-labelledby="export-review-title"
       onCancel={onClose} onKeyDown={(event) => event.stopPropagation()}>
       <h2 id="export-review-title">Review {format.toUpperCase()} export</h2>
+      <p>{scope === 'selection' ? 'Scope: selected bodies, including their joined members and all linked holes.' : 'Scope: all bodies in the project.'}</p>
       {!report && !error && <p role="status">Checking finished geometry…</p>}
       {report && <>
         {report.dimensions && <dl>

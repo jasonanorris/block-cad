@@ -216,3 +216,8 @@ kbd { padding: 5px 7px; border: 1px solid #e3e8f0; border-radius: 5px; backgroun
   .workspace-hint { bottom: 14px; left: 14px; max-width: calc(100% - 28px); }
   .axis-label { display: none; }
 }
+
+.export-scope { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.export-scope select { max-width: 120px; padding: 7px; border: 1px solid #dfe6f0; border-radius: 6px; background: white; color: inherit; font: inherit; }
+.project-actions { flex-wrap: wrap; justify-content: flex-end; }
+.resize-tools select { width: 112px; }

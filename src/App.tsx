@@ -27,6 +27,7 @@ import RadialArrayTools from './RadialArrayTools'
 import { radialArray } from './radialArray'
 import ResizeTools from './ResizeTools'
 import { resizeSelection } from './resizeSelection'
+import { selectedExportObjects, type ExportScope } from './exportSelection'
 import ExportReview, { type ExportFormat } from './ExportReview'
 
 const shapeLabels: Record<CadObjectType, string> = {
@@ -89,7 +90,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   }, [])
   const [cameraOrientation, setCameraOrientation] = useState('rotateX(-25deg) rotateY(-35deg)')
   const [projectError, setProjectError] = useState<string | null>(null)
-  const [exportRequest, setExportRequest] = useState<{ objects: CadObject[]; format: ExportFormat } | null>(null)
+  const [exportScope, setExportScope] = useState<ExportScope>('all')
+  const [exportRequest, setExportRequest] = useState<{ objects: CadObject[]; exportObjects: CadObject[]; scope: ExportScope; format: ExportFormat } | null>(null)
   const [svgError, setSvgError] = useState<string | null>(null)
   const [stlError, setStlError] = useState<string | null>(null)
   const [importingStl, setImportingStl] = useState(false)
@@ -101,6 +103,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const nudgeKeys = useRef(new Set<string>())
   const selectedObject = objects.find((object) => object.id === selectedObjectId)
   const selectedIds = new Set(selectedObjectIds)
+  const exportObjects = exportScope === 'all' ? objects : selectedExportObjects(objects, selectedIds)
+  const canExport = exportObjects.some((object) => !isHoleObject(object))
   const selectedObjects = objects.filter((object) => selectedIds.has(object.id))
   const selectedAssemblyIds = expandAssemblyIds(objects, selectedIds)
   const selectedAssembly = objects.filter((object) => selectedAssemblyIds.has(object.id))
@@ -181,11 +185,11 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
 
   async function downloadReviewedExport() {
     if (!exportRequest || sceneRef.current.objects !== exportRequest.objects) throw new Error('The model changed. Please export again.')
-    const { objects: snapshot, format } = exportRequest
-    const data = format === 'stl' ? await exportStl(snapshot) : await export3mf(snapshot)
+    const { objects: snapshot, exportObjects: sources, format, scope } = exportRequest
+    const data = format === 'stl' ? await exportStl(sources) : await export3mf(sources)
     if (sceneRef.current.objects !== snapshot) throw new Error('The model changed. Please export again.')
     download(new Blob([data], { type: format === 'stl' ? 'model/stl' : 'model/3mf' }),
-      format === 'stl' ? 'block-cad-model.stl' : 'block-cad-model.model.3mf')
+      `block-cad-${scope === 'selection' ? 'selection' : 'model'}.${format === 'stl' ? 'stl' : 'model.3mf'}`)
   }
 
   async function importSvgFile(event: ChangeEvent<HTMLInputElement>) {
@@ -566,8 +570,13 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
           <button type="button" onClick={newProject}>New</button>
           <button type="button" onClick={saveProject}>Save</button>
           <button type="button" onClick={() => fileInput.current?.click()}>Load</button>
-          <button type="button" onClick={() => setExportRequest({ objects, format: 'stl' })} disabled={objects.length === 0} title="Check and export all shapes as STL (millimeters)">Export STL</button>
-          <button type="button" onClick={() => setExportRequest({ objects, format: '3mf' })} disabled={objects.length === 0} title="Check and export finished solids as 3MF (millimeters)">Export 3MF</button>
+          <label className="export-scope">Export
+            <select aria-label="Export scope" value={exportScope} onChange={(event) => setExportScope(event.target.value as ExportScope)}>
+              <option value="all">All bodies</option><option value="selection">Selection</option>
+            </select>
+          </label>
+          <button type="button" onClick={() => setExportRequest({ objects, exportObjects, scope: exportScope, format: 'stl' })} disabled={!canExport} title="Review and export bodies in the chosen scope as STL (millimeters)">Export STL</button>
+          <button type="button" onClick={() => setExportRequest({ objects, exportObjects, scope: exportScope, format: '3mf' })} disabled={!canExport} title="Check and export finished solids as 3MF (millimeters)">Export 3MF</button>
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={loadProject} hidden aria-label="Choose a Block CAD project file" />
         </div>
       </header>
@@ -577,7 +586,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
       </div>}
       {projectError && <div className="project-error" role="alert">Could not load project: {projectError}</div>}
       {booleanError && <div className="project-error" role="alert">Could not calculate model: {booleanError}</div>}
-      {exportRequest && <ExportReview objects={exportRequest.objects} currentObjects={objects} format={exportRequest.format}
+      {exportRequest && <ExportReview objects={exportRequest.exportObjects} stale={objects !== exportRequest.objects} scope={exportRequest.scope} format={exportRequest.format}
         onClose={() => setExportRequest(null)} onDownload={downloadReviewedExport} />}
       {svgError && <div className="project-error" role="alert">Could not import SVG: {svgError}</div>}
       {stlError && <div className="project-error" role="alert">Could not import STL: {stlError}</div>}

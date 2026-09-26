@@ -101,3 +101,7 @@ Select three or more independent bodies, choose **Equal gaps** or **Centers**, a
 ### 54 — Proportional finished-size resizing
 
 Open **Resize selection**, choose a world dimension, enter its target size in millimeters, and click **Resize proportionally**. This sets the combined finished bounds of all selected bodies, including cuts and intersections. All axes, spacing, and linked cutters scale by the same factor around the combined center; source rotations and proportions stay intact. A separately selected ungrouped hole can be resized by itself. Hidden, locked, empty, and degenerate geometry is refused. Use **Drop to workplane** afterward to restore ground contact if needed. Each resize is one Undo step, and the source shapes remain editable.
+
+### 55 — Export selected bodies
+
+Choose **Selection** in the header's **Export** scope selector, then **Export STL** or **Export 3MF**. The review reports only those finished bodies and identifies its scope. Selecting any solid member of a joined assembly includes the whole assembly and every linked cutter, even hidden or ungrouped cutters. Unrelated bodies and separately selected holes are excluded; a hole-only or empty selection cannot export. **All bodies** retains the full-project export. Downloads use a `block-cad-selection` filename for selection exports. The review captures the scope and selected bodies when opened; editing the model invalidates it. Export does not modify the model, selection, or Undo history.
