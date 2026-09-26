@@ -238,9 +238,9 @@ export default function SceneControls({
     if (orbitRef.current) orbitRef.current.enabled = !boxSelectEnabled
     if (transformRef.current) {
       transformRef.current.enabled = !boxSelectEnabled
-      transformRef.current.getHelper().visible = !boxSelectEnabled
+      transformRef.current.getHelper().visible = !boxSelectEnabled && !!transformRef.current.object
     }
-  }, [camera, boxSelectEnabled, selectedObjectId])
+  }, [camera, boxSelectEnabled, selectedObjectId, toolMode])
 
   return null
 }

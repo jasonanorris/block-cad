@@ -49,7 +49,8 @@ export default function BoxSelection({ enabled, onSelect, onRectangle, onExit }:
       cancel()
     }
     const key = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
+      if (event.key !== 'Escape' || document.querySelector('dialog[open]')) return
+      if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable=true]')) return
       stop(event); cancel(); onExit()
     }
     canvas.addEventListener('pointerdown', down, true)
