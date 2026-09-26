@@ -108,8 +108,35 @@ function encodeSolid(solid: Manifold, center = [0, 0, 0]) {
   return encodeStlMesh(positions)
 }
 
+// A two-edge corner keeps the third edge sharp. This variable-radius patch
+// meets both cylindrical fillets tangentially and fades into the two side faces.
+function twoEdgeCorner(radius: number, runtime: Awaited<ReturnType<typeof loadManifold>>) {
+  const steps = 24, pad = Math.max(1, radius * .01)
+  const samples = [-pad, ...Array.from({ length: steps + 1 }, (_, i) => radius * (1 - Math.cos(i * Math.PI / (2 * steps))))]
+  const count = samples.length, vertices: number[] = [], triangles: number[] = []
+  for (const zLayer of [0, 1]) for (const y of samples) for (const x of samples) {
+    const sx = Math.sqrt(Math.max(0, 1 - (1 - Math.max(0, x) / radius) ** 2))
+    const sy = Math.sqrt(Math.max(0, 1 - (1 - Math.max(0, y) / radius) ** 2))
+    vertices.push(x, y, zLayer ? radius * (1 - sx * sy) : -pad)
+  }
+  const layer = count * count
+  for (let y = 0; y < count - 1; y++) for (let x = 0; x < count - 1; x++) {
+    const a = y * count + x, b = a + 1, c = b + count, d = a + count
+    triangles.push(a, c, b, a, d, c, a + layer, b + layer, c + layer, a + layer, c + layer, d + layer)
+  }
+  const perimeter = [...Array.from({ length: count }, (_, x) => x),
+    ...Array.from({ length: count - 1 }, (_, y) => (y + 1) * count + count - 1),
+    ...Array.from({ length: count - 1 }, (_, x) => layer - 2 - x),
+    ...Array.from({ length: count - 2 }, (_, y) => (count - 2 - y) * count)]
+  for (let i = 0; i < perimeter.length; i++) {
+    const a = perimeter[i], b = perimeter[(i + 1) % perimeter.length]
+    triangles.push(a, b, b + layer, a, b + layer, a + layer)
+  }
+  return runtime.Manifold.ofMesh(new runtime.Mesh({ numProp: 3, vertProperties: new Float32Array(vertices), triVerts: new Uint32Array(triangles) }))
+}
+
 // Resolve each edge against the same input. Shared chamfers meet at sharp miters;
-// three perpendicular fillets receive a spherical corner patch.
+// two perpendicular fillets receive a tangent patch; three receive a sphere.
 function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<ReturnType<typeof loadManifold>>, blended = false): Manifold {
   if (!['fillet', 'chamfer'].includes(feature.operation) || !Number.isFinite(feature.size) || feature.size < .01 || feature.size > 10000) throw new Error('Enter a radius or distance from 0.01 to 10,000 mm.')
   if (!feature.edges.length || feature.edges.length > MAX_FEATURE_EDGES) throw new Error(`Select 1 to ${MAX_FEATURE_EDGES} edges.`)
@@ -125,7 +152,7 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
   for (let i = 0; i < edges.length; i++) for (let j = i + 1; j < edges.length; j++) {
     if (sameEdge(edges[i], edges[j])) throw new Error('Select each edge only once.')
   }
-  const corners: { origin: Vector3; axes: Vector3[] }[] = []
+  const corners: { origin: Vector3; axes: Vector3[]; paired: boolean }[] = []
   if (feature.operation === 'fillet') {
     const vertices: Point[] = []
     edges.forEach((edge) => [edge.a, edge.b].forEach((p) => { if (!vertices.some((q) => v(p).distanceTo(v(q)) < tolerance)) vertices.push(p) }))
@@ -133,11 +160,19 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
       const incident = edges.filter((edge) => [edge.a, edge.b].some((q) => v(p).distanceTo(v(q)) < tolerance))
       if (incident.length < 2) continue
       const axes = incident.map((edge) => v(v(p).distanceTo(v(edge.a)) < tolerance ? edge.b : edge.a).sub(v(p)).normalize())
-      if (incident.length !== 3 || incident.some((edge) => Math.abs(edge.angle - 90) > 1e-4) ||
+      if (incident.length > 3 || incident.some((edge) => Math.abs(edge.angle - 90) > 1e-4) ||
         axes.some((axis, i) => axes.slice(i + 1).some((other) => Math.abs(axis.dot(other)) > 1e-6))) {
-        throw new Error('Fillets at a shared corner require all three perpendicular edges in the same feature. Other corner blends are not supported yet.')
+        throw new Error('Shared fillet corners require two or three perpendicular edges with 90° faces in the same feature.')
       }
-      corners.push({ origin: v(p), axes })
+      const paired = incident.length === 2
+      if (paired) {
+        const normalsA = [v(incident[0].normalA), v(incident[0].normalB)]
+        const normalsB = [v(incident[1].normalA), v(incident[1].normalB)]
+        const common = normalsA.find((normal) => normalsB.some((other) => normal.dot(other) > 1 - 1e-6))
+        if (!common) throw new Error('The two fillets must share a planar face.')
+        axes.push(common.clone().negate())
+      }
+      corners.push({ origin: v(p), axes, paired })
     }
   }
   const allocated: Manifold[] = [], removals: Manifold[] = []
@@ -190,13 +225,17 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
     }
     for (const corner of corners) {
       const radius = feature.size
-      // Replace the intersecting cylindrical corner with a sphere tangent to all
-      // three edge fillets. The cut is restricted to the corner's radius-sized cube.
+      // Replace the intersection ridge with a tangent corner patch. For two
+      // edges, leave the third edge sharp; for three, use a spherical octant.
       const frame = new Matrix4().makeBasis(...corner.axes as [Vector3, Vector3, Vector3]).setPosition(corner.origin)
-      const cube = track(runtime.Manifold.cube([radius, radius, radius]))
-      const sphere = track(runtime.Manifold.sphere(radius, 128))
-      const centered = track(sphere.translate([radius, radius, radius]))
-      const patch = track(cube.subtract(centered))
+      let patch: Manifold
+      if (corner.paired) patch = track(twoEdgeCorner(radius, runtime))
+      else {
+        const cube = track(runtime.Manifold.cube([radius, radius, radius]))
+        const sphere = track(runtime.Manifold.sphere(radius, 128))
+        const centered = track(sphere.translate([radius, radius, radius]))
+        patch = track(cube.subtract(centered))
+      }
       const worldPatch = track(patch.transform(frame.elements as Mat4))
       result = track(result.subtract(worldPatch))
     }

@@ -107,7 +107,7 @@ test('multi-edge rejection and dependent-feature errors preserve the original mo
  const edges=await findFeatureEdges(objects,[shape.id]),edge=edges[0]
  const shared=edges.find(e=>e!==edge && [e.a,e.b].some(a=>[edge.a,edge.b].some(b=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z)<1e-5)))
  const original=serializeProject(objects)
- await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,shared],'fillet',2),/all three perpendicular/)
+ assert.equal((await previewEdgeFeature(objects,[shape.id],[edge,shared],'fillet',2)).object.edgeHistory.features[0].edges.length,2)
  await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[edge,edge],'chamfer',2),/only once/)
  await assert.rejects(()=>previewEdgeFeature(objects,[shape.id],[],'fillet',2),/Select 1/)
  assert.equal(serializeProject(objects),original)
@@ -278,4 +278,49 @@ test('remaining edges after spherical blends support transformed sequential feat
   assert.ok((await exportStl([updated])).byteLength>84)
  }
  assert.deepEqual(restored,parseProject(original)[0])
+})
+
+test('two-edge fillets blend all box corner orientations while retaining the third sharp edge',async()=>{
+ const {Vector3}=await import('three')
+ const {decodeStlMesh}=await import('../src/stlMesh.ts')
+ const {editEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const shape={...box('paired'),position:{x:0,y:0,z:0},dimensions:{x:20,y:20,z:20}}
+ const edges=await findFeatureEdges([shape],[shape.id]),runtime=await loadManifold()
+ const v=p=>new Vector3(p.x,p.y,p.z)
+ for(const x of [-10,10]) for(const y of [-10,10]) for(const z of [-10,10]) {
+  const corner=new Vector3(x,y,z),incident=edges.filter(e=>[e.a,e.b].some(p=>v(p).distanceTo(corner)<1e-5))
+  for(let omit=0;omit<3;omit++) for(const radius of [2,10]) {
+   const selected=incident.filter((_,i)=>i!==omit)
+   const axes=selected.map(e=>v(v(e.a).distanceTo(corner)<1e-5?e.b:e.a).sub(corner).normalize())
+   const third=incident[omit];axes.push(v(v(third.a).distanceTo(corner)<1e-5?third.b:third.a).sub(corner).normalize())
+   const result=(await previewEdgeFeature([shape],[shape.id],selected,'fillet',radius)).object
+   const positions=decodeStlMesh(result.meshData);let patchVertices=0,sharpEnd=false
+   for(let i=0;i<positions.length;i+=3) {
+    const p=new Vector3(positions[i]+result.position.x,positions[i+1]+result.position.y,positions[i+2]+result.position.z).sub(corner)
+    const [a,b,c]=axes.map(axis=>axis.dot(p))
+    if(Math.abs(a)<1e-5 && Math.abs(b)<1e-5 && Math.abs(c-radius)<1e-4) sharpEnd=true
+    if(a>1e-4 && b>1e-4 && a<radius-1e-4 && b<radius-1e-4 && c<radius+1e-4) {
+     const expected=radius*(1-Math.sqrt(1-(1-a/radius)**2)*Math.sqrt(1-(1-b/radius)**2))
+     // Measure normal error: vertical error exaggerates tessellation error
+     // where the tangent patch meets a vertical side face.
+     const sx=Math.sqrt(1-(1-a/radius)**2),sy=Math.sqrt(1-(1-b/radius)**2)
+     const slope=Math.hypot(1,(1-a/radius)*sy/sx,(1-b/radius)*sx/sy)
+     assert.ok(Math.abs(c-expected)/slope<radius*.003,`corner patch ${c} vs ${expected}`)
+     patchVertices++
+    }
+   }
+   assert.ok(patchVertices>100);assert.ok(sharpEnd,'third edge must end at the blend, not acquire a step')
+   assert.equal(readSolidManifold(getSolidBodies([result])[0],runtime,s=>s.status()),'NoError')
+  }
+ }
+ // Switch a stored meeting chamfer into a paired blend after Save/Load and transforms.
+ const corner=edges[0].a,pair=edges.filter(e=>[e.a,e.b].some(p=>v(p).distanceTo(v(corner))<1e-5)).slice(0,2)
+ const chamfer=(await previewEdgeFeature([shape],[shape.id],pair,'chamfer',2)).object
+ const moved={...chamfer,position:{x:30,y:40,z:20},rotation:{x:.3,y:.5,z:.2},scale:{x:-1,y:2,z:1}}
+ const loaded=parseProject(serializeProject([moved]))[0],id=loaded.edgeHistory.features[0].id
+ const edited=(await editEdgeFeature([loaded],[loaded.id],id,{operation:'fillet',size:3})).object
+ assert.deepEqual(edited.rotation,moved.rotation);assert.deepEqual(edited.scale,moved.scale)
+ assert.ok((await exportStl([edited])).byteLength>84)
+ const removed=(await editEdgeFeature([edited],[edited.id],id,null)).object
+ assert.ok(Math.abs(readSolidManifold(getSolidBodies([removed])[0],runtime,s=>s.volume())-8000)<.01)
 })
