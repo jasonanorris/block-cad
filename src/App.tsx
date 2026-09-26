@@ -25,6 +25,8 @@ import { repeatSelection } from './repeatSelection'
 import RepeatTools from './RepeatTools'
 import RadialArrayTools from './RadialArrayTools'
 import { radialArray } from './radialArray'
+import ResizeTools from './ResizeTools'
+import { resizeSelection } from './resizeSelection'
 import ExportReview, { type ExportFormat } from './ExportReview'
 
 const shapeLabels: Record<CadObjectType, string> = {
@@ -770,6 +772,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               ))}
             </div>
             <p className="selection-hint">Mirror flips the arrangement around its shared center on a world axis, including linked holes.</p>
+            <ResizeTools disabled={!canPosition}
+              onResize={(axis, size) => void positionSelection((current, ids) => resizeSelection(current, ids, axis, size))} />
             <RadialArrayTools disabled={!selectedObjectIds.length || positioning}
               onRepeat={(axis, count, angle, center) => insertArray(radialArray(objects, new Set(selectedObjectIds), axis, count, angle, center))} />
             <RepeatTools disabled={!selectedObjectIds.length || positioning} onRepeat={(axis, count, spacing) => insertArray(repeatSelection(objects, new Set(selectedObjectIds), axis, count, spacing))} />

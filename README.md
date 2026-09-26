@@ -97,3 +97,7 @@ Select shapes and open **Radial array**. Set a world rotation axis, count includ
 ### 53 — Distribute bodies
 
 Select three or more independent bodies, choose **Equal gaps** or **Centers**, and click **Distribute X/Y/Z**. Bodies are ordered by their finished bounding-box centers on that world axis; the two end bodies stay fixed. Equal gaps accounts for different body widths and refuses a selection without enough room. Center spacing can overlap wide bodies. Joined assemblies count once, and all linked holes travel with their body. Hidden, locked, and empty geometry is rejected. Each action is one Undo step.
+
+### 54 — Proportional finished-size resizing
+
+Open **Resize selection**, choose a world dimension, enter its target size in millimeters, and click **Resize proportionally**. This sets the combined finished bounds of all selected bodies, including cuts and intersections. All axes, spacing, and linked cutters scale by the same factor around the combined center; source rotations and proportions stay intact. A separately selected ungrouped hole can be resized by itself. Hidden, locked, empty, and degenerate geometry is refused. Use **Drop to workplane** afterward to restore ground contact if needed. Each resize is one Undo step, and the source shapes remain editable.
