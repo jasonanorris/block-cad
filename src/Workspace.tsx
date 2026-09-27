@@ -224,7 +224,7 @@ export default function Workspace(props: WorkspaceProps) {
       <Canvas
         frameloop="demand"
         onCreated={({ gl }) => { gl.localClippingEnabled = true }}
-        camera={{ position: [65, 50, 65], fov: 45, near: 0.1, far: 1000 }}
+        camera={{ position: [65, 50, 65], fov: 45, near: 0.001, far: 1000 }}
         onPointerMissed={(event) => { if (!props.edgeSession && !props.pickFace && !props.boxSelectEnabled && !gizmoInteractionRef.current && !event.shiftKey) props.onSelectObject(null) }}
       >
         <CadScene {...props} gizmoInteractionRef={gizmoInteractionRef} onRectangle={setRectangle} />

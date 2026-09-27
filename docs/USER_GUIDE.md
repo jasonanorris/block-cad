@@ -13,6 +13,10 @@ Open **Create → Example projects**, choose the nameplate, section demo, or eig
 5. Turn a shape into a Hole and select its target solid. Overlap it with the solid to cut it. Group a solid and its linked holes to hide cutter wireframes.
 6. Use alignment, distribution, mirror, linear/radial arrays, and proportional resizing for repeated or precisely placed features.
 
+## Inspect small details
+
+Point at the detail and scroll to zoom toward it. Perspective and flat views support close inspection of small edges and fillets. Use **Frame selection** or **Frame all** to return to a useful overview if you zoom past the surface.
+
 ## Find tools
 
 The right sidebar shows one tool tab at a time:

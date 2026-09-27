@@ -19,7 +19,7 @@ export function frameCamera(camera: PerspectiveCamera | OrthographicCamera, boun
     distance = paddedRadius * 2
   }
   camera.position.copy(center).addScaledVector(direction, -distance)
-  camera.near = Math.max(0.001, radius / 1000)
+  camera.near = 0.001
   camera.far = distance + radius * 100
   camera.updateProjectionMatrix()
   camera.updateMatrixWorld()

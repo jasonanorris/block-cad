@@ -52,7 +52,7 @@ export default function SceneControls({
 }: SceneControlsProps) {
   const { camera, gl, scene, size, get, set, invalidate } = useThree()
   const perspectiveCamera = useRef(camera as PerspectiveCamera)
-  const orthographicCamera = useMemo(() => new OrthographicCamera(-120, 120, 60, -60, 0.1, 1000), [])
+  const orthographicCamera = useMemo(() => new OrthographicCamera(-120, 120, 60, -60, 0.001, 1000), [])
   const orbitRef = useRef<OrbitControls | null>(null)
   const transformRef = useRef<TransformControls | null>(null)
   const selectedIdRef = useRef(selectedObjectId)
@@ -96,7 +96,7 @@ export default function SceneControls({
     }
     nextCamera.position.set(...positions[cameraView])
     nextCamera.zoom = 1
-    nextCamera.near = 0.1
+    nextCamera.near = 0.001
     nextCamera.far = 1000
     nextCamera.up.set(0, cameraView === 'top' || cameraView === 'bottom' ? 0 : 1, cameraView === 'top' ? -1 : cameraView === 'bottom' ? 1 : 0)
     nextCamera.lookAt(...target)
@@ -115,10 +115,11 @@ export default function SceneControls({
     const orbit = new OrbitControls(camera, gl.domElement)
     orbitRef.current = orbit
     orbit.target.set(0, 8, 0)
-    orbit.minDistance = 25
+    orbit.minDistance = 0.05
     orbit.maxDistance = 400
     orbit.minZoom = 0.25
-    orbit.maxZoom = 8
+    orbit.maxZoom = 2048
+    orbit.zoomToCursor = true
     orbit.enableRotate = camera === perspectiveCamera.current
     orbit.addEventListener('change', () => { updateViewCube(camera); invalidate() })
     orbit.update()
@@ -212,10 +213,10 @@ export default function SceneControls({
     if (!target) return
     orbit.target.copy(target)
     const distance = camera.position.distanceTo(target)
-    orbit.minDistance = Math.min(25, distance / 100)
+    orbit.minDistance = Math.min(0.05, distance / 1000)
     orbit.maxDistance = Math.max(400, distance * 10)
     orbit.minZoom = Math.min(0.25, camera.zoom / 100)
-    orbit.maxZoom = Math.max(8, camera.zoom * 100)
+    orbit.maxZoom = Math.max(2048, camera.zoom * 1000)
     orbit.update()
   }, [camera, scene, frameRequest, frameSelectionIds, gizmoInteractionRef])
 
