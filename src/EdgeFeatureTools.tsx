@@ -1,3 +1,4 @@
+import EdgePresets from './EdgePresets'
 import { CURVE_QUALITIES, type CurveQuality } from './curveQuality'
 import type { EdgeFeatureController } from './useEdgeFeature'
 import type { EdgeOperation } from './edgeFeatures'
@@ -21,6 +22,12 @@ export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatu
       {picking ? <>
         <p role="status">{tools.selected.length ? tools.advanced ? `${tools.selected.length} edges selected. Preview checks radius compatibility.` : `${tools.selected.length} edges selected (${[...new Set(tools.selected.map((index) => `${Number(tools.edges[index].angle.toFixed(1))}°`))].join(', ')}). Maximum ${tools.operation === 'fillet' ? 'radius' : 'distance'} ${Number(Math.min(...tools.selected.map((index) => tools.operation === 'fillet' ? tools.edges[index].maxRadius : tools.edges[index].maxSize)).toFixed(4))} mm.` : `${tools.edges.length} eligible edges. Hover to highlight, then click to select.`}</p>
         <button type="button" onClick={tools.selectAll} disabled={tools.busy}>Select all edges</button>
+        <details><summary>Selection shortcuts</summary>
+          <p className="selection-hint">Start with one or more selected edges. Chain follows connected edges, stopping at branches unless one continuation is tangent within 5°. Matching adds edges within 0.5% (minimum 0.0001 mm). Length uses sampled curves; radius means an existing circular edge, not the new fillet radius. Nothing is applied until Preview and Apply.</p>
+          <button type="button" disabled={tools.busy || !tools.selected.length} onClick={() => tools.extendSelection('chain')}>Select connected chain</button>
+          <button type="button" disabled={tools.busy || !tools.selected.length} onClick={() => tools.extendSelection('length')}>Select matching length</button>
+          <button type="button" disabled={tools.busy || !tools.selected.some(i => tools.edges[i]?.radius !== undefined)} onClick={() => tools.extendSelection('radius')}>Select matching radius</button>
+        </details>
         <button type="button" onClick={tools.clearSelection} disabled={!tools.selected.length || tools.busy}>Clear edges</button>
       </> : <p role="status">{tools.removing ? 'Remove' : 'Edit'} feature {tools.features.findIndex((feature) => feature.id === tools.editing) + 1}. Preview to rebuild the remaining feature history.</p>}
       {!tools.removing && <>
@@ -28,11 +35,12 @@ export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatu
           <option value="fillet">Fillet</option><option value="chamfer">Chamfer</option>
         </select></label>
         <label>{tools.operation === 'fillet' ? 'Radius' : 'Distance along each face'} (mm)
-          <input aria-label="Edge feature size" type="number" step="any" min="0.01" value={tools.size} onChange={(e) => tools.setSize(e.target.value)} /></label>
+          <input aria-label="Edge feature size" disabled={tools.busy} type="number" step="any" min="0.01" value={tools.size} onChange={(e) => tools.setSize(e.target.value)} /></label>
         <label>Curve quality<select aria-label="Curve quality" disabled={tools.busy} value={tools.quality} onChange={e => tools.setQuality(e.target.value as CurveQuality)}>
           {Object.entries(CURVE_QUALITIES).map(([value, quality]) => <option key={value} value={value}>{quality.label}</option>)}
         </select></label>
         <p className="selection-hint">Finer curves increase rebuild time and file size.{tools.advanced ? ' The finest quality in this body’s feature history controls its curved mesh.' : ''} Preview and Apply to update the mesh.</p>
+        <EdgePresets tools={tools} />
         {tools.advanced && <details><summary>Selected edges and individual sizes</summary>
           <p className="selection-hint">Hover or focus a row to highlight its edge orange. Failed edges reported by the kernel are red. Inside/outside labels are geometric hints; transitions may be smooth or ambiguous. Leave sizes blank to use the common size.</p>
           {(picking ? tools.selected : tools.features.find(f => f.id === tools.editing)?.edges.map((_, i) => i) ?? []).map((index, ordinal) => {

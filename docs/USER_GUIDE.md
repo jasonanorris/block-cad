@@ -60,6 +60,19 @@ Tubes have a concentric opening. For Rounded box, choose **Round → Sides only 
 
 ## Fillet or chamfer edges
 
+### Selection shortcuts and presets
+
+After selecting seed edges, expand **Selection shortcuts**:
+
+- **Select connected chain** follows endpoint-connected edges. At a branch it stops unless exactly one edge continues tangentially within 5°. It does not flood all edges of a box; use Select all edges for that.
+- **Select matching length** adds edges matching any seed’s world-space length. Curved lengths are estimated from the sampled paths.
+- **Select matching radius** adds circular edges with matching existing radii in Advanced CAD. This refers to the edge’s circle, not the radius you plan to apply. Straight edges and elliptical paths have no matching circular radius. Circle checks use world-space samples, including object scaling.
+
+Matching tolerance is 0.5%, with a minimum of 0.0001 mm. Shortcuts add to the current selection; if the result would exceed 24 edges, the current selection is retained and an error explains the limit. Any selection change invalidates the preview. Radius and geometry compatibility are still checked by Preview.
+
+Expand **Size and quality presets** to save a named operation, common size, and quality. **Use preset** clears individual edge-size overrides and the old preview; preview again before Apply. Presets are reusable in both engines, stored only in this browser, and separate from project files. Saving an existing name replaces it (case-insensitive); up to 20 names are supported. Delete preset removes the chosen browser preset. Applied feature settings remain in the project as usual.
+
+
 **Curve quality** offers Standard, Fine (default), and Extra fine in both edge tools. Choose Standard for smaller meshes, Fine for close inspection, or Extra fine for additional detail. The quality is saved with each feature. Advanced CAD tessellates the whole body at the finest quality requested in its history; mesh tools use each feature’s own setting. To refresh an existing fillet, select its body, open its edge feature history, choose **Edit**, then **Preview edges → Apply edges** with the same size. Save/Load alone retains the cached mesh. Undo restores the previous result. More detail uses more memory and can take longer to calculate; it does not guarantee that a geometric defect disappears.
 
 **Choose the tool mode:** Mesh tools offer the existing restricted edge operations. **Advanced CAD** supports nonperpendicular prism corners, fillets ending in rounded surfaces, inside pocket/hole edges, and different radii on meeting edges. Start with native primitives, tubes, rounded boxes, L-brackets, or their joins/cuts. Its first use loads an additional geometry engine. Existing advanced bodies automatically use Advanced CAD. Cone and tube rims can be selected directly; a smooth sphere has no sharp edges until a join or cut creates one. Rounded boxes retain their Sides only or All edges shape and radius. L-brackets include their inside corner.

@@ -1,3 +1,4 @@
+import { extendEdgeSelection, type EdgeSelectionShortcut } from './edgeSelection'
 import { curveQuality, type CurveQuality } from './curveQuality'
 import { EdgeBuildError } from './edgeDiagnostics'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -65,6 +66,8 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
     setEdgeSize: (index: number, value: string) => { invalidate(); setEdgeSizes(current => ({ ...current, [index]: value })) }, preview, busy, error, features, editing, removing,
     active: edges.length > 0 || !!editing || busy, start, cancel, calculate, edit,
     pick: (index: number) => { if (editing) { setFocusedEdge(index); return }; invalidate(); setSelected((current) => current.includes(index) ? current.filter((value) => value !== index) : [...current, index]) },
+    extendSelection: (mode: EdgeSelectionShortcut) => { invalidate(); try { setSelected(extendEdgeSelection(edges, selected, mode)) } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not extend selection.') } },
+    applyPreset: (preset: { operation: EdgeOperation; size: number; quality: CurveQuality }) => { invalidate(); setOperation(preset.operation); setSize(String(preset.size)); setQuality(preset.quality); setEdgeSizes({}) },
     selectAll: () => { invalidate(); if (edges.length <= MAX_FEATURE_EDGES) setSelected(edges.map((_, index) => index)); else setError(`Select up to ${MAX_FEATURE_EDGES} edges per feature.`) },
     clearSelection: () => { invalidate(); setSelected([]) },
     setOperation: (value: EdgeOperation) => { invalidate(); setOperation(value) },

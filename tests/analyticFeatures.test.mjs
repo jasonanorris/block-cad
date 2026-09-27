@@ -229,3 +229,14 @@ test('project quality rebuild is atomic across engines and skips locked assembli
  await assert.rejects(rebuildProjectQuality([analytic,broken],'fine'),/No bodies were changed/)
  assert.equal(JSON.stringify(objects),before)
 })
+
+test('analytic circular radius matching follows world scale and excludes elliptical edges',async()=>{
+ const cylinder={...shape(),type:'cylinder',dimensions:{diameter:20,height:20}}
+ const edges=await findAnalyticEdges([cylinder],[cylinder.id])
+ assert.equal(edges.length,2)
+ for(const edge of edges) assert.ok(Math.abs(edge.radius-10)<1e-5)
+ const scaled={...cylinder,scale:{x:2,y:3,z:2}}
+ for(const edge of await findAnalyticEdges([scaled],[scaled.id])) assert.ok(Math.abs(edge.radius-20)<1e-5)
+ const ellipse={...cylinder,scale:{x:2,y:1,z:1}}
+ for(const edge of await findAnalyticEdges([ellipse],[ellipse.id])) assert.equal(edge.radius,undefined)
+})

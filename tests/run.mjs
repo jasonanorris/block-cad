@@ -37,3 +37,5 @@ import './edgeFeatures.test.mjs'
 import './analyticFeatures.test.mjs'
 
 import './displayGeometry.test.mjs'
+
+import './edgeSelection.test.mjs'

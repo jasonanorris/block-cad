@@ -107,3 +107,9 @@ The font licenses are shipped in `public/licenses/helvetiker.txt` and `public/li
 - Mesh inspection: compare selected-body triangle counts against the rendered mesh; joined bodies count once and pending Booleans show a pending message. Confirm the size is labeled as triangle positions.
 - Selected-only wireframe: toggle with multiple visible bodies and change selection; overlays must follow selection. Crease-angle changes must alter normals without changing saved meshes.
 - Bulk quality: rebuild mixed mesh/analytic histories, including hidden bodies. Check locked assemblies are skipped, failures/cancellation are atomic, stale results are discarded, and a single Undo/Redo restores the entire batch.
+
+## Edge shortcuts and presets
+
+- Seed a box edge: chain stops at ambiguous corners, matching length selects the equal-length edges, and exceeding 24 leaves the selection unchanged. Check reversed chains, loops, and a unique tangent continuation at a branch.
+- Pick a cylinder rim in Advanced CAD and match radius: both equal rims should select. Verify scaled circles still match and ellipses do not. Preview/Apply must still perform the normal geometry checks.
+- Save, replace, reuse and delete a named preset. Reopen the tools to confirm browser persistence. Using a preset must reset overrides and invalidate an existing preview without changing committed geometry. Check malformed storage and invalid sizes are handled.

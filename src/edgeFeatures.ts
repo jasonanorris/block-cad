@@ -7,7 +7,7 @@ import { objectMatrix, readSolidManifold } from './booleanGeometry'
 import { loadManifold } from './manifoldRuntime'
 import { encodeStlMesh, stlMeshManifold, MAX_STL_TRIANGLES } from './stlMesh'
 
-export type FeatureEdge = { a: Point; b: Point; normalA: Point; normalB: Point; angle: number; maxSize: number; maxRadius: number; key?: string; path?: Point[]; size?: number; curveType?: 'straight' | 'curved'; edgeType?: 'inside' | 'outside' | 'transition' }
+export type FeatureEdge = { a: Point; b: Point; normalA: Point; normalB: Point; angle: number; maxSize: number; maxRadius: number; key?: string; path?: Point[]; size?: number; radius?: number; curveType?: 'straight' | 'curved'; edgeType?: 'inside' | 'outside' | 'transition' }
 import { MAX_EDGE_FEATURES, MAX_FEATURE_EDGES, type EdgeHistory, type EdgeFeature, type StoredEdge, type EdgeOperation } from './edgeFeatureData'
 export type { EdgeOperation } from './edgeFeatureData'
 const v = (p: Point) => new Vector3(p.x, p.y, p.z)

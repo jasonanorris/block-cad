@@ -1,3 +1,4 @@
+import { circularRadius } from './edgeSelection'
 import { bodyCurveQuality, curveQuality, type CurveQuality } from './curveQuality'
 import { EdgeBuildError } from './edgeDiagnostics'
 import { Matrix4, Vector3 } from 'three'
@@ -61,7 +62,7 @@ export async function findAnalyticEdges(objects: CadObject[], ids: string[], fea
     if (!listed.length) throw new Error('This body has no sharp edges to select. A smooth sphere has none; joins or cuts can create edges.')
     return listed.map(edge => {
       const path = edge.path.map(p => { const v = new Vector3(p.x, p.y, p.z).applyMatrix4(c.matrix); return { x: v.x, y: v.y, z: v.z } })
-      return { ...describeKernelEdge(oc, scope, shape, edge), a: path[0], b: path.at(-1)!, path, key: edge.key, normalA: { x: 0, y: 0, z: 0 }, normalB: { x: 0, y: 0, z: 0 }, angle: 0, maxSize: 10000, maxRadius: 10000 }
+      return { ...describeKernelEdge(oc, scope, shape, edge), radius: circularRadius(path), a: path[0], b: path.at(-1)!, path, key: edge.key, normalA: { x: 0, y: 0, z: 0 }, normalB: { x: 0, y: 0, z: 0 }, angle: 0, maxSize: 10000, maxRadius: 10000 }
     })
   })
 }
