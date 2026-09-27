@@ -91,3 +91,11 @@ export async function editAnalyticFeature(objects: CadObject[], ids: string[], f
     return { object: { ...c.object, ...kernelMesh(oc, scope, replay(oc, scope, history), bodyCurveQuality(features)), analyticHistory: history }, replacedIds: c.ids }
   })
 }
+
+export async function rebuildAnalyticQuality(object: Extract<CadObject, { type: 'stl' }>, quality: CurveQuality) {
+  return job((oc, scope) => {
+    if (!object.analyticHistory) throw new Error('This body has no analytic history.')
+    const history = { ...object.analyticHistory, features: object.analyticHistory.features.map(f => ({ ...f, quality: curveQuality(quality) })) }
+    return { ...object, ...kernelMesh(oc, scope, replay(oc, scope, history), bodyCurveQuality(history.features)), analyticHistory: history }
+  })
+}

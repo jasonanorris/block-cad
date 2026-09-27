@@ -2,8 +2,9 @@ import { BufferGeometry, Float32BufferAttribute, Vector3 } from 'three'
 
 // Display-only normals. A 0.000001 mm key tolerance closes numeric seams
 // without merging distinct small details (model units are millimeters).
-// A 30-degree crease keeps hard corners while averaging fine curved facets.
-export function smoothDisplayGeometry(source: BufferGeometry): BufferGeometry {
+// The crease angle keeps hard corners while averaging fine curved facets.
+export function smoothDisplayGeometry(source: BufferGeometry, creaseAngle = 30): BufferGeometry {
+  if (!Number.isFinite(creaseAngle) || creaseAngle < 1 || creaseAngle > 90) throw new Error('Crease angle must be 1–90 degrees.')
   const geometry = source.index ? source.toNonIndexed() : source.clone()
   const positions = geometry.getAttribute('position')
   const normals: Vector3[] = [], shared = new Map<string, number[]>()
@@ -24,7 +25,7 @@ export function smoothDisplayGeometry(source: BufferGeometry): BufferGeometry {
       if (entries) entries.push(index); else shared.set(key, [index])
     }
   }
-  const result = new Float32Array(positions.count * 3), sum = new Vector3(), crease = Math.cos(Math.PI / 6)
+  const result = new Float32Array(positions.count * 3), sum = new Vector3(), crease = Math.cos(creaseAngle * Math.PI / 180)
   for (let i = 0; i < positions.count; i++) {
     const face = normals[Math.floor(i / 3)]
     sum.set(0, 0, 0)

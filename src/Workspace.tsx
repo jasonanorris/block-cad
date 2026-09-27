@@ -29,7 +29,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
   cutGeometry,
   clippingPlanes,
   surfaceReady,
-  smoothShading, wireframeOverlay,
+  smoothShading, wireframeOverlay, creaseAngle, selectedWireframe,
 }: {
   object: CadObject
   isSelected: boolean
@@ -39,6 +39,8 @@ const CadObjectMesh = memo(function CadObjectMesh({
   selectedMeshRef: RefObject<Mesh | null>
   clippingPlanes: Plane[]
   surfaceReady: boolean
+  creaseAngle: number
+  selectedWireframe: boolean
   smoothShading: boolean
   wireframeOverlay: boolean
   cutGeometry?: BufferGeometry
@@ -49,13 +51,14 @@ const CadObjectMesh = memo(function CadObjectMesh({
   useEffect(() => () => sourceGeometry.dispose(), [sourceGeometry])
   const baseGeometry = cutGeometry ?? sourceGeometry
   const displayGeometry = useMemo(() => smoothShading && (cutGeometry || object.type === 'stl')
-    ? smoothDisplayGeometry(baseGeometry) : null, [baseGeometry, smoothShading, object.type, cutGeometry])
+    ? smoothDisplayGeometry(baseGeometry, creaseAngle) : null, [baseGeometry, smoothShading, object.type, cutGeometry, creaseAngle])
   useEffect(() => () => displayGeometry?.dispose(), [displayGeometry])
   if (object.hidden) return null
   const { position, rotation, scale } = object
   const isCutter = isHoleObject(object)
   const sourceOverlay = hiddenInGroup && isSelected
   const wireframe = isCutter || sourceOverlay
+  const showOverlay = wireframeOverlay && (!selectedWireframe || isSelected) && !wireframe
 
   return (
     <mesh
@@ -82,7 +85,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
         emissiveIntensity={isSelected ? 0.18 : 0}
         roughness={0.75}
         flatShading={!smoothShading || (!cutGeometry && ['wedge', 'prism'].includes(object.type))}
-        polygonOffset={wireframeOverlay && !wireframe}
+        polygonOffset={showOverlay}
         polygonOffsetFactor={1}
         polygonOffsetUnits={1}
         wireframe={wireframe}
@@ -91,7 +94,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
         depthTest={!wireframe}
         depthWrite={!wireframe}
       />
-      {wireframeOverlay && !wireframe && <mesh raycast={() => {}} renderOrder={2} userData={{ inspectionWireframe: true }}>
+      {showOverlay && <mesh raycast={() => {}} renderOrder={2} userData={{ inspectionWireframe: true }}>
         <primitive object={baseGeometry} attach="geometry" />
         <meshBasicMaterial wireframe color="#24374d" transparent opacity={0.45} depthWrite={false}
           clippingPlanes={clippingPlanes} side={clippingPlanes.length ? DoubleSide : FrontSide} />
@@ -102,7 +105,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
 
 function CadScene({
   objects,
-  smoothShading, wireframeOverlay,
+  smoothShading, wireframeOverlay, creaseAngle, selectedWireframe,
   selectedObjectId,
   selectedObjectIds,
   onSelectObject,
@@ -157,7 +160,7 @@ function CadScene({
         <CadObjectMesh
           key={object.id}
           object={object}
-          smoothShading={smoothShading} wireframeOverlay={wireframeOverlay}
+          smoothShading={smoothShading} wireframeOverlay={wireframeOverlay} creaseAngle={creaseAngle} selectedWireframe={selectedWireframe}
           surfaceReady={!pendingSurfaces.has(object.id)}
           isSelected={selectedObjectIds.includes(object.id)}
           isActive={object.id === selectedObjectId}
@@ -196,6 +199,8 @@ function CadScene({
 }
 
 type WorkspaceProps = {
+  creaseAngle: number
+  selectedWireframe: boolean
   smoothShading: boolean
   wireframeOverlay: boolean
   edgeSession: boolean

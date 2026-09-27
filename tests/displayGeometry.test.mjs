@@ -33,3 +33,13 @@ test('nearby disconnected details do not share display normals',()=>{
  assert.ok(result.getAttribute('normal').array.every((v,i)=>Math.abs(v-source.getAttribute('normal').array[i])<1e-6))
  result.dispose();source.dispose()
 })
+
+test('crease angle changes display normals without changing triangles',()=>{
+ const source=new BufferGeometry()
+ source.setAttribute('position',new Float32BufferAttribute([0,0,0,1,0,0,0,1,0, 1,0,0,0,0,0,0,-1,1],3))
+ const sharp=smoothDisplayGeometry(source,30),smooth=smoothDisplayGeometry(source,60)
+ assert.deepEqual(sharp.getAttribute('position').array,smooth.getAttribute('position').array)
+ assert.notDeepEqual(sharp.getAttribute('normal').array,smooth.getAttribute('normal').array)
+ for(const angle of [0,91,NaN]) assert.throws(()=>smoothDisplayGeometry(source,angle),/Crease/)
+ source.dispose();sharp.dispose();smooth.dispose()
+})

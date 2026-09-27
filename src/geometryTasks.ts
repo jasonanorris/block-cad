@@ -9,6 +9,7 @@ import type { FeatureEdge, EdgeOperation } from './edgeFeatures'
 
 export type EdgePreview = { object: Extract<CadObject, { type: 'stl' }>; replacedIds: string[] }
 export type GeometryTasks = {
+  rebuildQuality: { input: { objects: CadObject[]; quality: CurveQuality }; output: CadObject[] }
   edges: { input: { objects: CadObject[]; ids: string[]; advanced?: boolean; featureId?: string }; output: FeatureEdge[] }
   edgePreview: { input: { objects: CadObject[]; ids: string[]; edges: FeatureEdge[]; operation: EdgeOperation; size: number; quality?: CurveQuality; advanced?: boolean }; output: EdgePreview }
   edgeEdit: { input: { objects: CadObject[]; ids: string[]; featureId: string; advanced?: boolean; change: { operation: EdgeOperation; size: number; quality?: CurveQuality; sizes?: (number | null)[] } | null }; output: EdgePreview }

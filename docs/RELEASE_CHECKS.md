@@ -103,3 +103,7 @@ The font licenses are shipped in `public/licenses/helvetiker.txt` and `public/li
 - Toggle Smooth shading on a filleted body: curved lighting blends, box corners stay sharp, and switching back shows individual facets.
 - Toggle Wireframe overlay: triangle edges appear over visible solids, stay clipped in section view, and do not intercept selection or edge picks. Hidden/grouped sources must not gain an overlay.
 - Verify display toggles preserve vertex positions, saved project data, export geometry, and Undo/Redo; dispose derived display geometry when objects change.
+
+- Mesh inspection: compare selected-body triangle counts against the rendered mesh; joined bodies count once and pending Booleans show a pending message. Confirm the size is labeled as triangle positions.
+- Selected-only wireframe: toggle with multiple visible bodies and change selection; overlays must follow selection. Crease-angle changes must alter normals without changing saved meshes.
+- Bulk quality: rebuild mixed mesh/analytic histories, including hidden bodies. Check locked assemblies are skipped, failures/cancellation are atomic, stale results are discarded, and a single Undo/Redo restores the entire batch.

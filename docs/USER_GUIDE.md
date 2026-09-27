@@ -17,9 +17,13 @@ Open **Create → Example projects**, choose the nameplate, section demo, or eig
 
 Point at the detail and scroll to zoom toward it. Perspective and flat views support close inspection of small edges and fillets. Use **Frame selection** or **Frame all** to return to a useful overview if you zoom past the surface.
 
-**Smooth shading** (on by default) blends the lighting across curved mesh facets while retaining creases of 30° or more. Turn it off to inspect flat triangle faces. Native wedges and prisms retain their planar faces. Shallow angular edges in imported or baked meshes may also look smooth because these meshes do not identify which surfaces were originally curves.
+**Smooth shading** (on by default) blends the lighting across curved mesh facets while retaining creases at or above the chosen angle (30° by default). Open **Display options → Crease angle** to choose 1–90° for baked meshes and Boolean results; lower values preserve more angular edges. Turn it off to inspect flat triangle faces. Native wedges and prisms retain their planar faces. Shallow angular edges in imported or baked meshes may also look smooth because these meshes do not identify which surfaces were originally curves.
 
-**Wireframe overlay** draws triangle edges over the solids, follows section clipping, and leaves selection and edge picking available. Use it with smooth shading off to inspect tessellation. Both buttons are above the workspace tools; they affect only the current view, never saved meshes, dimensions, STL, or 3MF exports.
+**Wireframe overlay** draws triangle edges over the solids, follows section clipping, and leaves selection and edge picking available. Enable **Display options → Selected-only wireframe** to limit the overlay to selected objects. Use it with smooth shading off to inspect tessellation. Both buttons are above the workspace tools; they affect only the current view, never saved meshes, dimensions, STL, or 3MF exports.
+
+**Mesh inspection & quality** shows selected committed bodies’ triangle count and uncompressed triangle-position data size (36 bytes per triangle). Joined/cut bodies are counted once; while a Boolean result is pending, counts wait for it. This is not total GPU memory or saved-file size.
+
+To switch the whole model’s feature quality, choose **All fillet/edge histories → Standard / Fine / Extra fine → Rebuild all edge quality**. This rebuilds all features on unlocked bodies, including hidden bodies, and leaves primitives or imported meshes without editable history alone. Locked assemblies are skipped. Cancel stops the worker; failures and changes to the model discard unfinished results. One Undo restores all rebuilt bodies. Mesh limits and dependent-feature checks still apply.
 
 ## Find tools
 

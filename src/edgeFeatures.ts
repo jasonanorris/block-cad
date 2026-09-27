@@ -299,3 +299,8 @@ export async function editEdgeFeature(objects: CadObject[], ids: string[], featu
   const features = object.edgeHistory!.features.flatMap((feature) => feature.id !== featureId ? [feature] : change ? [{ ...feature, ...change }] : [])
   return { object: await rebuild(object, { ...object.edgeHistory!, features }), replacedIds: [object.id] }
 }
+
+export async function rebuildMeshQuality(object: Extract<CadObject, { type: 'stl' }>, quality: CurveQuality) {
+  if (!object.edgeHistory) throw new Error('This body has no mesh feature history.')
+  return rebuild(object, { ...object.edgeHistory, features: object.edgeHistory.features.map(f => ({ ...f, quality: curveQuality(quality) })) })
+}

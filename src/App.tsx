@@ -1,3 +1,4 @@
+import MeshInspection from './MeshInspection'
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import type { TransformControlsMode } from 'three/addons/controls/TransformControls.js'
 import Workspace from './Workspace'
@@ -128,6 +129,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const [workplaneHeight, setWorkplaneHeight] = useState(0)
   const [workplaneDraft, setWorkplaneDraft] = useState('0')
   const [smoothShading, setSmoothShading] = useState(true)
+  const [creaseAngle, setCreaseAngle] = useState(30)
+  const [selectedWireframe, setSelectedWireframe] = useState(false)
   const [wireframeOverlay, setWireframeOverlay] = useState(false)
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
   const [frameRequest, setFrameRequest] = useState<FrameRequest | null>(null)
@@ -746,9 +749,17 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="view-presets" role="group" aria-label="Surface display">
-            <button type="button" aria-pressed={smoothShading} onClick={() => setSmoothShading(value => !value)} title="Smooth curved facets; keep creases of 30 degrees or more sharp. Display only.">Smooth shading</button>
+            <button type="button" aria-pressed={smoothShading} onClick={() => setSmoothShading(value => !value)} title="Smooth curved facets using the chosen crease angle. Display only.">Smooth shading</button>
             <button type="button" aria-pressed={wireframeOverlay} onClick={() => setWireframeOverlay(value => !value)} title="Show mesh triangles over solid surfaces. Display only.">Wireframe overlay</button>
           </div>
+          <details className="repeat-tools"><summary>Display options</summary>
+            <label>Crease angle (degrees)<input aria-label="Shading crease angle" type="number" min="1" max="90" value={creaseAngle} disabled={!smoothShading}
+              onChange={e => { const value = Number(e.target.value); if (Number.isFinite(value) && value >= 1 && value <= 90) setCreaseAngle(value) }} /></label>
+            <p className="selection-hint">1–90°. Lower angles preserve more creases; higher angles smooth more faces. Applies to baked meshes and Boolean results.</p>
+            <label><input type="checkbox" checked={selectedWireframe} onChange={e => setSelectedWireframe(e.target.checked)} />Selected-only wireframe</label>
+          </details>
+          <MeshInspection objects={objects} selectedIds={selectedObjectIds} geometries={booleanGeometries} disabled={edgeActive || splitting}
+            onApply={(source, result) => commit(current => current.objects === source ? { ...current, objects: result } : current)} />
           <div className="workspace-toolbar" aria-label="Transform tools">
             <button type="button" className={`tool-button${boxSelectEnabled ? ' is-active' : ''}`}
               aria-pressed={boxSelectEnabled} onClick={() => { setBoxSelectEnabled((enabled) => !enabled); setPickMode(null) }}>Box select</button>
@@ -797,7 +808,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="workspace-frame">
-            <Workspace smoothShading={smoothShading} wireframeOverlay={wireframeOverlay} edgeSession={edgeActive} featureEdges={edgeTools.displayEdges} selectedEdge={edgeTools.editing ? edgeTools.displayEdges.map((_, index) => index) : edgeTools.selected} focusedEdge={edgeTools.focusedEdge} failedEdgeKeys={edgeTools.failedKeys} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
+            <Workspace smoothShading={smoothShading} wireframeOverlay={wireframeOverlay} creaseAngle={creaseAngle} selectedWireframe={selectedWireframe} edgeSession={edgeActive} featureEdges={edgeTools.displayEdges} selectedEdge={edgeTools.editing ? edgeTools.displayEdges.map((_, index) => index) : edgeTools.selected} focusedEdge={edgeTools.focusedEdge} failedEdgeKeys={edgeTools.failedKeys} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
               section={section}
               objects={displayObjects}
               selectedObjectId={canTransformSelected ? selectedObjectId : null}

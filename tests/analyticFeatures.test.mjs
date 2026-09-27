@@ -206,3 +206,26 @@ test('analytic quality controls tessellation without changing radii and survives
  const rebuilt=(await editAnalyticFeature([loaded],[loaded.id],loaded.analyticHistory.features[0].id,{operation:'fillet',size:2})).object
  assert.equal(decodeStlMesh(rebuilt.meshData).length,counts[1])
 })
+
+test('project quality rebuild is atomic across engines and skips locked assemblies',async()=>{
+ const {rebuildProjectQuality,qualityTargets}=await import('../src/rebuildQuality.ts')
+ const {findFeatureEdges,previewEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const b=shape(),ae=await findAnalyticEdges([b],[b.id])
+ const analytic=(await previewAnalyticFeature([b],[b.id],[ae[0]],'fillet',1,'standard')).object
+ const me=await findFeatureEdges([b],[b.id])
+ const mesh=(await previewEdgeFeature([b],[b.id],me[0],'fillet',1,'standard')).object
+ const hidden={...mesh,id:'hidden',hidden:true},locked={...mesh,id:'locked',locked:true}
+ const joined={...mesh,id:'joined',joinGroupId:'locked-group'},member={...b,id:'member',joinGroupId:'locked-group',locked:true}
+ const objects=[analytic,mesh,hidden,locked,joined,member],before=JSON.stringify(objects)
+ assert.deepEqual(qualityTargets(objects).map(o=>o.id),[analytic.id,mesh.id,hidden.id])
+ const result=await rebuildProjectQuality(objects,'extra-fine')
+ assert.equal(JSON.stringify(objects),before)
+ for(const object of result.slice(0,3)) {
+  assert.ok((object.analyticHistory??object.edgeHistory).features.every(f=>f.quality==='extra-fine'))
+  assert.ok(object.meshData.length>objects.find(o=>o.id===object.id).meshData.length)
+ }
+ for(let i=3;i<result.length;i++) assert.equal(result[i],objects[i])
+ const broken=structuredClone(mesh);broken.edgeHistory.features[0].size=10000
+ await assert.rejects(rebuildProjectQuality([analytic,broken],'fine'),/No bodies were changed/)
+ assert.equal(JSON.stringify(objects),before)
+})
