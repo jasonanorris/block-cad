@@ -1,3 +1,4 @@
+import { CURVE_QUALITIES, type CurveQuality } from './curveQuality'
 import type { EdgeFeatureController } from './useEdgeFeature'
 import type { EdgeOperation } from './edgeFeatures'
 
@@ -11,7 +12,7 @@ export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatu
     <button type="button" disabled={disabled || tools.busy} onClick={() => void tools.start()}>{picking ? 'Pick edges again' : 'Select edges'}</button>
     {tools.features.length > 0 && <ol className="edge-feature-list" aria-label="Edge feature history">
       {tools.features.map((feature, index) => <li key={feature.id}>
-        <span>{index + 1}. {feature.operation === 'fillet' ? 'Fillet' : 'Chamfer'} · {feature.size} mm · {feature.edges.length} edge{feature.edges.length === 1 ? '' : 's'}{feature.edges.some(edge => edge.size !== undefined) ? ' · individual sizes' : ''}</span>
+        <span>{index + 1}. {feature.operation === 'fillet' ? 'Fillet' : 'Chamfer'} · {feature.size} mm · {feature.edges.length} edge{feature.edges.length === 1 ? '' : 's'} · {CURVE_QUALITIES[feature.quality ?? 'fine'].label}{feature.edges.some(edge => edge.size !== undefined) ? ' · individual sizes' : ''}</span>
         <div><button type="button" aria-label={`Edit edge feature ${index + 1}`} disabled={disabled || tools.busy} onClick={() => tools.edit(feature)}>Edit</button>
           <button type="button" aria-label={`Remove edge feature ${index + 1}`} disabled={disabled || tools.busy} onClick={() => tools.edit(feature, true)}>Remove</button></div>
       </li>)}
@@ -28,6 +29,10 @@ export default function EdgeFeatureTools({ tools, disabled }: { tools: EdgeFeatu
         </select></label>
         <label>{tools.operation === 'fillet' ? 'Radius' : 'Distance along each face'} (mm)
           <input aria-label="Edge feature size" type="number" step="any" min="0.01" value={tools.size} onChange={(e) => tools.setSize(e.target.value)} /></label>
+        <label>Curve quality<select aria-label="Curve quality" disabled={tools.busy} value={tools.quality} onChange={e => tools.setQuality(e.target.value as CurveQuality)}>
+          {Object.entries(CURVE_QUALITIES).map(([value, quality]) => <option key={value} value={value}>{quality.label}</option>)}
+        </select></label>
+        <p className="selection-hint">Finer curves increase rebuild time and file size.{tools.advanced ? ' The finest quality in this body’s feature history controls its curved mesh.' : ''} Preview and Apply to update the mesh.</p>
         {tools.advanced && <details><summary>Selected edges and individual sizes</summary>
           <p className="selection-hint">Hover or focus a row to highlight its edge orange. Failed edges reported by the kernel are red. Inside/outside labels are geometric hints; transitions may be smooth or ambiguous. Leave sizes blank to use the common size.</p>
           {(picking ? tools.selected : tools.features.find(f => f.id === tools.editing)?.edges.map((_, i) => i) ?? []).map((index, ordinal) => {

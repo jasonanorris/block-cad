@@ -1,3 +1,4 @@
+import { bodyCurveQuality, curveQuality, type CurveQuality } from './curveQuality'
 import { EdgeBuildError } from './edgeDiagnostics'
 import { Matrix4, Vector3 } from 'three'
 import type { CadObject } from './cadModel'
@@ -64,29 +65,29 @@ export async function findAnalyticEdges(objects: CadObject[], ids: string[], fea
     })
   })
 }
-export async function previewAnalyticFeature(objects: CadObject[], ids: string[], edges: FeatureEdge[], operation: EdgeOperation, size: number) {
+export async function previewAnalyticFeature(objects: CadObject[], ids: string[], edges: FeatureEdge[], operation: EdgeOperation, size: number, quality: CurveQuality = 'fine') {
   if (!edges.length || edges.length > MAX_FEATURE_EDGES || !Number.isFinite(size) || size < .01 || size > 10000) throw new Error('Select 1–24 edges and enter a size from 0.01 to 10,000 mm.')
   return job((oc, scope) => {
     const c = context(oc, scope, objects, ids)
     if (c.history.features.length >= MAX_EDGE_FEATURES) throw new Error('A body supports up to 32 edge features.')
     const available = kernelEdges(oc, scope, c.shape)
-    const feature: EdgeFeature = { id: crypto.randomUUID(), operation, size, edges: edges.map(edge => {
+    const feature: EdgeFeature = { id: crypto.randomUUID(), operation, size, quality: curveQuality(quality), edges: edges.map(edge => {
       const current = available.find(e => e.key === edge.key)
       if (!current) throw new Error('The edge is no longer available. Select edges again.')
       return { a: current.path[0], b: current.path.at(-1)!, key: current.key, ...(edge.size !== undefined ? { size: edge.size } : {}) }
     }) }
     validateEdgeFeatures([feature], true)
     const shape = kernelFeature(oc, scope, c.shape, feature)
-    return { object: { ...c.object, ...kernelMesh(oc, scope, shape), analyticHistory: { ...c.history, features: [...c.history.features, feature] } }, replacedIds: c.ids }
+    return { object: { ...c.object, ...kernelMesh(oc, scope, shape, bodyCurveQuality([...c.history.features, feature])), analyticHistory: { ...c.history, features: [...c.history.features, feature] } }, replacedIds: c.ids }
   })
 }
-export async function editAnalyticFeature(objects: CadObject[], ids: string[], featureId: string, change: { operation: EdgeOperation; size: number; sizes?: (number | null)[] } | null) {
+export async function editAnalyticFeature(objects: CadObject[], ids: string[], featureId: string, change: { operation: EdgeOperation; size: number; quality?: CurveQuality; sizes?: (number | null)[] } | null) {
   return job((oc, scope) => {
     const c = context(oc, scope, objects, ids)
     if (!c.history.features.some(f => f.id === featureId)) throw new Error('Separate later joins/cuts before editing this feature. Its source history is preserved until a new advanced feature is applied.')
-    const features = c.history.features.flatMap(feature => feature.id !== featureId ? [feature] : change ? [{ ...feature, operation: change.operation, size: change.size, edges: feature.edges.map((edge, index) => ({ ...edge, size: change.sizes ? change.sizes[index] ?? undefined : edge.size })) }] : [])
+    const features = c.history.features.flatMap(feature => feature.id !== featureId ? [feature] : change ? [{ ...feature, operation: change.operation, size: change.size, quality: curveQuality(change.quality ?? feature.quality), edges: feature.edges.map((edge, index) => ({ ...edge, size: change.sizes ? change.sizes[index] ?? undefined : edge.size })) }] : [])
     validateEdgeFeatures(features, true)
     const history = { ...c.history, features }
-    return { object: { ...c.object, ...kernelMesh(oc, scope, replay(oc, scope, history)), analyticHistory: history }, replacedIds: c.ids }
+    return { object: { ...c.object, ...kernelMesh(oc, scope, replay(oc, scope, history), bodyCurveQuality(features)), analyticHistory: history }, replacedIds: c.ids }
   })
 }

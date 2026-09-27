@@ -1,3 +1,4 @@
+import type { CurveQuality } from './curveQuality'
 import type { CadObject } from './cadModel'
 import type { measureSelection } from './measurements'
 import type { selectionReference } from './referenceOrigin'
@@ -9,8 +10,8 @@ import type { FeatureEdge, EdgeOperation } from './edgeFeatures'
 export type EdgePreview = { object: Extract<CadObject, { type: 'stl' }>; replacedIds: string[] }
 export type GeometryTasks = {
   edges: { input: { objects: CadObject[]; ids: string[]; advanced?: boolean; featureId?: string }; output: FeatureEdge[] }
-  edgePreview: { input: { objects: CadObject[]; ids: string[]; edges: FeatureEdge[]; operation: EdgeOperation; size: number; advanced?: boolean }; output: EdgePreview }
-  edgeEdit: { input: { objects: CadObject[]; ids: string[]; featureId: string; advanced?: boolean; change: { operation: EdgeOperation; size: number; sizes?: (number | null)[] } | null }; output: EdgePreview }
+  edgePreview: { input: { objects: CadObject[]; ids: string[]; edges: FeatureEdge[]; operation: EdgeOperation; size: number; quality?: CurveQuality; advanced?: boolean }; output: EdgePreview }
+  edgeEdit: { input: { objects: CadObject[]; ids: string[]; featureId: string; advanced?: boolean; change: { operation: EdgeOperation; size: number; quality?: CurveQuality; sizes?: (number | null)[] } | null }; output: EdgePreview }
   measure: { input: { objects: CadObject[]; ids: string[]; activeId: string | null }; output: Awaited<ReturnType<typeof measureSelection>> }
   reference: { input: { objects: CadObject[]; ids: string[]; edge: 'min' | 'center' | 'max' }; output: Awaited<ReturnType<typeof selectionReference>> }
   inspect: { input: { objects: CadObject[]; settings: PrintSettings }; output: ExportReport }

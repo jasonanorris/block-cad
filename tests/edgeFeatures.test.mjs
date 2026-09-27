@@ -130,7 +130,7 @@ test('format 20 validates edge history and shares both base and resulting meshes
  const [edge]=await findFeatureEdges([shape],[shape.id])
  const {object}=await previewEdgeFeature([shape],[shape.id],edge,'chamfer',2)
  const file=JSON.parse(serializeProject([object,{...object,id:'copy'}]))
- assert.equal(file.version,21);assert.equal(file.meshes.length,2)
+ assert.equal(file.version,22);assert.equal(file.meshes.length,2)
  assert.equal(file.objects[0].edgeHistory.baseMeshRef,file.objects[1].edgeHistory.baseMeshRef)
  assert.deepEqual(parseProject(JSON.stringify(file)),[object,{...object,id:'copy'}])
  for(const mutate of [f=>f.version=19,f=>f.objects[0].edgeHistory.baseMeshRef=999,
@@ -323,4 +323,28 @@ test('two-edge fillets blend all box corner orientations while retaining the thi
  assert.ok((await exportStl([edited])).byteLength>84)
  const removed=(await editEdgeFeature([edited],[edited.id],id,null)).object
  assert.ok(Math.abs(readSolidManifold(getSolidBodies([removed])[0],runtime,s=>s.volume())-8000)<.01)
+})
+
+test('mesh curve quality changes detail, preserves shape and persists through history edits',async()=>{
+ const {editEdgeFeature}=await import('../src/edgeFeatures.ts')
+ const {decodeStlMesh}=await import('../src/stlMesh.ts')
+ const shape={...box('quality'),dimensions:{x:20,y:20,z:20}},edges=await findFeatureEdges([shape],[shape.id])
+ const runtime=await loadManifold(),counts=[]
+ let previous
+ for(const quality of ['standard','fine','extra-fine']) {
+  const object=previous ? (await editEdgeFeature([previous],[previous.id],previous.edgeHistory.features[0].id,{operation:'fillet',size:2,quality})).object
+   : (await previewEdgeFeature([shape],[shape.id],edges[0],'fillet',2,quality)).object
+  assert.equal(object.edgeHistory.features[0].quality,quality)
+  assert.deepEqual(parseProject(serializeProject([object])),[object])
+  counts.push(decodeStlMesh(object.meshData).length)
+  const volume=readSolidManifold(getSolidBodies([object])[0],runtime,s=>{assert.equal(s.status(),'NoError');return s.volume()})
+  assert.ok(Math.abs(volume-(8000-20*4*(1-Math.PI/4)))<.2)
+  previous=object
+ }
+ assert.ok(counts[0]<counts[1] && counts[1]<counts[2])
+ const malformed=JSON.parse(serializeProject([previous]));malformed.objects[0].edgeHistory.features[0].quality='ultra'
+ assert.throws(()=>parseProject(JSON.stringify(malformed)),/quality/)
+ const legacy=structuredClone(previous);delete legacy.edgeHistory.features[0].quality
+ const rebuilt=(await editEdgeFeature([legacy],[legacy.id],legacy.edgeHistory.features[0].id,{operation:'fillet',size:2})).object
+ assert.equal(decodeStlMesh(rebuilt.meshData).length,counts[1])
 })

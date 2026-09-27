@@ -7,7 +7,7 @@ import { validateEdgeHistory } from './edgeFeatureData'
 import { decodeStlMesh } from './stlMesh'
 
 const PROJECT_FORMAT = 'block-cad'
-const PROJECT_VERSION = 21
+const PROJECT_VERSION = 22
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)

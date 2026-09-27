@@ -180,3 +180,29 @@ test('cones, tubes, brackets, rounded boxes, and sphere cuts support editable an
  const result=(await previewAnalyticFeature([rounded,hole],[rounded.id],[rims[0]],'fillet',.5)).object
  assert.ok((await exportStl([result])).byteLength>84)
 })
+
+test('analytic quality controls tessellation without changing radii and survives persistence',async()=>{
+ const {decodeStlMesh}=await import('../src/stlMesh.ts')
+ const {bodyCurveQuality}=await import('../src/curveQuality.ts')
+ const b=shape(),edges=(await findAnalyticEdges([b],[b.id])).filter(e=>e.path.every(p=>close(p.x,15)&&close(p.z,15)))
+ const counts=[];let previous
+ for(const quality of ['standard','fine','extra-fine']) {
+  const object=previous ? (await editAnalyticFeature([previous],[previous.id],previous.analyticHistory.features[0].id,{operation:'fillet',size:2,quality})).object
+   : (await previewAnalyticFeature([b],[b.id],edges,'fillet',2,quality)).object
+  counts.push(decodeStlMesh(object.meshData).length)
+  assert.equal(object.analyticHistory.features[0].quality,quality)
+  assert.equal(object.analyticHistory.features[0].size,2)
+  assert.ok(Math.abs(await volume(object)-(18000-20*4*(1-Math.PI/4)))<.2)
+  assert.deepEqual(parseProject(serializeProject([object])),JSON.parse(JSON.stringify([object])))
+  previous=object
+ }
+ assert.ok(counts[0]<counts[1] && counts[1]<counts[2])
+ assert.equal(bodyCurveQuality([{quality:'extra-fine'},{quality:'standard'}]),'extra-fine')
+ const malformed=JSON.parse(serializeProject([previous]));malformed.objects[0].analyticHistory.features[0].quality='ultra'
+ assert.throws(()=>parseProject(JSON.stringify(malformed)),/quality/)
+ const legacy=structuredClone(previous);delete legacy.analyticHistory.features[0].quality
+ const file=JSON.parse(serializeProject([legacy]));file.version=21
+ const loaded=parseProject(JSON.stringify(file))[0]
+ const rebuilt=(await editAnalyticFeature([loaded],[loaded.id],loaded.analyticHistory.features[0].id,{operation:'fillet',size:2})).object
+ assert.equal(decodeStlMesh(rebuilt.meshData).length,counts[1])
+})

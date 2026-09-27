@@ -11,7 +11,7 @@ export function meshCopies(count){const geometry=new BoxGeometry(20,20,20).toNon
 
 test('project 18 stores identical meshes once and restores independently editable object metadata',()=>{
  const objects=meshCopies(100),text=serializeProject(objects),file=JSON.parse(text)
- assert.equal(file.version,21);assert.equal(file.meshes.length,1)
+ assert.equal(file.version,22);assert.equal(file.meshes.length,1)
  assert.ok(file.objects.every(o=>o.meshRef===0 && !Object.hasOwn(o,'meshData')))
  assert.deepEqual(parseProject(text),objects)
  const legacy=JSON.stringify({format:'block-cad',version:17,units:'mm',objects})

@@ -1,3 +1,4 @@
+import { CURVE_QUALITIES, curveQuality, type CurveQuality } from './curveQuality'
 import { EdgeBuildError } from './edgeDiagnostics'
 import { Matrix4, Vector3 } from 'three'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
@@ -218,9 +219,10 @@ export function kernelFeature(oc: CadKernel, scope: KernelScope, shape: TopoDS_S
   if (!builder.IsDone()) throw failure()
   const result = scope.keep(builder.Shape()); validateKernelShape(oc, scope, result); return result
 }
-export function kernelMesh(oc: CadKernel, scope: KernelScope, shape: TopoDS_Shape) {
+export function kernelMesh(oc: CadKernel, scope: KernelScope, shape: TopoDS_Shape, quality: CurveQuality = 'fine') {
   // Finer chord and angle tolerances reduce visible facets at close inspection.
-  scope.keep(new oc.BRepMesh_IncrementalMesh_2(shape, .005, false, .075, false))
+  const settings = CURVE_QUALITIES[curveQuality(quality)]
+  scope.keep(new oc.BRepMesh_IncrementalMesh_2(shape, settings.linear, false, settings.angular, false))
   const writer = scope.keep(new oc.StlAPI_Writer()), path = '/block-cad.stl'
   try {
     if (!writer.Write(shape, path, scope.keep(new oc.Message_ProgressRange_1()))) throw new Error('Could not tessellate the analytic body.')

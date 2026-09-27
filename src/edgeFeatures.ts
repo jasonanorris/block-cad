@@ -1,3 +1,4 @@
+import { CURVE_QUALITIES, curveQuality, type CurveQuality } from './curveQuality'
 import { Matrix4, Vector3 } from 'three'
 import type { Manifold, Mat4 } from 'manifold-3d'
 import { type CadObject, type Vector3 as Point, isHoleObject } from './cadModel'
@@ -111,8 +112,8 @@ function encodeSolid(solid: Manifold, center = [0, 0, 0]) {
 
 // A two-edge corner keeps the third edge sharp. This variable-radius patch
 // meets both cylindrical fillets tangentially and fades into the two side faces.
-function twoEdgeCorner(radius: number, runtime: Awaited<ReturnType<typeof loadManifold>>) {
-  const steps = 32, pad = Math.max(1, radius * .01)
+function twoEdgeCorner(radius: number, steps: number, runtime: Awaited<ReturnType<typeof loadManifold>>) {
+  const pad = Math.max(1, radius * .01)
   const samples = [-pad, ...Array.from({ length: steps + 1 }, (_, i) => radius * (1 - Math.cos(i * Math.PI / (2 * steps))))]
   const count = samples.length, vertices: number[] = [], triangles: number[] = []
   for (const zLayer of [0, 1]) for (const y of samples) for (const x of samples) {
@@ -139,6 +140,7 @@ function twoEdgeCorner(radius: number, runtime: Awaited<ReturnType<typeof loadMa
 // Resolve each edge against the same input. Shared chamfers meet at sharp miters;
 // two perpendicular fillets receive a tangent patch; three receive a sphere.
 function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<ReturnType<typeof loadManifold>>, blended = false): Manifold {
+  const quality = CURVE_QUALITIES[curveQuality(feature.quality)]
   if (!['fillet', 'chamfer'].includes(feature.operation) || !Number.isFinite(feature.size) || feature.size < .01 || feature.size > 10000) throw new Error('Enter a radius or distance from 0.01 to 10,000 mm.')
   if (!feature.edges.length || feature.edges.length > MAX_FEATURE_EDGES) throw new Error(`Select 1 to ${MAX_FEATURE_EDGES} edges.`)
   const available = solidEdges(solid, blended)
@@ -193,7 +195,7 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
       const tangentA: [number, number] = [0, distance]
       let profile: [number, number][] = [[0, 0], tangentB, tangentA]
       if (operation === 'fillet') {
-        const sweep = Math.PI - angle, segments = Math.max(2, Math.ceil(sweep / (Math.PI / 96)))
+        const sweep = Math.PI - angle, segments = Math.max(2, Math.ceil(sweep / (Math.PI / (2 * quality.arcSteps))))
         const arc = Array.from({ length: segments + 1 }, (_, i): [number, number] => {
           if (i === 0) return tangentB
           if (i === segments) return tangentA
@@ -230,10 +232,10 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
       // edges, leave the third edge sharp; for three, use a spherical octant.
       const frame = new Matrix4().makeBasis(...corner.axes as [Vector3, Vector3, Vector3]).setPosition(corner.origin)
       let patch: Manifold
-      if (corner.paired) patch = track(twoEdgeCorner(radius, runtime))
+      if (corner.paired) patch = track(twoEdgeCorner(radius, quality.cornerSteps, runtime))
       else {
         const cube = track(runtime.Manifold.cube([radius, radius, radius]))
-        const sphere = track(runtime.Manifold.sphere(radius, 128))
+        const sphere = track(runtime.Manifold.sphere(radius, quality.sphereSegments))
         const centered = track(sphere.translate([radius, radius, radius]))
         patch = track(cube.subtract(centered))
       }
@@ -263,7 +265,7 @@ async function rebuild(object: Extract<CadObject, { type: 'stl' }>, history: Edg
   } finally { result.delete() }
 }
 
-export async function previewEdgeFeature(objects: CadObject[], ids: string[], picked: FeatureEdge | FeatureEdge[], operation: EdgeOperation, size: number) {
+export async function previewEdgeFeature(objects: CadObject[], ids: string[], picked: FeatureEdge | FeatureEdge[], operation: EdgeOperation, size: number, quality: CurveQuality = 'fine') {
   const edges = Array.isArray(picked) ? picked : [picked]
   const editable = historyObject(objects, ids), unit = selectedUnit(objects, ids)
   let object: Extract<CadObject, { type: 'stl' }>, history: EdgeHistory, localEdges: StoredEdge[]
@@ -286,11 +288,11 @@ export async function previewEdgeFeature(objects: CadObject[], ids: string[], pi
     localEdges = edges.map((edge) => transformEdge(edge, objectMatrix(object).invert()))
   }
   if (history.features.length >= MAX_EDGE_FEATURES) throw new Error(`A body supports up to ${MAX_EDGE_FEATURES} edge features.`)
-  const feature: EdgeFeature = { id: crypto.randomUUID(), operation, size, edges: localEdges }
+  const feature: EdgeFeature = { id: crypto.randomUUID(), operation, size, quality: curveQuality(quality), edges: localEdges }
   return { object: await rebuild(object, { ...history, features: [...history.features, feature] }), replacedIds: [...unit.ids] }
 }
 
-export async function editEdgeFeature(objects: CadObject[], ids: string[], featureId: string, change: { operation: EdgeOperation; size: number } | null) {
+export async function editEdgeFeature(objects: CadObject[], ids: string[], featureId: string, change: { operation: EdgeOperation; size: number; quality?: CurveQuality } | null) {
   const object = historyObject(objects, ids)
   if (!object) throw new Error('Select a body with editable edge features.')
   if (!object.edgeHistory!.features.some((feature) => feature.id === featureId)) throw new Error('This feature no longer exists.')

@@ -1,3 +1,4 @@
+import { curveQuality, type CurveQuality } from './curveQuality'
 import { EdgeBuildError } from './edgeDiagnostics'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CadObject } from './cadModel'
@@ -16,6 +17,7 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
   const [selected, setSelected] = useState<number[]>([])
   const [editing, setEditing] = useState<string | null>(null), [removing, setRemoving] = useState(false)
   const [operation, setOperation] = useState<EdgeOperation>('fillet')
+  const [quality, setQuality] = useState<CurveQuality>('fine')
   const [size, setSize] = useState('2')
   const [preferAdvanced, setPreferAdvanced] = useState(false)
   const [edgeSizes, setEdgeSizes] = useState<Record<number, string>>({})
@@ -37,7 +39,7 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
     finally { if (current === generation.current) setBusy(false) }
   }
   async function edit(feature: EdgeFeature, remove = false) {
-    cancel(); onBegin(); setEditing(feature.id); setOperation(feature.operation); setSize(String(feature.size)); setRemoving(remove); setEdgeSizes(Object.fromEntries(feature.edges.map((edge, index) => [index, edge.size === undefined ? '' : String(edge.size)])))
+    cancel(); onBegin(); setEditing(feature.id); setOperation(feature.operation); setQuality(curveQuality(feature.quality)); setSize(String(feature.size)); setRemoving(remove); setEdgeSizes(Object.fromEntries(feature.edges.map((edge, index) => [index, edge.size === undefined ? '' : String(edge.size)])))
     if (advanced && !remove) {
       const current = ++generation.current; setBusy(true)
       try { const result = await jobs.run('edges', { objects, ids, advanced: true, featureId: feature.id }); if (current === generation.current) setEditingEdges(result) }
@@ -51,14 +53,14 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
     const value = size.trim() ? Number(size) : NaN
     try {
       const result = editing
-        ? await jobs.run('edgeEdit', { objects, ids, advanced, featureId: editing, change: removing ? null : { operation, size: value, ...(advanced ? { sizes: features.find(f => f.id === editing)!.edges.map((_, i) => edgeSizes[i]?.trim() ? Number(edgeSizes[i]) : null) } : {}) } })
-        : await jobs.run('edgePreview', { objects, ids, edges: selected.map((index) => ({ ...edges[index], ...(advanced && edgeSizes[index]?.trim() ? { size: Number(edgeSizes[index]) } : {}) })), operation, size: value, advanced })
+        ? await jobs.run('edgeEdit', { objects, ids, advanced, featureId: editing, change: removing ? null : { operation, quality, size: value, ...(advanced ? { sizes: features.find(f => f.id === editing)!.edges.map((_, i) => edgeSizes[i]?.trim() ? Number(edgeSizes[i]) : null) } : {}) } })
+        : await jobs.run('edgePreview', { objects, ids, edges: selected.map((index) => ({ ...edges[index], ...(advanced && edgeSizes[index]?.trim() ? { size: Number(edgeSizes[index]) } : {}) })), operation, quality, size: value, advanced })
       if (current === generation.current) setPreviewState({ objects, ids, result })
     } catch (reason) { if (current === generation.current) { setError(reason instanceof Error ? reason.message : 'Could not preview these edges.'); setFailedKeys(reason instanceof EdgeBuildError ? reason.edgeKeys : []) } }
     finally { if (current === generation.current) setBusy(false) }
   }
   const displayEdges = editing ? editingEdges : edges
-  return { edges, displayEdges, focusedEdge, setFocusedEdge, failedKeys, selected, operation, size, advanced, analyticBody, edgeSizes,
+  return { edges, displayEdges, focusedEdge, setFocusedEdge, failedKeys, selected, operation, quality, size, advanced, analyticBody, edgeSizes,
     setAdvanced: (value: boolean) => { cancel(); setPreferAdvanced(value) },
     setEdgeSize: (index: number, value: string) => { invalidate(); setEdgeSizes(current => ({ ...current, [index]: value })) }, preview, busy, error, features, editing, removing,
     active: edges.length > 0 || !!editing || busy, start, cancel, calculate, edit,
@@ -66,6 +68,7 @@ export function useEdgeFeature(objects: CadObject[], ids: string[], onBegin: () 
     selectAll: () => { invalidate(); if (edges.length <= MAX_FEATURE_EDGES) setSelected(edges.map((_, index) => index)); else setError(`Select up to ${MAX_FEATURE_EDGES} edges per feature.`) },
     clearSelection: () => { invalidate(); setSelected([]) },
     setOperation: (value: EdgeOperation) => { invalidate(); setOperation(value) },
+    setQuality: (value: CurveQuality) => { invalidate(); setQuality(value) },
     setSize: (value: string) => { invalidate(); setSize(value) },
     apply: () => { if (preview && !busy) { onApply(preview); cancel() } },
   }

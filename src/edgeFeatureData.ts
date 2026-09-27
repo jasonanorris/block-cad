@@ -1,9 +1,10 @@
+import { curveQuality, type CurveQuality } from './curveQuality'
 import type { Vector3 } from './cadModel'
 import { decodeStlMesh } from './stlMesh'
 
 export type EdgeOperation = 'fillet' | 'chamfer'
 export type StoredEdge = { a: Vector3; b: Vector3; key?: string; size?: number }
-export type EdgeFeature = { id: string; operation: EdgeOperation; size: number; edges: StoredEdge[] }
+export type EdgeFeature = { id: string; operation: EdgeOperation; size: number; quality?: CurveQuality; edges: StoredEdge[] }
 export type EdgeHistory = { baseMeshData: string; features: EdgeFeature[] }
 export const MAX_EDGE_FEATURES = 32
 export const MAX_FEATURE_EDGES = 24
@@ -46,6 +47,6 @@ export function validateEdgeFeatures(value: unknown, advanced = false): EdgeFeat
       if (e.size !== undefined && (typeof e.size !== 'number' || !Number.isFinite(e.size) || e.size < .01 || e.size > 10000)) throw new Error('Edge overrides must be 0.01 to 10,000 mm.')
       return { a, b, ...(advanced ? { key: e.key as string, ...(e.size !== undefined ? { size: e.size as number } : {}) } : {}) }
     })
-    return { id: f.id, operation: f.operation, size: f.size, edges }
+    return { id: f.id, operation: f.operation, size: f.size, ...(f.quality !== undefined ? { quality: curveQuality(f.quality) } : {}), edges }
   })
 }
