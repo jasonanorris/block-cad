@@ -127,6 +127,8 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
   const [referenceOrigin, setReferenceOrigin] = useState<Vector3>({ x: 0, y: 0, z: 0 })
   const [workplaneHeight, setWorkplaneHeight] = useState(0)
   const [workplaneDraft, setWorkplaneDraft] = useState('0')
+  const [smoothShading, setSmoothShading] = useState(true)
+  const [wireframeOverlay, setWireframeOverlay] = useState(false)
   const [cameraView, setCameraView] = useState<CameraView>('perspective')
   const [frameRequest, setFrameRequest] = useState<FrameRequest | null>(null)
   const requestFrame = useCallback((scope: FrameRequest['scope']) => {
@@ -743,6 +745,10 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
               ))}
             </div>
           </div>
+          <div className="view-presets" role="group" aria-label="Surface display">
+            <button type="button" aria-pressed={smoothShading} onClick={() => setSmoothShading(value => !value)} title="Smooth curved facets; keep creases of 30 degrees or more sharp. Display only.">Smooth shading</button>
+            <button type="button" aria-pressed={wireframeOverlay} onClick={() => setWireframeOverlay(value => !value)} title="Show mesh triangles over solid surfaces. Display only.">Wireframe overlay</button>
+          </div>
           <div className="workspace-toolbar" aria-label="Transform tools">
             <button type="button" className={`tool-button${boxSelectEnabled ? ' is-active' : ''}`}
               aria-pressed={boxSelectEnabled} onClick={() => { setBoxSelectEnabled((enabled) => !enabled); setPickMode(null) }}>Box select</button>
@@ -791,7 +797,7 @@ export default function App({ initialObjects, recoveryNotice = '', initialAutosa
             </div>
           </div>
           <div className="workspace-frame">
-            <Workspace edgeSession={edgeActive} featureEdges={edgeTools.displayEdges} selectedEdge={edgeTools.editing ? edgeTools.displayEdges.map((_, index) => index) : edgeTools.selected} focusedEdge={edgeTools.focusedEdge} failedEdgeKeys={edgeTools.failedKeys} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
+            <Workspace smoothShading={smoothShading} wireframeOverlay={wireframeOverlay} edgeSession={edgeActive} featureEdges={edgeTools.displayEdges} selectedEdge={edgeTools.editing ? edgeTools.displayEdges.map((_, index) => index) : edgeTools.selected} focusedEdge={edgeTools.focusedEdge} failedEdgeKeys={edgeTools.failedKeys} edgePreviewing={!!edgeTools.preview} onPickEdge={edgeTools.pick} onCancelEdge={edgeTools.cancel} measurementPoints={measurementPoints} facePlane={facePlane} pickFace={pickMode !== null} onPickFace={acceptSurface} onExitFace={exitFace} onFaceError={setPositionError} referenceOrigin={referenceOrigin}
               section={section}
               objects={displayObjects}
               selectedObjectId={canTransformSelected ? selectedObjectId : null}

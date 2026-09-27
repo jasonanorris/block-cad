@@ -1,3 +1,4 @@
+import { smoothDisplayGeometry } from './displayGeometry'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { DoubleSide, FrontSide, type BufferGeometry, type Mesh, type Plane } from 'three'
@@ -28,6 +29,7 @@ const CadObjectMesh = memo(function CadObjectMesh({
   cutGeometry,
   clippingPlanes,
   surfaceReady,
+  smoothShading, wireframeOverlay,
 }: {
   object: CadObject
   isSelected: boolean
@@ -37,12 +39,18 @@ const CadObjectMesh = memo(function CadObjectMesh({
   selectedMeshRef: RefObject<Mesh | null>
   clippingPlanes: Plane[]
   surfaceReady: boolean
+  smoothShading: boolean
+  wireframeOverlay: boolean
   cutGeometry?: BufferGeometry
 }) {
   const sourceGeometry = useMemo(() => createSourceGeometry(object), [object.type, object.dimensions,
     object.type === 'svg' || object.type === 'text' ? object.contours : null, object.type === 'stl' ? object.meshData : null,
     object.type === 'prism' ? object.sides : null, object.type === 'custom' ? object.parameters : null])
   useEffect(() => () => sourceGeometry.dispose(), [sourceGeometry])
+  const baseGeometry = cutGeometry ?? sourceGeometry
+  const displayGeometry = useMemo(() => smoothShading && (cutGeometry || object.type === 'stl')
+    ? smoothDisplayGeometry(baseGeometry) : null, [baseGeometry, smoothShading, object.type, cutGeometry])
+  useEffect(() => () => displayGeometry?.dispose(), [displayGeometry])
   if (object.hidden) return null
   const { position, rotation, scale } = object
   const isCutter = isHoleObject(object)
@@ -64,27 +72,37 @@ const CadObjectMesh = memo(function CadObjectMesh({
         onSelect(object.id, event.nativeEvent.shiftKey)
       }}
     >
-      <primitive object={cutGeometry ?? sourceGeometry} attach="geometry" />
+      <primitive object={displayGeometry ?? baseGeometry} attach="geometry" />
       <meshStandardMaterial
+        key={smoothShading ? 'smooth' : 'flat'}
         clippingPlanes={clippingPlanes}
         side={clippingPlanes.length ? DoubleSide : FrontSide}
         color={isSelected ? '#f3a447' : object.color ?? DEFAULT_OBJECT_COLOR}
         emissive={isSelected ? '#5c2d00' : '#000000'}
         emissiveIntensity={isSelected ? 0.18 : 0}
         roughness={0.75}
-        flatShading={!!cutGeometry || ['cone', 'wedge', 'prism'].includes(object.type)}
+        flatShading={!smoothShading || (!cutGeometry && ['wedge', 'prism'].includes(object.type))}
+        polygonOffset={wireframeOverlay && !wireframe}
+        polygonOffsetFactor={1}
+        polygonOffsetUnits={1}
         wireframe={wireframe}
         transparent={wireframe}
         opacity={wireframe ? 0.55 : 1}
         depthTest={!wireframe}
         depthWrite={!wireframe}
       />
+      {wireframeOverlay && !wireframe && <mesh raycast={() => {}} renderOrder={2} userData={{ inspectionWireframe: true }}>
+        <primitive object={baseGeometry} attach="geometry" />
+        <meshBasicMaterial wireframe color="#24374d" transparent opacity={0.45} depthWrite={false}
+          clippingPlanes={clippingPlanes} side={clippingPlanes.length ? DoubleSide : FrontSide} />
+      </mesh>}
     </mesh>
   )
 })
 
 function CadScene({
   objects,
+  smoothShading, wireframeOverlay,
   selectedObjectId,
   selectedObjectIds,
   onSelectObject,
@@ -139,6 +157,7 @@ function CadScene({
         <CadObjectMesh
           key={object.id}
           object={object}
+          smoothShading={smoothShading} wireframeOverlay={wireframeOverlay}
           surfaceReady={!pendingSurfaces.has(object.id)}
           isSelected={selectedObjectIds.includes(object.id)}
           isActive={object.id === selectedObjectId}
@@ -177,6 +196,8 @@ function CadScene({
 }
 
 type WorkspaceProps = {
+  smoothShading: boolean
+  wireframeOverlay: boolean
   edgeSession: boolean
   featureEdges: FeatureEdge[]
   selectedEdge: number[]

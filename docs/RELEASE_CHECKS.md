@@ -97,3 +97,9 @@ The font licenses are shipped in `public/licenses/helvetiker.txt` and `public/li
 - Advanced CAD starts from all native primitives, tubes, rounded boxes, L-brackets, and their analytic joins/cuts. Imported or baked meshes retain mesh-tool support. The on-demand WASM is about 48 MiB uncompressed / 14 MB gzip and starts with a 100 MiB heap. See ADVANCED_FILLETS.md for implementation and limits.
 
 - Expanded sources: verify cone base-rim fillets, tube-rim fillets, bracket edges, sides-only rounded-box edges, and edges created by cutting spheres/all-edge rounded boxes. Check analytic dimensions/volumes, radius zero and maximum-radius rounded boxes (including spheres/capsules), Save/Load, feature editing, transforms, and STL/3MF exports. Smooth spheres must not offer their parameter seam as an edge.
+
+## Surface display
+
+- Toggle Smooth shading on a filleted body: curved lighting blends, box corners stay sharp, and switching back shows individual facets.
+- Toggle Wireframe overlay: triangle edges appear over visible solids, stay clipped in section view, and do not intercept selection or edge picks. Hidden/grouped sources must not gain an overlay.
+- Verify display toggles preserve vertex positions, saved project data, export geometry, and Undo/Redo; dispose derived display geometry when objects change.

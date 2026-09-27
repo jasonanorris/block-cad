@@ -17,6 +17,10 @@ Open **Create → Example projects**, choose the nameplate, section demo, or eig
 
 Point at the detail and scroll to zoom toward it. Perspective and flat views support close inspection of small edges and fillets. Use **Frame selection** or **Frame all** to return to a useful overview if you zoom past the surface.
 
+**Smooth shading** (on by default) blends the lighting across curved mesh facets while retaining creases of 30° or more. Turn it off to inspect flat triangle faces. Native wedges and prisms retain their planar faces. Shallow angular edges in imported or baked meshes may also look smooth because these meshes do not identify which surfaces were originally curves.
+
+**Wireframe overlay** draws triangle edges over the solids, follows section clipping, and leaves selection and edge picking available. Use it with smooth shading off to inspect tessellation. Both buttons are above the workspace tools; they affect only the current view, never saved meshes, dimensions, STL, or 3MF exports.
+
 ## Find tools
 
 The right sidebar shows one tool tab at a time:
