@@ -112,7 +112,7 @@ function encodeSolid(solid: Manifold, center = [0, 0, 0]) {
 // A two-edge corner keeps the third edge sharp. This variable-radius patch
 // meets both cylindrical fillets tangentially and fades into the two side faces.
 function twoEdgeCorner(radius: number, runtime: Awaited<ReturnType<typeof loadManifold>>) {
-  const steps = 24, pad = Math.max(1, radius * .01)
+  const steps = 32, pad = Math.max(1, radius * .01)
   const samples = [-pad, ...Array.from({ length: steps + 1 }, (_, i) => radius * (1 - Math.cos(i * Math.PI / (2 * steps))))]
   const count = samples.length, vertices: number[] = [], triangles: number[] = []
   for (const zLayer of [0, 1]) for (const y of samples) for (const x of samples) {
@@ -193,7 +193,7 @@ function applyFeature(solid: Manifold, feature: EdgeFeature, runtime: Awaited<Re
       const tangentA: [number, number] = [0, distance]
       let profile: [number, number][] = [[0, 0], tangentB, tangentA]
       if (operation === 'fillet') {
-        const sweep = Math.PI - angle, segments = Math.max(2, Math.ceil(sweep / (Math.PI / 48)))
+        const sweep = Math.PI - angle, segments = Math.max(2, Math.ceil(sweep / (Math.PI / 96)))
         const arc = Array.from({ length: segments + 1 }, (_, i): [number, number] => {
           if (i === 0) return tangentB
           if (i === segments) return tangentA

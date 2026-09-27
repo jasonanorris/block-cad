@@ -219,7 +219,8 @@ export function kernelFeature(oc: CadKernel, scope: KernelScope, shape: TopoDS_S
   const result = scope.keep(builder.Shape()); validateKernelShape(oc, scope, result); return result
 }
 export function kernelMesh(oc: CadKernel, scope: KernelScope, shape: TopoDS_Shape) {
-  scope.keep(new oc.BRepMesh_IncrementalMesh_2(shape, .02, false, .15, false))
+  // Finer chord and angle tolerances reduce visible facets at close inspection.
+  scope.keep(new oc.BRepMesh_IncrementalMesh_2(shape, .005, false, .075, false))
   const writer = scope.keep(new oc.StlAPI_Writer()), path = '/block-cad.stl'
   try {
     if (!writer.Write(shape, path, scope.keep(new oc.Message_ProgressRange_1()))) throw new Error('Could not tessellate the analytic body.')
